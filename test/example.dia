@@ -1,0 +1,56 @@
+# Example dialog script
+
+var playerName = "Hero"
+var health = 100
+var score = 0
+
+func greet()
+	Hello there, player!
+	@show_portrait "hero_happy"
+	@change_expresion "happy" "niz"
+end
+
+if (health > 50)
+	You are feeling healthy.
+	@playSound "health_full"
+elseif (health > 20)
+	You are getting tired.
+	@playSound "health_low"
+else
+	You need to rest!
+	@playSound "health_critical"
+end
+
+Welcome to the adventure game!
+What would you like to do?
+
+switch (choice)
+	case 1
+		You chose to explore.
+		@loadScene "forest" fast
+	case 2
+		You chose to rest.
+		@heal_player 50
+	case 3
+		You chose to quit.
+		@exitGame
+end
+
+The end of the story.
+
+
+
+# This is a comment
+var x = 10
+func abc()
+	This is inside the function
+	@change_expresion "happy" "niz"
+	@playSound sound_effect
+end
+
+if (x > 5) 
+	x is greater than 5
+	@show_message "You did it!"
+end
+
+This is also a line of dialog.

@@ -1,0 +1,3 @@
+--class-path test
+--library nz-dialog
+--run Main

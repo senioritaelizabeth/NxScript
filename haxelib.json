@@ -1,0 +1,12 @@
+{
+  "name": "nz-dialog",
+  "url": "https://github.com/senioritaelizabeth/Nz-Dialogue",
+  "license": "MIT",
+  "tags": ["dialog", "tokenizer"],
+  "description": "Ehrm, ehrm",
+  "version": "0.1.0",
+  "classPath": "src/",
+  "releasenote": "Initial release",
+  "contributors": ["senioritaelizabeth"],
+  "dependencies": {}
+}

@@ -13,11 +13,13 @@ Nz-Dialogue is a scripting system that lets you write dialogue and game logic in
 ### Installation
 
 1. Add this to your project:
+
 ```bash
 haxelib git nz-dialogue https://github.com/senioritaelizabeth/Nz-Dialogue.git
 ```
 
 2. Add it to your `.hxml` file:
+
 ```
 -lib nz-dialogue
 ```
@@ -46,18 +48,18 @@ var executor = new Executor(blocks);
 // Execute step by step
 while (executor.hasNext()) {
     var result = executor.nextExecute();
-    
+
     switch (result) {
         case ERDialog(text):
             trace("Character says: " + text);
-        
+
         case ERAtCall(command, args):
             trace("Command: " + command);
             // Handle your custom commands here
-        
+
         case ERVar(name, value):
             trace("Variable set: " + name + " = " + value);
-        
+
         default:
             // Other execution results
     }

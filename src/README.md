@@ -26,6 +26,7 @@ src/nz/
 ## Module Overview
 
 ### Tokenizer
+
 - **Purpose**: Lexical analysis
 - **Input**: Raw dialogue source code (`.dia` files)
 - **Output**: Stream of tokens
@@ -34,6 +35,7 @@ src/nz/
   - `Tokenizer`: Converts source code into tokens
 
 ### Parser
+
 - **Purpose**: Syntax analysis
 - **Input**: Token stream
 - **Output**: Abstract Syntax Tree (AST)
@@ -42,6 +44,7 @@ src/nz/
   - `Parser`: Converts tokens into executable blocks
 
 ### Executor
+
 - **Purpose**: Runtime execution
 - **Input**: AST blocks
 - **Output**: Executes dialogue with control flow
@@ -51,6 +54,7 @@ src/nz/
   - `CallbackHandler`: Interface for custom @commands
 
 ### Storage
+
 - **Purpose**: Code serialization
 - **Input**: Token stream
 - **Output**: Reconstructed source code
@@ -60,6 +64,7 @@ src/nz/
 ## Usage
 
 ### Simple Usage (Recommended)
+
 ```haxe
 import nz.tokenizer.Tokenizer;
 import nz.parser.Parser;
@@ -76,16 +81,6 @@ while (executor.hasNext()) {
     var result = executor.nextExecute();
     // Handle result...
 }
-```
-
-### Legacy Compatibility
-```haxe
-import nz.Dialogue;
-
-// Old names still work
-var tokenizer = new DiaTokenizer(sourceCode);
-var parser = new DiaParser(tokens);
-var executor = new DiaExecutor(blocks);
 ```
 
 ## Design Principles

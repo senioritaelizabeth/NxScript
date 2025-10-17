@@ -1,16 +1,47 @@
-import sys.io.File;
-import nz.DiaTokenizer;
+﻿import sys.io.File;
+import tests.TokenizerTest;
+import tests.ParserTest;
+import tests.ExecutorTest;
+import tests.FunctionCallTest;
+import tests.TokenStorageTest;
+import tests.FlowTest;
 
 class Main {
 	static function main() {
-		var script = File.getContent("test/example.dia");
+		trace("==================================================");
+		trace("           Nz-Dialogue Test Suite");
+		trace("==================================================\n");
 
-		var tokenizer = new DiaTokenizer(script);
-		var tokens = tokenizer.tokenize();
+		var exampleScript = File.getContent("test/examples/example.dia");
+		var functionScript = File.getContent("test/examples/function_test.dia");
 
-		trace("=== TOKENS ===");
-		for (t in tokens) {
-			trace('Line ${t.line}, Col ${t.col}: ${t.token}');
+		var passedTests = 0;
+		var totalTests = 6;
+
+		if (TokenizerTest.run(exampleScript))
+			passedTests++;
+		if (ParserTest.run(exampleScript))
+			passedTests++;
+		if (ExecutorTest.run(exampleScript))
+			passedTests++;
+		if (FunctionCallTest.run(functionScript))
+			passedTests++;
+		if (TokenStorageTest.run(exampleScript))
+			passedTests++;
+		if (FlowTest.run(functionScript))
+			passedTests++;
+
+		trace("==================================================");
+		trace("                  SUMMARY");
+		trace("==================================================");
+		trace('Tests passed: ${passedTests}/${totalTests}');
+
+		if (passedTests == totalTests) {
+			trace("Status: ALL TESTS PASSED");
+		} else {
+			trace("Status: SOME TESTS FAILED");
 		}
+
+		trace("finished~");
 	}
 }

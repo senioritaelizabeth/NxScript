@@ -1,0 +1,30 @@
+# Test function calls
+
+var counter = 0
+
+func sayHello
+	Hello from sayHello function!
+	Counter is now incremented.
+end
+
+func showInfo
+	This is the info function.
+	It can display multiple lines.
+	@playSound info_sound
+end
+
+# Main script starts here
+Starting the script...
+
+# Call function using @
+@sayHello
+
+Some dialog in between.
+
+# Call another function
+@showInfo
+
+# Call the first function again
+@sayHello
+
+End of script.

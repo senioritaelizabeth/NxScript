@@ -1,20 +1,27 @@
-package nz;
+package nz.tokenizer;
 
-import nz.Token;
+import nz.tokenizer.Token;
+import nz.storage.TokenStorage;
 
 using StringTools;
 
-class DiaTokenizer {
+/**
+ * Tokenizer for the dialogue language
+ * Converts source code into a stream of tokens
+ */
+class Tokenizer {
 	var input:String;
 	var pos:Int = 0;
 	var line:Int = 1;
 	var col:Int = 1;
+	var storage:TokenStorage;
 
 	static var keywords = ["var", "func", "if", "elseif", "else", "switch", "case", "end", "return"];
 	static var operators = ["+", "-", "*", "/", "==", "!=", "<=", ">=", "<", ">", "and", "or"];
 
 	public function new(input:String) {
 		this.input = input.replace('\r\n', '\n').replace('\r', '\n');
+		this.storage = new TokenStorage();
 	}
 
 	public function tokenize():Array<TokenPos> {
@@ -467,5 +474,10 @@ class DiaTokenizer {
 
 	private function isAlphaNum(ch:String):Bool {
 		return isAlpha(ch) || isDigit(ch);
+	}
+
+	// Save tokens to file
+	public function saveTokens(tokens:Array<TokenPos>, filePath:String):Void {
+		storage.save(tokens, filePath);
 	}
 }

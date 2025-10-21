@@ -1,0 +1,276 @@
+# ============================================
+# Nz-Dialogue Complete Test Suite
+# ============================================
+# This file contains all tests for the dialogue system
+
+# ============================================
+# SECTION 1: BASIC FEATURES
+# ============================================
+
+# Test variables
+var playerName = "Hero"
+var health = 100
+var score = 0
+var x = 10
+var y = 15
+
+# Test comments - this is a comment
+
+# Test basic dialog
+Hello there, player!
+
+# Test function definition
+func greet()
+	Welcome to the adventure game!
+end
+
+func farewell()
+	Goodbye, see you next time!
+end
+
+# Test if statement
+if (health > 50)
+	You are feeling healthy.
+end
+
+if (health < 30)
+	You need to rest.
+end
+
+# Test at-commands
+@playSound health_full
+@show_message You did it!
+
+# ============================================
+# SECTION 2: CONTROL FLOW
+# ============================================
+
+# Test switch statement
+switch (x)
+	case 10
+		X equals ten
+	case 20
+		X equals twenty
+end
+
+# Test nested if-else
+if (score > 100)
+	High score!
+elseif (score > 50)
+	Good score!
+else
+	Keep trying!
+end
+
+# ============================================
+# SECTION 3: FUNCTIONS
+# ============================================
+
+var counter = 0
+
+func sayHello()
+	Hello from sayHello function!
+	Counter is now incremented.
+end
+
+func showInfo()
+	This is the info function.
+	It can display multiple lines.
+	@playSound info_sound
+end
+
+Starting the script...
+
+@sayHello
+
+Some dialog in between.
+
+@showInfo
+
+@sayHello
+
+End of script.
+
+# ============================================
+# SECTION 4: OPERATORS - ARITHMETIC
+# ============================================
+
+var a = 10
+var b = 5
+var c = 0
+
+var sum = a + b
+var diff = a - b
+var mult = a * b
+var div = a / b
+
+# ============================================
+# SECTION 5: OPERATORS - COMPARISON
+# ============================================
+
+if (a > b)
+	A is greater than B
+end
+
+if (a >= 10)
+	A is greater or equal to 10
+end
+
+if (b < a)
+	B is less than A
+end
+
+if (b <= 5)
+	B is less or equal to 5
+end
+
+if (a == 10)
+	A equals 10
+end
+
+if (b != 10)
+	B is not equal to 10
+end
+
+# ============================================
+# SECTION 6: OPERATORS - LOGICAL
+# ============================================
+
+# Test AND operator with symbols
+if (x > 5 && y < 20)
+	Both conditions are true (AND with &&)
+end
+
+# Test AND operator with words
+if (x > 5 and y < 20)
+	Both conditions are true (AND with 'and')
+end
+
+# Test OR operator with symbols
+if (a == 0 || b == 0)
+	At least one is zero (OR with ||)
+end
+
+# Test OR operator with words
+if (a == 0 or b == 0)
+	At least one is zero (OR with 'or')
+end
+
+# Test NOT operator with symbol
+if (!(a == 0))
+	A is not zero (NOT with !)
+end
+
+# Test NOT operator with word
+if (not a == 0)
+	A is not zero (NOT with 'not')
+end
+
+# Test complex conditions
+if (a > 5 && b < 10 && c == 0)
+	All three conditions are true
+end
+
+if ((a > 5 && b < 10) || c == 1)
+	First part is true OR second part
+end
+
+# Test with zero and positive
+if (a > 0)
+	A is positive
+end
+
+if (b > 0)
+	B is also positive
+end
+
+if (c == 0)
+	C is zero
+end
+
+# Test negative conditions
+if (a > 100 && b > 100)
+	This should not appear (both false)
+end
+
+if (!(a > 100 && b > 100))
+	At least one is not greater than 100
+end
+
+if (a > 50)
+	A is very large
+elseif (a > 20 && a <= 50)
+	A is medium
+elseif (a > 10 && a <= 20)
+	A is small-medium
+else
+	A is small or equal to 10
+end
+
+# ============================================
+# SECTION 7: BOOLEAN VARIABLES & NOT OPERATOR
+# ============================================
+
+var isActive = true
+var isReady = false
+
+if (isActive)
+	System is active
+end
+
+# Test NOT operator with !
+if (!isReady)
+	System is not ready (using !)
+end
+
+# Test NOT operator with word
+if (not isReady)
+	System is not ready (using not)
+end
+
+# Test combined with AND (&&)
+if (isActive && !isReady)
+	Active but not ready (&&)
+end
+
+# Test combined with AND (word)
+if (isActive and not isReady)
+	Active but not ready (and/not)
+end
+
+# Test NOT with parentheses
+if (not (a == 0))
+	A is not zero (not)
+end
+
+if (!(a == 0))
+	A is not zero (!)
+end
+
+# ============================================
+# SECTION 8: COMPLEX SCENARIOS
+# ============================================
+
+func complexTest(value)
+	if (value > 50)
+		Value is high
+		return value
+	end
+	Value is low
+	return 0
+end
+
+@complexTest 75
+
+# Test nested control structures
+if (isActive)
+	if (isReady)
+		System is active and ready
+	else
+		System is active but not ready
+	end
+else
+	System is not active
+end
+
+All tests completed!

@@ -1,12 +1,12 @@
 {
-  "name": "nz-dialog",
+  "name": "nzlang-suite",
   "url": "https://github.com/senioritaelizabeth/Nz-Dialogue",
   "license": "MIT",
-  "tags": ["dialog", "tokenizer"],
-  "description": "Ehrm, ehrm",
-  "version": "0.1.0",
+  "tags": ["scripting", "bytecode", "dialogue", "vm", "compiler", "interpreter"],
+  "description": "NzLang Suite - A comprehensive suite of scripting languages for Haxe: Nz-Script (bytecode VM), Nz-Dialogue (interactive conversations), and Nz-Cinematic (cutscenes)",
+  "version": "1.0.0",
   "classPath": "src/",
-  "releasenote": "Initial release",
+  "releasenote": "Complete rewrite: Added Nz-Script bytecode language with hex opcodes, stack-based VM, functions, lambdas, arrays, dictionaries, and full debugging support",
   "contributors": ["senioritaelizabeth"],
   "dependencies": {}
 }

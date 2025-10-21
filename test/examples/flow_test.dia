@@ -1,9 +1,0 @@
-# Test del flujo de ejecución
-
-func abc
-	Hola
-end
-
-Hola! voy a hablarte de algo
-@abc
-Hehe, fue todo!

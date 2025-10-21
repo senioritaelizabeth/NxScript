@@ -1,0 +1,4 @@
+# Run the complete Nz-Script example
+-cp src
+-main RunExample
+--interp

@@ -2,7 +2,7 @@
 
 > Una suite completa de lenguajes de scripting para proyectos Haxe
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Haxe](https://img.shields.io/badge/language-Haxe-orange.svg)](https://haxe.org)
 
 [🇬🇧 Read in English](README.md)
@@ -536,7 +536,7 @@ haxe run_example.hxml
 
 ## 📄 Licencia
 
-Licencia MIT - Libre para usar en tus proyectos sin restricciones.
+Licencia Apache 2.0 - Libre para usar en tus proyectos sin restricciones.
 
 ---
 

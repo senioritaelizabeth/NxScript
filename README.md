@@ -2,7 +2,7 @@
 
 > A comprehensive suite of scripting languages for Haxe projects
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Haxe](https://img.shields.io/badge/language-Haxe-orange.svg)](https://haxe.org)
 
 [🇪🇸 Leer en Español](README_ES.md)
@@ -13,11 +13,11 @@
 
 ### The Three Languages
 
-| Language | Extension | Purpose | Status |
-|----------|-----------|---------|--------|
-| **Nz-Script** | `.nzs` | General-purpose bytecode scripting | ✅ Ready |
-| **Nz-Dialogue** | `.dia` | Interactive dialogue and conversations | ✅ Ready |
-| **Nz-Cinematic** | `.cin` | Cutscenes and camera sequences | 🚧 Coming Soon |
+| Language         | Extension | Purpose                                | Status         |
+| ---------------- | --------- | -------------------------------------- | -------------- |
+| **Nz-Script**    | `.nzs`    | General-purpose bytecode scripting     | ✅ Ready       |
+| **Nz-Dialogue**  | `.dia`    | Interactive dialogue and conversations | ✅ Ready       |
+| **Nz-Cinematic** | `.cin`    | Cutscenes and camera sequences         | 🚧 Coming Soon |
 
 ---
 
@@ -112,15 +112,15 @@ class Game {
     static function main() {
         // Create interpreter
         var interp = new Interpreter(false);
-        
+
         // Load and run script
         var script = sys.io.File.getContent("game.nzs");
         var result = interp.run(script, "game.nzs");
-        
+
         // Access/modify variables from Haxe
         interp.vm.variables.set("player_health", VNumber(100));
         var health = interp.vm.variables.get("player_health");
-        
+
         // Call script functions from Haxe
         trace("Script executed successfully!");
     }
@@ -172,7 +172,7 @@ end
 func giveQuest
     We have a problem with bandits nearby.
     Can you help us?
-    
+
     @showQuestUI "Defeat the Bandits"
     questCompleted = false
 end
@@ -180,11 +180,11 @@ end
 func questReward
     Thank you for your help!
     Here is your reward.
-    
+
     gold = gold + 100
     @giveItem "Magic Sword"
     @playSound "reward"
-    
+
     You have earned 100 gold!
 end
 
@@ -198,11 +198,11 @@ switch (playerChoice)
         @giveQuest
         Elder: Good luck, hero!
         @fadeOut
-        
+
     case 2
         Elder: I understand. Come back if you change your mind.
         @endDialogue
-        
+
     case 3
         Elder: The market is just down the road.
 end
@@ -227,42 +227,42 @@ import nz.dialogue.executor.Executor;
 
 class DialogueSystem {
     var executor:Executor;
-    
+
     public function loadDialogue(filename:String) {
         var script = sys.io.File.getContent(filename);
-        
+
         var tokenizer = new Tokenizer(script);
         var tokens = tokenizer.tokenize();
-        
+
         var parser = new Parser(tokens);
         var blocks = parser.parse();
-        
+
         executor = new Executor(blocks);
     }
-    
+
     public function update() {
         if (executor.hasNext()) {
             var result = executor.nextExecute();
-            
+
             switch (result) {
                 case ERDialog(text):
                     // Show dialogue text to player
                     showDialogueBox(text);
-                    
+
                 case ERAtCall(command, args):
                     // Handle game commands
                     handleCommand(command, args);
-                    
+
                 case ERVar(name, value):
                     // Variable was set
                     trace('Variable $name = $value');
-                    
+
                 default:
                     // Other execution results
             }
         }
     }
-    
+
     function handleCommand(cmd:String, args:Array<Dynamic>) {
         switch (cmd) {
             case "showQuestUI":
@@ -280,7 +280,7 @@ class DialogueSystem {
 
 ---
 
-## 🎬 Nz-Cinematic *(Coming Soon)*
+## 🎬 Nz-Cinematic _(Coming Soon)_
 
 A specialized language for cutscenes, camera movements, and cinematic sequences.
 
@@ -320,7 +320,8 @@ haxe test.hxml
 ```
 
 Tests include:
-- ✅ Arithmetic operations (+, -, *, /, %)
+
+- ✅ Arithmetic operations (+, -, \*, /, %)
 - ✅ Variables (let, var, const)
 - ✅ Functions and recursion
 - ✅ Lambda expressions
@@ -339,6 +340,7 @@ haxe all.hxml
 ```
 
 Tests include:
+
 - ✅ Variable declarations and assignments
 - ✅ Function definitions and calls
 - ✅ @Commands
@@ -360,6 +362,7 @@ haxe run_example.hxml
 ```
 
 The example demonstrates:
+
 - Variables and constants
 - All arithmetic operations
 - String and number methods
@@ -376,6 +379,7 @@ The example demonstrates:
 ### Try Nz-Dialogue Examples
 
 Check the `tests/all_tests.dia` file for a comprehensive dialogue example with:
+
 - Variable management
 - Function calls
 - Branching dialogues
@@ -420,6 +424,7 @@ nzlang-suite/
 ## 🎯 Use Cases
 
 ### Nz-Script is Perfect For:
+
 - 🎮 Game logic and mechanics
 - 🔧 Configuration with dynamic logic
 - 🎲 Procedural generation rules
@@ -428,6 +433,7 @@ nzlang-suite/
 - 📚 Educational programming
 
 ### Nz-Dialogue is Perfect For:
+
 - 💬 RPG dialogue systems
 - 📖 Interactive fiction
 - 🎭 Visual novels
@@ -495,17 +501,17 @@ executor.setVariable(name:String, value:Dynamic):Void
 
 ## 🌟 Why Choose NzLang Suite?
 
-| Feature | Benefit |
-|---------|---------|
-| 🚀 **Easy to Learn** | Clean, minimal syntax |
-| ⚡ **Fast Execution** | Bytecode compilation for performance |
-| 🔧 **Flexible** | Three specialized languages for different needs |
-| 🎯 **Purpose-Built** | Each language optimized for its domain |
-| 📦 **Haxe Native** | Seamless integration with Haxe projects |
-| 🐛 **Debuggable** | Full line/column tracking |
-| 🧪 **Battle-Tested** | 72+ tests across all modules |
-| 📖 **Well Documented** | Complete examples and guides |
-| 🆓 **Free & Open** | No restrictions, use anywhere |
+| Feature                | Benefit                                         |
+| ---------------------- | ----------------------------------------------- |
+| 🚀 **Easy to Learn**   | Clean, minimal syntax                           |
+| ⚡ **Fast Execution**  | Bytecode compilation for performance            |
+| 🔧 **Flexible**        | Three specialized languages for different needs |
+| 🎯 **Purpose-Built**   | Each language optimized for its domain          |
+| 📦 **Haxe Native**     | Seamless integration with Haxe projects         |
+| 🐛 **Debuggable**      | Full line/column tracking                       |
+| 🧪 **Battle-Tested**   | 72+ tests across all modules                    |
+| 📖 **Well Documented** | Complete examples and guides                    |
+| 🆓 **Free & Open**     | No restrictions, use anywhere                   |
 
 ---
 
@@ -536,7 +542,7 @@ haxe run_example.hxml
 
 ## 📄 License
 
-MIT License - Free to use in your projects with no restrictions.
+Apache 2.0 License - Free to use in your projects with no restrictions.
 
 ---
 

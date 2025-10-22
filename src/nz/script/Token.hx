@@ -8,6 +8,10 @@ enum Keyword {
 	KVar; // var - external variable
 	KConst; // const - constant
 	KFunc; // func - function
+	KClass; // class - class declaration
+	KExtends; // extends - class inheritance
+	KNew; // new - instantiation
+	KThis; // this - self reference
 	KReturn; // return
 	KIf; // if
 	KElse; // else

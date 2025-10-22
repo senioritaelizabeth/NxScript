@@ -60,6 +60,9 @@ class Op {
 	public static inline var SET_MEMBER = 0x73; // Set object member
 	public static inline var GET_INDEX = 0x74; // Get indexed value
 	public static inline var SET_INDEX = 0x75; // Set indexed value
+	public static inline var MAKE_CLASS = 0x76; // Create a class
+	public static inline var INSTANTIATE = 0x77; // Create class instance
+	public static inline var GET_THIS = 0x78; // Get 'this' reference
 
 	// Iterations (0x80 - 0x8F)
 	public static inline var GET_ITER = 0x80; // Get iterator from iterable
@@ -119,6 +122,9 @@ class Op {
 			case SET_MEMBER: "SET_MEMBER";
 			case GET_INDEX: "GET_INDEX";
 			case SET_INDEX: "SET_INDEX";
+			case MAKE_CLASS: "MAKE_CLASS";
+			case INSTANTIATE: "INSTANTIATE";
+			case GET_THIS: "GET_THIS";
 			case GET_ITER: "GET_ITER";
 			case FOR_ITER: "FOR_ITER";
 			case LOAD_NULL: "LOAD_NULL";
@@ -156,6 +162,14 @@ typedef FunctionChunk = {
 	isLambda:Bool
 }
 
+typedef ClassData = {
+	name:String,
+	superClass:Null<String>,
+	methods:Map<String, FunctionChunk>,
+	fields:Map<String, Value>, // Default field values
+	constructor:Null<FunctionChunk>
+}
+
 enum Value {
 	VNumber(v:Float);
 	VString(v:String);
@@ -165,4 +179,7 @@ enum Value {
 	VDict(map:Map<String, Value>);
 	VFunction(func:FunctionChunk, closure:Map<String, Value>);
 	VNativeFunction(name:String, arity:Int, fn:Array<Value>->Value);
+	VNativeObject(obj:Dynamic); // Haxe objects that can be accessed from script
+	VClass(classData:ClassData); // Class definition
+	VInstance(className:String, fields:Map<String, Value>, classData:ClassData); // Class instance
 }

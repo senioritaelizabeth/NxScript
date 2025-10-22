@@ -43,6 +43,7 @@ class Parser {
 			case TKeyword(KVar): parseVar();
 			case TKeyword(KConst): parseConst();
 			case TKeyword(KFunc): parseFunc();
+			case TKeyword(KClass): parseClass();
 			case TKeyword(KReturn): parseReturn();
 			case TKeyword(KIf): parseIf();
 			case TKeyword(KWhile): parseWhile();
@@ -121,6 +122,100 @@ class Parser {
 		expect(TRightBrace, "Expected '}' after function body");
 
 		return SFunc(name, params, returnType, body);
+	}
+
+	function parseClass():Stmt {
+		advance(); // consume 'class'
+		var name = expectIdentifier();
+
+		var superClass:Null<String> = null;
+		if (match(TKeyword(KExtends))) {
+			superClass = expectIdentifier();
+		}
+
+		expect(TLeftBrace, "Expected '{' before class body");
+
+		var fields:Array<ClassField> = [];
+		var methods:Array<ClassMethod> = [];
+
+		skipNewlines();
+		while (!check(TRightBrace) && !isEOF()) {
+			var token = peek();
+
+			switch (token.token) {
+				case TKeyword(KVar):
+					// Field declaration
+					advance(); // consume 'var'
+					var fieldName = expectIdentifier();
+					var fieldType:Null<TypeHint> = null;
+					var fieldInit:Null<Expr> = null;
+
+					if (match(TColon)) {
+						fieldType = parseTypeHint();
+					}
+
+					if (match(TOperator(OAssign))) {
+						fieldInit = parseExpression();
+					}
+
+					fields.push({
+						name: fieldName,
+						type: fieldType,
+						init: fieldInit
+					});
+
+				case TKeyword(KFunc):
+					// Method declaration
+					advance(); // consume 'func'
+
+					// Method name - 'new' is allowed as a special case for constructors
+					var methodName:String;
+					var token = peek();
+					switch (token.token) {
+						case TIdentifier(name):
+							advance();
+							methodName = name;
+						case TKeyword(KNew):
+							advance();
+							methodName = "new";
+						default:
+							error("Expected method name");
+							return null; // Unreachable
+					}
+
+					var isConstructor = (methodName == "new");
+
+					expect(TLeftParen, "Expected '(' after method name");
+					var params = parseParameters();
+					expect(TRightParen, "Expected ')' after parameters");
+
+					var returnType:Null<TypeHint> = null;
+					if (match(TArrow)) {
+						returnType = parseTypeHint();
+					}
+
+					expect(TLeftBrace, "Expected '{' before method body");
+					var body = parseBlockBody();
+					expect(TRightBrace, "Expected '}' after method body");
+
+					methods.push({
+						name: methodName,
+						params: params,
+						returnType: returnType,
+						body: body,
+						isConstructor: isConstructor
+					});
+
+				default:
+					error("Expected 'var' or 'func' in class body");
+			}
+
+			skipNewlines();
+		}
+
+		expect(TRightBrace, "Expected '}' after class body");
+
+		return SClass(name, superClass, methods, fields);
 	}
 
 	function parseParameters():Array<Param> {
@@ -505,6 +600,18 @@ class Parser {
 				advance();
 				ENull;
 
+			case TKeyword(KThis):
+				advance();
+				EThis;
+
+			case TKeyword(KNew):
+				advance();
+				var className = expectIdentifier();
+				expect(TLeftParen, "Expected '(' after class name in 'new' expression");
+				var args = parseArguments();
+				expect(TRightParen, "Expected ')' after arguments");
+				ENew(className, args);
+
 			case TIdentifier(name):
 				advance();
 				EIdentifier(name);
@@ -667,6 +774,11 @@ class Parser {
 			default:
 				throw 'Expected identifier at line ${token.line}, col ${token.col}';
 		}
+	}
+
+	function error(message:String):Void {
+		var token = peek();
+		throw '$message at line ${token.line}, col ${token.col}';
 	}
 
 	function skipNewlines() {

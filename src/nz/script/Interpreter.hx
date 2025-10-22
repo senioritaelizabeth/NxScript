@@ -26,6 +26,251 @@ class Interpreter {
 	public function new(debug:Bool = false) {
 		this.debug = debug;
 		this.vm = new VM(debug);
+
+		// Register built-in functions
+		registerBuiltins();
+	}
+
+	/**
+	 * Register all built-in global functions
+	 */
+	private function registerBuiltins():Void {
+		// Console output
+		registerFunction("trace", -1, function(args:Array<Value>):Value {
+			var parts:Array<Dynamic> = [];
+			for (arg in args) {
+				parts.push(vm.valueToHaxe(arg));
+			}
+
+			// Get current instruction line info
+			var lineInfo = "";
+			if (vm.currentInstruction != null) {
+				lineInfo = '${vm.scriptName}:${vm.currentInstruction.line}: ';
+			}
+
+			trace(lineInfo + parts.join(" "));
+			return VNull;
+		});
+
+		registerFunction("print", -1, function(args:Array<Value>):Value {
+			var parts:Array<Dynamic> = [];
+			for (arg in args) {
+				parts.push(vm.valueToHaxe(arg));
+			}
+			// Sys.print(parts.join(" "));
+			return VNull;
+		});
+
+		registerFunction("println", -1, function(args:Array<Value>):Value {
+			var parts:Array<Dynamic> = [];
+			for (arg in args) {
+				parts.push(vm.valueToHaxe(arg));
+			}
+			// Sys.println(parts.join(" "));
+			return VNull;
+		});
+
+		// Type checking
+		registerFunction("typeof", 1, function(args:Array<Value>):Value {
+			return VString(switch (args[0]) {
+				case VNull: "null";
+				case VBool(_): "bool";
+				case VNumber(_): "number";
+				case VString(_): "string";
+				case VArray(_): "array";
+				case VDict(_): "dict";
+				case VFunction(_, _): "function";
+				case VClass(_): "class";
+				case VInstance(className, _, _): "instance";
+				case VNativeFunction(_, _, _): "function";
+				case VNativeObject(_): "object";
+			});
+		});
+
+		// Type conversion
+		registerFunction("int", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.floor(n);
+				case VString(s): Std.parseInt(s);
+				case VBool(b): b ? 1 : 0;
+				default: 0;
+			});
+		});
+
+		registerFunction("float", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): n;
+				case VString(s): Std.parseFloat(s);
+				case VBool(b): b ? 1.0 : 0.0;
+				default: 0.0;
+			});
+		});
+
+		registerFunction("str", 1, function(args:Array<Value>):Value {
+			return VString(vm.valueToString(args[0]));
+		});
+
+		registerFunction("bool", 1, function(args:Array<Value>):Value {
+			return VBool(switch (args[0]) {
+				case VNull: false;
+				case VBool(b): b;
+				case VNumber(n): n != 0;
+				case VString(s): s.length > 0;
+				default: true;
+			});
+		});
+
+		// Math functions
+		registerFunction("abs", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.abs(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("floor", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.floor(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("ceil", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.ceil(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("round", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.round(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("sqrt", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.sqrt(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("pow", 2, function(args:Array<Value>):Value {
+			var base = switch (args[0]) {
+				case VNumber(n): n;
+				default: 0.0;
+			}
+			var exp = switch (args[1]) {
+				case VNumber(n): n;
+				default: 0.0;
+			}
+			return VNumber(Math.pow(base, exp));
+		});
+
+		registerFunction("sin", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.sin(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("cos", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.cos(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("tan", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VNumber(n): Math.tan(n);
+				default: 0;
+			});
+		});
+
+		registerFunction("min", 2, function(args:Array<Value>):Value {
+			var a = switch (args[0]) {
+				case VNumber(n): n;
+				default: 0.0;
+			}
+			var b = switch (args[1]) {
+				case VNumber(n): n;
+				default: 0.0;
+			}
+			return VNumber(Math.min(a, b));
+		});
+
+		registerFunction("max", 2, function(args:Array<Value>):Value {
+			var a = switch (args[0]) {
+				case VNumber(n): n;
+				default: 0.0;
+			}
+			var b = switch (args[1]) {
+				case VNumber(n): n;
+				default: 0.0;
+			}
+			return VNumber(Math.max(a, b));
+		});
+
+		registerFunction("random", 0, function(args:Array<Value>):Value {
+			return VNumber(Math.random());
+		});
+
+		// Array functions
+		registerFunction("len", 1, function(args:Array<Value>):Value {
+			return VNumber(switch (args[0]) {
+				case VArray(arr): arr.length;
+				case VString(s): s.length;
+				case VDict(map): Lambda.count(map);
+				default: 0;
+			});
+		});
+
+		registerFunction("push", 2, function(args:Array<Value>):Value {
+			switch (args[0]) {
+				case VArray(arr):
+					arr.push(args[1]);
+					return VNull;
+				default:
+					throw "push() requires an array";
+			}
+		});
+
+		registerFunction("pop", 1, function(args:Array<Value>):Value {
+			return switch (args[0]) {
+				case VArray(arr): arr.length > 0 ? arr.pop() : VNull;
+				default: throw "pop() requires an array";
+			}
+		});
+
+		// String functions
+		registerFunction("upper", 1, function(args:Array<Value>):Value {
+			return VString(switch (args[0]) {
+				case VString(s): s.toUpperCase();
+				default: "";
+			});
+		});
+
+		registerFunction("lower", 1, function(args:Array<Value>):Value {
+			return VString(switch (args[0]) {
+				case VString(s): s.toLowerCase();
+				default: "";
+			});
+		});
+
+		registerFunction("trim", 1, function(args:Array<Value>):Value {
+			return VString(switch (args[0]) {
+				case VString(s): StringTools.trim(s);
+				default: "";
+			});
+		});
+
+		// Constants
+		variables.set("PI", VNumber(Math.PI));
+		variables.set("E", VNumber(Math.exp(1)));
+		variables.set("NaN", VNumber(Math.NaN));
+		variables.set("Infinity", VNumber(Math.POSITIVE_INFINITY));
 	}
 
 	/**
@@ -86,8 +331,17 @@ class Interpreter {
 	 * Run source code from a file
 	 */
 	public function runFile(path:String):Value {
-		var content = sys.io.File.getContent(path);
-		return run(content);
+		// var content = sys.io.File.getContent(path);
+		return run("content");
+	}
+
+	/**
+	 * Run source code and return result as Haxe Dynamic (auto-converted)
+	 * Makes testing easier: `runDynamic("1 + 2") == 3`
+	 */
+	public function runDynamic(source:String, ?scriptName:String = "script"):Dynamic {
+		var result = run(source, scriptName);
+		return vm.valueToHaxe(result);
 	}
 
 	/**
@@ -99,17 +353,34 @@ class Interpreter {
 	}
 
 	/**
-	 * Set a variable from Haxe code
+	 * Set a variable with a Haxe value (auto-converted to script Value)
 	 */
-	public function setVar(name:String, value:Value) {
-		variables.set(name, value);
+	public function setVar(name:String, value:Dynamic) {
+		variables.set(name, vm.haxeToValue(value));
 	}
 
 	/**
-	 * Get a variable value
+	 * Get a variable value (auto-converted to Haxe Dynamic)
+	 */
+	public function getVarDynamic(name:String):Dynamic {
+		var value = variables.get(name);
+		if (value == null)
+			return null;
+		return vm.valueToHaxe(value);
+	}
+
+	/**
+	 * Get a variable value as script Value
 	 */
 	public function getVar(name:String):Null<Value> {
 		return variables.get(name);
+	}
+
+	/**
+	 * Check if a variable exists
+	 */
+	public function hasVar(name:String):Bool {
+		return variables.exists(name);
 	}
 
 	/**
@@ -124,6 +395,71 @@ class Interpreter {
 	 */
 	public function callFunction(name:String, args:Array<Value>):Value {
 		return vm.callMethod(name, args);
+	}
+
+	/**
+	 * Create a type-safe instance of a script class
+	 * 
+	 * Usage with Interface for IDE Support:
+	 * ```haxe
+	 * interface MyCat {
+	 *     var meow:Bool;
+	 *     var name:String;
+	 *     function speak():String;
+	 * }
+	 * 
+	 * // ✅ For IDE support with autocomplete and type checking:
+	 * var cat = interp.createInstance("MyCat");
+	 * var typedCat:MyCat = cat;  // Assign to typed variable for autocomplete
+	 * 
+	 * // Access fields (autocomplete works!)
+	 * trace(typedCat.meow);
+	 * 
+	 * // Call methods using the Dynamic version to avoid interpreter type checks
+	 * trace(cat.speak());
+	 * 
+	 * // ✅ Modify fields directly
+	 * cat.meow = false;
+	 * cat.name = "Fluffy";
+	 * cat.__syncToScript__();  // Sync changes back to script
+	 * ```
+	 * 
+	 * Note: In Haxe interpreter mode (--interp), use Dynamic for method calls
+	 * to avoid runtime type verification issues. For field access, you can use
+	 * typed variables to get IDE autocomplete.
+	 * 
+	 * In compiled targets (C++, JS, etc.), full type safety works without issues.
+	 * 
+	 * @param className The name of the script class to instantiate
+	 * @param args Optional constructor arguments
+	 * @return A dynamic proxy object that can be assigned to an interface type
+	 */
+	public function createInstance<T>(className:String, ?args:Array<Dynamic>):T {
+		if (args == null)
+			args = [];
+
+		var proxy:Dynamic = if (args.length > 0) {
+			ScriptClass.instantiate(this, className, args);
+		} else {
+			ScriptClass.get(this, className);
+		}
+
+		return proxy;
+	}
+
+	/**
+	 * Create a strongly-typed instance using an interface (better IDE support)
+	 * 
+	 * Usage:
+	 * ```haxe
+	 * var cat = interp.typed(MyCat, "MyCat");
+	 * // Now 'cat' has full autocomplete and type safety!
+	 * ```
+	 * 
+	 * Note: This is a compile-time only helper. At runtime it's the same as createInstance.
+	 */
+	public inline function typed<T>(interfaceType:Class<T>, className:String, ?args:Array<Dynamic>):T {
+		return createInstance(className, args);
 	}
 
 	// Getters

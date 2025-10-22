@@ -85,6 +85,46 @@ class Compiler {
 				if (!isLast)
 					emit(Op.POP);
 
+			case SClass(className, superClass, methods, fields):
+				// Push class name
+				emitConstant(VString(className));
+				// Push super class (or null)
+				if (superClass != null) {
+					emitWithString(Op.LOAD_VAR, superClass);
+				} else {
+					emit(Op.LOAD_NULL);
+				}
+				// Compile and push methods
+				for (method in methods) {
+					// Push method name
+					emitConstant(VString(method.name));
+					// Push method function
+					var funcChunk = compileFunction(method.name, method.params, method.body, false);
+					var funcIndex = functions.length;
+					functions.push(funcChunk);
+					emitWithArg(Op.MAKE_FUNC, funcIndex);
+					// Push isConstructor flag
+					emit(method.isConstructor ? Op.LOAD_TRUE : Op.LOAD_FALSE);
+				}
+				// Compile and push fields
+				for (field in fields) {
+					// Push field name
+					emitConstant(VString(field.name));
+					// Push field init value
+					if (field.init != null) {
+						compileExpression(field.init);
+					} else {
+						emit(Op.LOAD_NULL);
+					}
+				}
+				// Create class: MAKE_CLASS with encoded counts (methods << 16 | fields)
+				var counts = (methods.length << 16) | fields.length;
+				emitWithArg(Op.MAKE_CLASS, counts);
+				// Store class
+				emitWithString(Op.STORE_VAR, className);
+				if (!isLast)
+					emit(Op.POP);
+
 			case SReturn(expr):
 				if (expr != null) {
 					compileExpression(expr);
@@ -226,6 +266,19 @@ class Compiler {
 
 			case EIdentifier(name):
 				emitWithString(Op.LOAD_VAR, name);
+
+			case EThis:
+				emit(Op.GET_THIS);
+
+			case ENew(className, args):
+				// Load the class
+				emitWithString(Op.LOAD_VAR, className);
+				// Push arguments
+				for (arg in args) {
+					compileExpression(arg);
+				}
+				// Instantiate
+				emitWithArg(Op.INSTANTIATE, args.length);
 
 			case EBinary(op, left, right):
 				compileExpression(left);

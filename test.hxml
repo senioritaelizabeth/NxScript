@@ -1,5 +1,0 @@
-# NzLang Suite - Test Runner
-# Tests all Nz-Script features (30 tests)
--cp src
--main TestAll
---interp

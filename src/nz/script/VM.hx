@@ -24,14 +24,19 @@ class VM {
 	// Native functions
 	public var methods:Map<String, Value>;
 
-	var debug:Bool = false;
-	var maxInstructions:Int = 10000; // Safety limit
+	// Classes registry (for inheritance lookup)
+	public var classes:Map<String, ClassData>;
+
+	public var debug:Bool = false;
+
+	public var maxInstructions:Int = 1000000; // Safety limit
+
 	var instructionCount:Int = 0;
 
 	// Script information for debugging
 	public var scriptName:String = "script";
 
-	var currentInstruction:Instruction = null;
+	public var currentInstruction:Instruction = null;
 
 	public function new(debug:Bool = false) {
 		this.debug = debug;
@@ -39,8 +44,10 @@ class VM {
 		letVariables = new Map();
 		constVariables = new Map();
 		methods = new Map();
+		classes = new Map();
 
 		initializeNativeFunctions();
+		NativeClasses.registerAll(this);
 	}
 
 	public function execute(chunk:Chunk):Value {
@@ -233,12 +240,14 @@ class VM {
 				case Op.GET_MEMBER:
 					var field = currentFrame.chunk.strings[inst.arg];
 					var object = pop();
+					if (debug)
+						trace('GET_MEMBER: field=$field, object type=${Type.enumConstructor(object)}');
 					push(getMember(object, field));
 
 				case Op.SET_MEMBER:
 					var field = currentFrame.chunk.strings[inst.arg];
-					var value = pop();
-					var object = pop();
+					var object = pop(); // El objeto está arriba
+					var value = pop(); // El valor está debajo
 					setMember(object, field, value);
 					push(value);
 
@@ -253,6 +262,160 @@ class VM {
 					var object = pop();
 					setIndex(object, index, value);
 					push(value);
+
+				// Classes
+				case Op.MAKE_CLASS:
+					// Decode counts: methods = high 16 bits, fields = low 16 bits
+					var counts = inst.arg;
+					var methodCount = counts >> 16;
+					var fieldCount = counts & 0xFFFF;
+
+					// Pop fields (name, value pairs)
+					var fields = new Map<String, Value>();
+					for (i in 0...fieldCount) {
+						var value = pop();
+						var name = switch (pop()) {
+							case VString(s): s;
+							default: throw "Field name must be a string";
+						}
+						fields.set(name, value);
+					}
+
+					// Pop methods (name, function, isConstructor triples)
+					var methods = new Map<String, FunctionChunk>();
+					var constructor:Null<FunctionChunk> = null;
+					for (i in 0...methodCount) {
+						var isConstructor = switch (pop()) {
+							case VBool(b): b;
+							default: false;
+						}
+						var func = switch (pop()) {
+							case VFunction(f, _): f;
+							default: throw "Method must be a function";
+						}
+						var name = switch (pop()) {
+							case VString(s): s;
+							default: throw "Method name must be a string";
+						}
+						methods.set(name, func);
+						if (isConstructor) {
+							constructor = func;
+						}
+					}
+
+					// Pop super class
+					var superClass:Null<String> = switch (pop()) {
+						case VNull: null;
+						case VNativeObject(_): "HaxeNative"; // Placeholder for native inheritance
+						case VClass(c): c.name;
+						default: throw "Super class must be null or a class";
+					}
+
+					// Pop class name
+					var className = switch (pop()) {
+						case VString(s): s;
+						default: throw "Class name must be a string";
+					}
+
+					// Create class data
+					var classData:ClassData = {
+						name: className,
+						superClass: superClass,
+						methods: methods,
+						fields: fields,
+						constructor: constructor
+					};
+
+					// Register class in global registry
+					classes.set(className, classData);
+
+					push(VClass(classData));
+
+				case Op.INSTANTIATE:
+					var argCount = inst.arg;
+					var args:Array<Value> = [];
+					for (i in 0...argCount) {
+						args.unshift(pop());
+					}
+
+					var classValue = pop();
+
+					var instance = switch (classValue) {
+						case VClass(classData):
+							// Create instance with fields from the entire inheritance chain
+							var instanceFields = new Map<String, Value>();
+
+							// Collect fields from parent classes first
+							var currentClass = classData;
+							var classChain:Array<ClassData> = [];
+							while (currentClass != null) {
+								classChain.unshift(currentClass); // Add to front
+								if (currentClass.superClass != null && classes.exists(currentClass.superClass)) {
+									currentClass = classes.get(currentClass.superClass);
+								} else {
+									currentClass = null;
+								}
+							}
+
+							// Apply fields from parent to child (so child overrides parent)
+							for (cls in classChain) {
+								for (field in cls.fields.keys()) {
+									instanceFields.set(field, cls.fields.get(field));
+								}
+							}
+
+							var inst = VInstance(classData.name, instanceFields, classData);
+
+							// Call constructor if it exists
+							if (classData.constructor != null) {
+								// Check argument count
+								if (args.length != classData.constructor.paramCount) {
+									throw 'Constructor expects ${classData.constructor.paramCount} arguments, got ${args.length}';
+								}
+
+								// Execute constructor by creating a temporary VM instance
+								// This is a hack to avoid frame management issues
+								var tempVM = new VM(debug);
+								tempVM.variables = this.variables;
+								tempVM.methods = this.methods;
+								tempVM.classes = this.classes;
+								tempVM.letVariables = new Map();
+								tempVM.constVariables = new Map();
+
+								// Create frame for constructor
+								tempVM.frames = [
+									{
+										chunk: classData.constructor.chunk,
+										ip: 0,
+										stackStart: 0,
+										localVars: new Map()
+									}
+								];
+								tempVM.currentFrame = tempVM.frames[0];
+
+								// Set 'this' and parameters
+								tempVM.currentFrame.localVars.set("this", inst);
+								for (i in 0...args.length) {
+									tempVM.currentFrame.localVars.set(classData.constructor.paramNames[i], args[i]);
+								}
+
+								// Run constructor (result is ignored)
+								tempVM.run();
+							}
+
+							inst;
+						default:
+							throw 'Cannot instantiate non-class value';
+					}
+
+					push(instance);
+
+				case Op.GET_THIS:
+					var thisValue = getVariable("this");
+					if (thisValue == null) {
+						throw "'this' is not defined in this context";
+					}
+					push(thisValue);
 
 				// Iteration
 				case Op.GET_ITER:
@@ -312,7 +475,8 @@ class VM {
 				return run();
 
 			case VNativeFunction(name, arity, fn):
-				if (args.length != arity) {
+				// -1 arity means variadic (no argument count check)
+				if (arity != -1 && args.length != arity) {
 					throw 'Native function $name expects $arity arguments, got ${args.length}';
 				}
 				return fn(args);
@@ -370,6 +534,74 @@ class VM {
 			throw "Stack underflow (peek) at IP: " + currentFrame.ip;
 		}
 		return stack[stack.length - 1];
+	}
+
+	// Conversion between Haxe and Script values
+
+	public function haxeToValue(value:Dynamic):Value {
+		if (value == null)
+			return VNull;
+		if (Std.isOfType(value, Bool))
+			return VBool(value);
+		if (Std.isOfType(value, Int) || Std.isOfType(value, Float))
+			return VNumber(value);
+		if (Std.isOfType(value, String))
+			return VString(value);
+		if (Std.isOfType(value, Array)) {
+			var arr:Array<Dynamic> = value;
+			return VArray([for (v in arr) haxeToValue(v)]);
+		}
+		// For other objects, wrap as native object
+		return VNativeObject(value);
+	}
+
+	public function valueToHaxe(value:Value):Dynamic {
+		return switch (value) {
+			case VNumber(n): n;
+			case VString(s): s;
+			case VBool(b): b;
+			case VNull: null;
+			case VArray(arr): [for (v in arr) valueToHaxe(v)];
+			case VDict(map):
+				var obj = {};
+				for (key in map.keys()) {
+					Reflect.setField(obj, key, valueToHaxe(map.get(key)));
+				}
+				obj;
+			case VNativeObject(obj): obj;
+			default: null;
+		}
+	}
+
+	/**
+	 * Call a script function with arguments (helper for external code)
+	 */
+	public function callFunction(func:FunctionChunk, closure:Map<String, Value>, args:Array<Value>):Value {
+		var tempVM = new VM(debug);
+		tempVM.variables = this.variables;
+		tempVM.methods = this.methods;
+		tempVM.classes = this.classes;
+		tempVM.letVariables = new Map();
+		tempVM.constVariables = new Map();
+
+		tempVM.frames = [
+			{
+				chunk: func.chunk,
+				ip: 0,
+				stackStart: 0,
+				localVars: closure.copy()
+			}
+		];
+		tempVM.currentFrame = tempVM.frames[0];
+
+		// Set parameters
+		for (i in 0...args.length) {
+			if (i < func.paramNames.length) {
+				tempVM.currentFrame.localVars.set(func.paramNames[i], args[i]);
+			}
+		}
+
+		return tempVM.run();
 	}
 
 	// Arithmetic operations
@@ -474,20 +706,75 @@ class VM {
 	}
 
 	// Member access
-	function getMember(object:Value, field:String):Value {
+	public function getMember(object:Value, field:String):Value {
 		return switch (object) {
 			case VNumber(n): getNumberMethod(n, field);
 			case VString(s): getStringMethod(s, field);
 			case VArray(arr): getArrayMethod(arr, field);
 			case VDict(map): map.exists(field) ? map.get(field) : VNull;
+			case VInstance(className, fields, classData):
+				// Check instance fields first
+				if (fields.exists(field)) {
+					return fields.get(field);
+				}
+
+				// Check methods in class hierarchy
+				var currentClass = classData;
+				while (currentClass != null) {
+					if (currentClass.methods.exists(field)) {
+						var method = currentClass.methods.get(field);
+						// Return a bound method (closure with 'this')
+						return VFunction(method, ["this" => object]);
+					}
+					// Look in parent class
+					if (currentClass.superClass != null && classes.exists(currentClass.superClass)) {
+						currentClass = classes.get(currentClass.superClass);
+					} else {
+						currentClass = null;
+					}
+				}
+
+				throw 'Field $field not found in class $className';
+			case VNativeObject(obj):
+				// Access Haxe object field or method
+				try {
+					var value:Dynamic = Reflect.field(obj, field);
+
+					// If it's a function, wrap it as a native function
+					if (Reflect.isFunction(value)) {
+						return VNativeFunction(field, -1, (args:Array<Value>) -> {
+							// Convert script values to Haxe values
+							var haxeArgs = [for (arg in args) valueToHaxe(arg)];
+							// Call the method
+							var result = Reflect.callMethod(obj, value, haxeArgs);
+							// Convert result back to script value
+							return haxeToValue(result);
+						});
+					}
+
+					// Otherwise, convert the field value
+					return haxeToValue(value);
+				} catch (e:Dynamic) {
+					throw 'Cannot access field $field on native object';
+				}
 			default: throw 'Cannot access member $field';
 		}
 	}
 
-	function setMember(object:Value, field:String, value:Value) {
+	public function setMember(object:Value, field:String, value:Value) {
 		switch (object) {
 			case VDict(map):
 				map.set(field, value);
+			case VInstance(className, fields, classData):
+				// Set instance field
+				fields.set(field, value);
+			case VNativeObject(obj):
+				// Set Haxe object field
+				try {
+					Reflect.setField(obj, field, valueToHaxe(value));
+				} catch (e:Dynamic) {
+					throw 'Cannot set field $field on native object: $e';
+				}
 			default:
 				throw 'Cannot set member $field';
 		}
@@ -567,11 +854,34 @@ class VM {
 	// Native method helpers
 	function getNumberMethod(n:Float, method:String):Value {
 		return switch (method) {
+			// Rounding
 			case "floor": VNativeFunction("floor", 0, (_) -> VNumber(Math.floor(n)));
 			case "ceil": VNativeFunction("ceil", 0, (_) -> VNumber(Math.ceil(n)));
 			case "round": VNativeFunction("round", 0, (_) -> VNumber(Math.round(n)));
 			case "abs": VNativeFunction("abs", 0, (_) -> VNumber(Math.abs(n)));
+
+			// Roots & Powers
 			case "sqrt": VNativeFunction("sqrt", 0, (_) -> VNumber(Math.sqrt(n)));
+			case "pow": VNativeFunction("pow", 1, (args) -> switch (args[0]) {
+					case VNumber(exp): VNumber(Math.pow(n, exp));
+					default: throw 'Expected number';
+				});
+
+			// Trigonometry
+			case "sin": VNativeFunction("sin", 0, (_) -> VNumber(Math.sin(n)));
+			case "cos": VNativeFunction("cos", 0, (_) -> VNumber(Math.cos(n)));
+			case "tan": VNativeFunction("tan", 0, (_) -> VNumber(Math.tan(n)));
+			case "asin": VNativeFunction("asin", 0, (_) -> VNumber(Math.asin(n)));
+			case "acos": VNativeFunction("acos", 0, (_) -> VNumber(Math.acos(n)));
+			case "atan": VNativeFunction("atan", 0, (_) -> VNumber(Math.atan(n)));
+
+			// Type conversions
+			case "int": VNativeFunction("int", 0, (_) -> VNumber(Math.floor(n)));
+			case "float": VNativeFunction("float", 0, (_) -> VNumber(n));
+			case "str": VNativeFunction("str", 0, (_) -> VString(Std.string(n)));
+			case "bool": VNativeFunction("bool", 0, (_) -> VBool(n != 0));
+
+			// Basic arithmetic
 			case "add": VNativeFunction("add", 1, (args) -> switch (args[0]) {
 					case VNumber(x): VNumber(n + x);
 					default: throw 'Expected number';
@@ -588,29 +898,150 @@ class VM {
 					case VNumber(x): VNumber(n / x);
 					default: throw 'Expected number';
 				});
+			case "mod": VNativeFunction("mod", 1, (args) -> switch (args[0]) {
+					case VNumber(x): VNumber(n % x);
+					default: throw 'Expected number';
+				});
+
+			// Comparison
+			case "min": VNativeFunction("min", 1, (args) -> switch (args[0]) {
+					case VNumber(x): VNumber(Math.min(n, x));
+					default: throw 'Expected number';
+				});
+			case "max": VNativeFunction("max", 1, (args) -> switch (args[0]) {
+					case VNumber(x): VNumber(Math.max(n, x));
+					default: throw 'Expected number';
+				});
+
 			default: throw 'Unknown Number method: $method';
 		}
 	}
 
 	function getStringMethod(s:String, method:String):Value {
 		return switch (method) {
+			// Properties
 			case "length": VNumber(s.length);
+
+			// Case conversion
 			case "upper": VNativeFunction("upper", 0, (_) -> VString(s.toUpperCase()));
 			case "lower": VNativeFunction("lower", 0, (_) -> VString(s.toLowerCase()));
-			case "trim": VNativeFunction("trim", 0, (_) -> VString(s.trim()));
+
+			// Trimming
+			case "trim": VNativeFunction("trim", 0, (_) -> VString(StringTools.trim(s)));
+
+			// Type conversion
+			case "int": VNativeFunction("int", 0, (_) -> VNumber(Std.parseInt(s) != null ? Std.parseInt(s) : 0));
+			case "float": VNativeFunction("float", 0, (_) -> VNumber(Std.parseFloat(s)));
+			case "bool": VNativeFunction("bool", 0, (_) -> VBool(s.length > 0));
+
+			// Search
+			case "contains": VNativeFunction("contains", 1, (args) -> switch (args[0]) {
+					case VString(search): VBool(s.indexOf(search) >= 0);
+					default: throw 'Expected string';
+				});
+			case "indexOf": VNativeFunction("indexOf", 1, (args) -> switch (args[0]) {
+					case VString(search): VNumber(s.indexOf(search));
+					default: throw 'Expected string';
+				});
+
+			// Substrings
+			case "charAt": VNativeFunction("charAt", 1, (args) -> switch (args[0]) {
+					case VNumber(i): VString(s.charAt(Std.int(i)));
+					default: throw 'Expected number';
+				});
+			case "substr": VNativeFunction("substr", 2, (args) -> {
+					var start = switch (args[0]) {
+						case VNumber(n): Std.int(n);
+						default: 0;
+					}
+					var len = switch (args[1]) {
+						case VNumber(n): Std.int(n);
+						default: s.length;
+					}
+					VString(s.substr(start, len));
+				});
+
+			// Split/Join
+			case "split": VNativeFunction("split", 1, (args) -> switch (args[0]) {
+					case VString(delim): VArray([for (part in s.split(delim)) VString(part)]);
+					default: throw 'Expected string';
+				});
+
 			default: throw 'Unknown String method: $method';
 		}
 	}
 
 	function getArrayMethod(arr:Array<Value>, method:String):Value {
 		return switch (method) {
+			// Properties
 			case "length": VNumber(arr.length);
+
+			// Add/Remove
 			case "push": VNativeFunction("push", 1, (args) -> {
 					arr.push(args[0]);
 					VNull;
 				});
 			case "pop": VNativeFunction("pop", 0, (_) -> arr.length == 0 ? VNull : arr.pop());
+			case "shift": VNativeFunction("shift", 0, (_) -> arr.length == 0 ? VNull : arr.shift());
+			case "unshift": VNativeFunction("unshift", 1, (args) -> {
+					arr.unshift(args[0]);
+					VNull;
+				});
+
+			// Access
+			case "first": VNativeFunction("first", 0, (_) -> arr.length > 0 ? arr[0] : VNull);
+			case "last": VNativeFunction("last", 0, (_) -> arr.length > 0 ? arr[arr.length - 1] : VNull);
+
+			// Search - need to compare values properly
+			case "contains": VNativeFunction("contains", 1, (args) -> {
+					var searchValue = args[0];
+					var found = false;
+					for (item in arr) {
+						if (valuesEqual(item, searchValue)) {
+							found = true;
+							break;
+						}
+					}
+					VBool(found);
+				});
+			case "indexOf": VNativeFunction("indexOf", 1, (args) -> {
+					var searchValue = args[0];
+					var index = -1;
+					for (i in 0...arr.length) {
+						if (valuesEqual(arr[i], searchValue)) {
+							index = i;
+							break;
+						}
+					}
+					VNumber(index);
+				});
+
+			// Transform
+			case "reverse": VNativeFunction("reverse", 0, (_) -> {
+					arr.reverse();
+					VArray(arr);
+				});
+			case "join": VNativeFunction("join", 1, (args) -> {
+					var delim = switch (args[0]) {
+						case VString(s): s;
+						default: ",";
+					}
+					var parts = [for (v in arr) valueToString(v)];
+					VString(parts.join(delim));
+				});
+
 			default: throw 'Unknown Array method: $method';
+		}
+	}
+
+	// Helper to compare two Values for equality
+	function valuesEqual(a:Value, b:Value):Bool {
+		return switch [a, b] {
+			case [VNumber(x), VNumber(y)]: x == y;
+			case [VString(x), VString(y)]: x == y;
+			case [VBool(x), VBool(y)]: x == y;
+			case [VNull, VNull]: true;
+			default: false; // Arrays, objects, etc need deep comparison
 		}
 	}
 
@@ -642,6 +1073,9 @@ class VM {
 				"{" + pairs.join(", ") + "}";
 			case VFunction(f, _): '<function ${f.name}>';
 			case VNativeFunction(name, _, _): '<native $name>';
+			case VNativeObject(obj): '<object ${Type.getClassName(Type.getClass(obj))}>';
+			case VClass(classData): '<class ${classData.name}>';
+			case VInstance(className, _, _): '<instance of $className>';
 		}
 	}
 
@@ -649,7 +1083,7 @@ class VM {
 	function initializeNativeFunctions() {
 		methods.set("print", VNativeFunction("print", 1, (args) -> {
 			var location = currentInstruction != null ? '[$scriptName - ${currentInstruction.line}:${currentInstruction.col}] ' : '';
-			Sys.println(location + valueToString(args[0]));
+			// Sys.println(location + valueToString(args[0]));
 			return VNull;
 		}));
 
@@ -672,6 +1106,9 @@ class VM {
 				case VDict(_): "Dict";
 				case VFunction(_, _): "Function";
 				case VNativeFunction(_, _, _): "NativeFunction";
+				case VNativeObject(obj): Type.getClassName(Type.getClass(obj));
+				case VClass(classData): "Class<" + classData.name + ">";
+				case VInstance(className, _, _): className;
 			}
 			return VString(typeName);
 		}));

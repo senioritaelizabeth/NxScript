@@ -14,6 +14,7 @@ enum Expr {
 
 	// Variables
 	EIdentifier(name:String);
+	EThis; // this reference
 
 	// Binary operations
 	EBinary(op:Operator, left:Expr, right:Expr);
@@ -29,6 +30,9 @@ enum Expr {
 
 	// Function call
 	ECall(callee:Expr, args:Array<Expr>);
+
+	// Instantiation: new ClassName(args)
+	ENew(className:String, args:Array<Expr>);
 
 	// Array literal
 	EArray(elements:Array<Expr>);
@@ -51,6 +55,9 @@ enum Stmt {
 
 	// Function declaration
 	SFunc(name:String, params:Array<Param>, returnType:Null<TypeHint>, body:Array<Stmt>);
+
+	// Class declaration
+	SClass(name:String, superClass:Null<String>, methods:Array<ClassMethod>, fields:Array<ClassField>);
 
 	// Control flow
 	SReturn(expr:Null<Expr>);
@@ -76,6 +83,20 @@ typedef StmtWithPos = {
 typedef Param = {
 	name:String,
 	type:Null<TypeHint>
+}
+
+typedef ClassMethod = {
+	name:String,
+	params:Array<Param>,
+	returnType:Null<TypeHint>,
+	body:Array<Stmt>,
+	isConstructor:Bool
+}
+
+typedef ClassField = {
+	name:String,
+	type:Null<TypeHint>,
+	init:Null<Expr>
 }
 
 enum TypeHint {

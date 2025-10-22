@@ -48,6 +48,7 @@ class TestRunner {
 
 		var passed = 0;
 		var failed = 0;
+		var current_cwd = Sys.getCwd();
 
 		// Run each test
 		for (testFile in testFiles) {
@@ -55,9 +56,10 @@ class TestRunner {
 			trace('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 			trace('Running: $testName');
 			trace('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+			Sys.setCwd(current_cwd + "/tests");
 
 			// Run haxe from the tests directory
-			var exitCode = Sys.command('haxe tests/$testFile > test_results/${testName}_output.txt 2>&1');
+			var exitCode = Sys.command('haxe $testFile > ../test_results/${testName}_output.txt 2>&1');
 
 			if (exitCode == 0) {
 				trace('✓ $testName PASSED\n');
@@ -66,6 +68,7 @@ class TestRunner {
 				trace('✗ $testName FAILED (exit code: $exitCode)\n');
 				failed++;
 			}
+			Sys.setCwd(current_cwd);
 
 			// Save result summary
 			var resultFile = 'test_results/${testName}_result.txt';

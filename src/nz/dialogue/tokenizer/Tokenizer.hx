@@ -1,20 +1,27 @@
-package nz;
+package nz.dialogue.tokenizer;
 
-import nz.Token;
+import nz.dialogue.tokenizer.Token;
+import nz.dialogue.storage.TokenStorage;
 
 using StringTools;
 
-class DiaTokenizer {
+/**
+ * Tokenizer for the dialogue language
+ * Converts source code into a stream of tokens
+ */
+class Tokenizer {
 	var input:String;
 	var pos:Int = 0;
 	var line:Int = 1;
 	var col:Int = 1;
+	var storage:TokenStorage;
+	var inCodeMode:Bool = false; // Track if we're parsing code tokens
 
 	static var keywords = ["var", "func", "if", "elseif", "else", "switch", "case", "end", "return"];
-	static var operators = ["+", "-", "*", "/", "==", "!=", "<=", ">=", "<", ">", "and", "or"];
 
 	public function new(input:String) {
 		this.input = input.replace('\r\n', '\n').replace('\r', '\n');
+		this.storage = new TokenStorage();
 	}
 
 	public function tokenize():Array<TokenPos> {
@@ -52,16 +59,18 @@ class DiaTokenizer {
 
 		if (peek() == '\n') {
 			advance();
+			inCodeMode = false; // Reset at end of line
 			return TNewLine;
 		}
 
 		// @call directive
 		if (peek() == '@') {
+			inCodeMode = true;
 			return readAtCall();
 		}
 
 		// Numbers (only if not part of a dialog line)
-		if (isDigit(peek()) && isStartOfStatement()) {
+		if (isDigit(peek()) && (isStartOfStatement() || inCodeMode)) {
 			return readNumber();
 		}
 
@@ -72,6 +81,7 @@ class DiaTokenizer {
 		if (isAlpha(peek()) && isStartOfStatement()) {
 			var word = peekWord();
 			if (keywords.contains(word)) {
+				inCodeMode = true; // We're starting code parsing
 				return readKeywordOrIdentifier();
 			}
 		}
@@ -92,24 +102,66 @@ class DiaTokenizer {
 				// Check for == operator
 				if (peek(1) == '=') {
 					advance(2);
-					return TOp('==');
+					return TOp(OEqual);
 				}
 				advance();
 				return TAssign;
-			default:
-				// Two-character operators
-				if (pos + 1 < input.length) {
-					var twoChar = input.substr(pos, 2);
-					if (operators.contains(twoChar)) {
-						advance(2);
-						return TOp(twoChar);
-					}
+			case '!':
+				// Check for != operator
+				if (peek(1) == '=') {
+					advance(2);
+					return TOp(ONotEqual);
 				}
-
-				// Single-character operators (only in expressions)
-				if (operators.contains(ch)) {
-					advance();
-					return TOp(ch);
+				advance();
+				return TOp(ONot);
+			case '<':
+				// Check for <= operator
+				if (peek(1) == '=') {
+					advance(2);
+					return TOp(OLessEq);
+				}
+				advance();
+				return TOp(OLess);
+			case '>':
+				// Check for >= operator
+				if (peek(1) == '=') {
+					advance(2);
+					return TOp(OGreaterEq);
+				}
+				advance();
+				return TOp(OGreater);
+			case '&':
+				// Check for && operator
+				if (peek(1) == '&') {
+					advance(2);
+					return TOp(OAnd);
+				}
+				advance();
+				return TDialog(readDialogText());
+			case '|':
+				// Check for || operator
+				if (peek(1) == '|') {
+					advance(2);
+					return TOp(OOr);
+				}
+				advance();
+				return TDialog(readDialogText());
+			case '+':
+				advance();
+				return TOp(OAdd);
+			case '-':
+				advance();
+				return TOp(OSub);
+			case '*':
+				advance();
+				return TOp(OMul);
+			case '/':
+				advance();
+				return TOp(ODiv);
+			default:
+				// If we're in code mode (after keywords, operators, etc.), read identifiers
+				if (isAlpha(ch) && inCodeMode) {
+					return readKeywordOrIdentifier();
 				}
 
 				// Otherwise, it's a dialog line
@@ -165,38 +217,7 @@ class DiaTokenizer {
 			name += advance();
 		}
 
-		skipWhitespace();
-
-		// Read arguments
-		var args:Array<String> = [];
-		while (!isEOF() && peek() != '\n') {
-			skipWhitespace();
-
-			if (peek() == '"') {
-				// String argument with quotes
-				advance(); // skip opening "
-				var arg = "";
-				while (!isEOF() && peek() != '"') {
-					arg += advance();
-				}
-				if (!isEOF())
-					advance(); // skip closing "
-				args.push(arg);
-			} else {
-				// Simple argument without quotes
-				var arg = "";
-				while (!isEOF() && peek() != ' ' && peek() != '\t' && peek() != '\n') {
-					arg += advance();
-				}
-				if (arg.length > 0) {
-					args.push(arg);
-				}
-			}
-
-			skipWhitespace();
-		}
-
-		return TAtCall(name, args);
+		return TAtCommand(name);
 	}
 
 	private function readNumber():Token {
@@ -229,6 +250,16 @@ class DiaTokenizer {
 			return handleKeyword(word);
 		}
 
+		// Check for logical operators (word form)
+		switch (word) {
+			case "and":
+				return TOp(OAnd);
+			case "or":
+				return TOp(OOr);
+			case "not":
+				return TOp(ONot);
+		}
+
 		// Check for boolean
 		if (word == "true")
 			return TBool(true);
@@ -239,170 +270,40 @@ class DiaTokenizer {
 	}
 
 	private function handleKeyword(keyword:String):Token {
-		skipWhitespace();
-
+		// Simply return the keyword token, let parser handle the rest
 		switch (keyword) {
 			case "var":
-				return parseVar();
+				return TKeyword(KVar);
 			case "func":
-				return parseFunc();
+				return TKeyword(KFunc);
 			case "if":
-				return parseIf();
+				return TKeyword(KIf);
 			case "elseif":
-				return parseElseIf();
+				return TKeyword(KElseIf);
 			case "else":
-				return TElse;
+				return TKeyword(KElse);
 			case "switch":
-				return parseSwitch();
+				return TKeyword(KSwitch);
 			case "case":
-				return parseCase();
+				return TKeyword(KCase);
 			case "end":
-				return TEnd;
+				return TKeyword(KEnd);
 			case "return":
-				return parseReturn();
+				return TKeyword(KReturn);
 			default:
 				return TIdentifier(keyword);
 		}
 	}
 
-	private function parseVar():Token {
-		skipWhitespace();
-		var name = "";
-		while (!isEOF() && (isAlphaNum(peek()) || peek() == '_')) {
-			name += advance();
-		}
-
-		skipWhitespace();
-
-		// Check for assignment
-		var value:Dynamic = null;
-		if (peek() == '=') {
-			advance(); // skip =
-			skipWhitespace();
-			value = readExpression();
-		}
-
-		return TVar(name, value);
-	}
-
-	private function parseFunc():Token {
-		skipWhitespace();
-		var name = "";
-		while (!isEOF() && (isAlphaNum(peek()) || peek() == '_')) {
-			name += advance();
-		}
-
-		skipWhitespace();
-
-		var params:Array<String> = [];
-		if (peek() == '(') {
-			advance(); // skip (
-			skipWhitespace();
-
-			while (!isEOF() && peek() != ')') {
-				var param = "";
-				while (!isEOF() && peek() != ',' && peek() != ')' && peek() != ' ') {
-					param += advance();
-				}
-				if (param.length > 0) {
-					params.push(param);
-				}
-				skipWhitespace();
-				if (peek() == ',') {
-					advance();
-					skipWhitespace();
-				}
-			}
-
-			if (peek() == ')')
-				advance(); // skip )
-		}
-
-		return TFunc(name, params);
-	}
-
-	private function parseIf():Token {
-		skipWhitespace();
-		if (peek() == '(')
-			advance(); // skip optional (
-		skipWhitespace();
-
-		var condition = readExpression();
-
-		skipWhitespace();
-		if (peek() == ')')
-			advance(); // skip optional )
-
-		return TIf(condition);
-	}
-
-	private function parseElseIf():Token {
-		skipWhitespace();
-		if (peek() == '(')
-			advance(); // skip optional (
-		skipWhitespace();
-
-		var condition = readExpression();
-
-		skipWhitespace();
-		if (peek() == ')')
-			advance(); // skip optional )
-
-		return TElseIf(condition);
-	}
-
-	private function parseSwitch():Token {
-		skipWhitespace();
-		if (peek() == '(')
-			advance(); // skip optional (
-		skipWhitespace();
-
-		var value = readExpression();
-
-		skipWhitespace();
-		if (peek() == ')')
-			advance(); // skip optional )
-
-		return TSwitch(value);
-	}
-
-	private function parseCase():Token {
-		skipWhitespace();
-		var value = readExpression();
-		return TCase(value);
-	}
-
-	private function parseReturn():Token {
-		skipWhitespace();
-		var expr = readExpression();
-		return TReturn(expr);
-	}
-
-	private function readExpression():String {
-		var expr = "";
-		var depth = 0;
-
-		while (!isEOF()) {
-			var ch = peek();
-
-			if (ch == '(')
-				depth++;
-			if (ch == ')') {
-				if (depth == 0)
-					break;
-				depth--;
-			}
-
-			if (depth == 0 && (ch == '\n' || ch == '{'))
-				break;
-
-			expr += advance();
-		}
-
-		return expr.trim();
-	}
-
 	private function readDialog():Token {
+		var text = readDialogText();
+		text = text.trim();
+		if (text.length == 0)
+			return null;
+		return TDialog(text);
+	}
+
+	private function readDialogText():String {
 		var text = "";
 
 		while (!isEOF()) {
@@ -415,11 +316,7 @@ class DiaTokenizer {
 			text += advance();
 		}
 
-		text = text.trim();
-		if (text.length == 0)
-			return null;
-
-		return TDialog(text);
+		return text;
 	}
 
 	// Helper functions
@@ -467,5 +364,10 @@ class DiaTokenizer {
 
 	private function isAlphaNum(ch:String):Bool {
 		return isAlpha(ch) || isDigit(ch);
+	}
+
+	// Save tokens to file
+	public function saveTokens(tokens:Array<TokenPos>, filePath:String):Void {
+		storage.save(tokens, filePath);
 	}
 }

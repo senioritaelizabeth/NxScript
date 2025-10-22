@@ -1,0 +1,20 @@
+# Build outputs
+*.n
+*.js
+*.swf
+*.cpp/
+*.cs/
+
+# IDE
+.vscode/
+.idea/
+
+# Haxe
+.haxelib/
+
+# Test results
+test_results/
+
+# Temporary files
+*.log
+log.log

@@ -2,6 +2,17 @@ package nz.dialogue.executor;
 
 import nz.dialogue.parser.Block;
 
+// Concrete frame class to avoid anonymous structure mutation issues
+class Frame {
+	public var blocks:Array<Block>;
+	public var pos:Int;
+
+	public function new(blocks:Array<Block>) {
+		this.blocks = blocks;
+		this.pos = 0;
+	}
+}
+
 /**
  * Executes dialogue code block by block
  * Manages variables, functions, and control flow
@@ -13,8 +24,8 @@ class Executor {
 	var functions:Map<String, FunctionDef> = new Map();
 	var callbackHandler:CallbackHandler;
 
-	var currentBlockStack:Array<Array<Block>> = [];
-	var currentPosStack:Array<Int> = [];
+	// Use a single frame stack where each frame holds blocks + current pos
+	var frameStack:Array<Frame> = [];
 
 	public function new(blocks:Array<Block>, ?callbackHandler:CallbackHandler) {
 		this.blocks = blocks;
@@ -22,10 +33,9 @@ class Executor {
 	}
 
 	public function hasNext():Bool {
-		if (currentBlockStack.length > 0) {
-			var currentBlocks = currentBlockStack[currentBlockStack.length - 1];
-			var currentPos = currentPosStack[currentPosStack.length - 1];
-			return currentPos < currentBlocks.length;
+		if (frameStack.length > 0) {
+			var top = frameStack[frameStack.length - 1];
+			return top.pos < top.blocks.length;
 		}
 		return pos < blocks.length;
 	}
@@ -37,18 +47,15 @@ class Executor {
 
 		var block:Block;
 
-		// Si estamos en un bloque anidado, ejecutar desde ahí
-		if (currentBlockStack.length > 0) {
-			var currentBlocks = currentBlockStack[currentBlockStack.length - 1];
-			var currentPos = currentPosStack[currentPosStack.length - 1];
-			block = currentBlocks[currentPos];
-			currentPosStack[currentPosStack.length - 1]++;
-
+		// Si estamos en un bloque anidado (frame stack), ejecutar desde ahí
+		if (frameStack.length > 0) {
+			var top = frameStack[frameStack.length - 1];
+			block = top.blocks[top.pos];
+			// Increment pos using explicit assignment to avoid generating `+=` on Variants
+			top.pos = top.pos + 1;
 			// Si terminamos el bloque actual, salir del stack
-			if (currentPosStack[currentPosStack.length - 1] >= currentBlocks.length) {
-				currentBlockStack.pop();
-				currentPosStack.pop();
-			}
+			if (top.pos >= top.blocks.length)
+				frameStack.pop();
 		} else {
 			block = blocks[pos];
 			pos++;
@@ -138,22 +145,14 @@ class Executor {
 
 	private function enterBlock(blocks:Array<Block>):Void {
 		if (blocks.length > 0) {
-			currentBlockStack.push(blocks);
-			currentPosStack.push(0);
+			frameStack.push(new Frame(blocks));
 		}
 	}
 
 	private function evaluateCondition(condition:String):Bool {
-		// Simple condition evaluation
-		var result = evaluateExpression(condition);
-		if (result == true || result == false) {
-			return result == true;
-		}
-		if (Std.isOfType(result, Int) || Std.isOfType(result, Float)) {
-			var numValue:Float = Std.parseFloat(Std.string(result));
-			return !Math.isNaN(numValue) && numValue > 0;
-		}
-		return result != null;
+		// For now use strict boolean evaluation: only true counts as truthy
+		var result:Dynamic = evaluateExpression(condition);
+		return result == true;
 	}
 
 	private function evaluateExpression(expr:String):Dynamic {
@@ -392,8 +391,7 @@ class Executor {
 
 	public function reset():Void {
 		pos = 0;
-		currentBlockStack = [];
-		currentPosStack = [];
+		frameStack = [];
 	}
 
 	public function callFunction(name:String, ?args:Array<Dynamic>):Bool {

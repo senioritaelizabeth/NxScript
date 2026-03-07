@@ -24,6 +24,9 @@ enum Keyword {
 	KTrue; // true
 	KFalse; // false
 	KNull; // null
+	KTry; // try
+	KCatch; // catch
+	KThrow; // throw
 }
 
 /**
@@ -52,6 +55,13 @@ enum Operator {
 
 	// Assignment
 	OAssign; // =
+	OAddAssign; // +=
+	OSubAssign; // -=
+	OMulAssign; // *=
+	ODivAssign; // /=
+	OModAssign; // %=
+	OIncrement; // ++
+	ODecrement; // --
 
 	// Bitwise
 	OBitAnd; // &

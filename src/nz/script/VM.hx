@@ -5,446 +5,754 @@ import nz.script.Bytecode;
 using StringTools;
 
 /**
- * Virtual Machine that executes bytecode
+ * The VM. It runs bytecode. That's literally the whole job.
+ *
+ * Architecture notes for the brave:
+ * - Pre-allocated 512-slot stack. No Array.push(), no realloc, no crying.
+ * - Locals live directly on the stack (stackBase..stackBase+localCount-1).
+ *   Allocating a fresh array per call was cute. We don't do that anymore.
+ * - EMPTY_MAP is a shared sentinel for closures that capture nothing.
+ *   Avoids `new Map()` on every single function call. You're welcome.
+ * - RETURN restores `sp = savedBase`, unwinding the callee's locals without touching a GC.
+ * - MAKE_FUNC caches VFunction(chunk, EMPTY_MAP) per function index.
+ *   Because creating the same object 100,000 times per second is a cry for help.
+ * - Trampoline architecture: RETURN with frames.length > 0 restores the outer frame
+ *   and CONTINUES in the same run() invocation. Do not call run() twice. You'll know why.
  */
 class VM {
-	// Stack for execution
-	var stack:Array<Value> = [];
+	// One Map to rule them all — shared across every zero-capture function. Never write to this.
+	static var EMPTY_MAP:Map<String, Value> = new Map<String, Value>();
 
-	// Variables storage
-	public var variables:Map<String, Value>;
+	// The stack. 512 slots, pre-allocated, sp is the logical top.
+	// If you overflow this, you wrote infinite recursion. That's on you.
+	var stack:Array<Value>;
+	var sp:Int = 0;
 
-	var letVariables:Map<String, Value>;
-	var constVariables:Map<String, Value>;
+	/** Global variables. Set from Haxe with `vm.globals.set(name, value)`, or via top-level script assignments. */
+	public var globals:Map<String, Value>;
 
-	// Call frames for function calls
+	// Let-scoped variables (block-level) and compile-time constants
+	var scopeVars:Map<String, Value>;
+	var constVars:Map<String, Value>;
+
+	// The call stack. frames[last] is currentFrame. Don't touch frames directly in hot code.
 	var frames:Array<CallFrame> = [];
 	var currentFrame:CallFrame;
 
-	// Native functions
-	public var methods:Map<String, Value>;
+	/** Externally-registered native Haxe functions. Prefer `Interpreter.register()` over writing to this directly. */
+	public var natives:Map<String, Value>;
 
-	// Classes registry (for inheritance lookup)
+	/** Class registry. Populated by MAKE_CLASS instructions and NativeClasses.registerAll(). Used for inheritance lookups during instantiation. */
 	public var classes:Map<String, ClassData>;
 
 	public var debug:Bool = false;
 
-	public var maxInstructions:Int = 1000000; // Safety limit
+	/** Maximum instructions before the VM throws. Default 10,000,000. Raise it if you have a very long-running script; lower it if you want a tighter sandbox. */
+	public var maxInstructions:Int = 10000000;
 
-	var instructionCount:Int = 0;
+	var catchStack:Array<CatchHandler> = [];
 
-	// Script information for debugging
+	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
 
+	/** The instruction currently executing. Only populated when `debug = true`. Null otherwise. */
 	public var currentInstruction:Instruction = null;
 
+	/**
+	 * Creates a VM. Optionally pass debug=true to get a trace per instruction.
+	 * Don't pass debug=true in production unless you enjoy reading walls of text.
+	 */
 	public function new(debug:Bool = false) {
 		this.debug = debug;
-		variables = new Map();
-		letVariables = new Map();
-		constVariables = new Map();
-		methods = new Map();
+		stack = [for (_ in 0...512) VNull]; // pre-allocated — resizing at runtime would be embarrassing
+		sp = 0;
+		globals = new Map();
+		scopeVars = new Map();
+		constVars = new Map();
+		natives = new Map();
 		classes = new Map();
+		catchStack = [];
 
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
 	}
 
+	/**
+	 * Runs a compiled Chunk from the top level.
+	 * Resets all execution state — don't call this mid-execution expecting continuity.
+	 * Builds the flat [op, arg, op, arg...] dispatch array on first run (cached forever after).
+	 */
 	public function execute(chunk:Chunk):Value {
-		// Create initial frame
+		sp = 0;
+		frames = [];
+		catchStack = [];
+
+		// Build flat dispatch array once. Haxe Instruction objects are cute but slow in a hot loop.
+		if (chunk.code == null)
+			buildFlatCode(chunk);
+
+		// Top-level frame has no locals. Stack starts fresh at 0.
 		currentFrame = {
 			chunk: chunk,
 			ip: 0,
-			stackStart: 0,
+			stackBase: 0,
 			localVars: new Map()
 		};
 		frames.push(currentFrame);
 
-		return run();
+		try {
+			return run();
+		} catch (e:ScriptException) {
+			throw 'Uncaught exception: ${valueToString(e.value)}';
+		}
+	}
+
+	/** Flatten Instruction objects into [op, arg, op, arg...] to eliminate object indirection in hot loop */
+	function buildFlatCode(chunk:Chunk) {
+		var insts = chunk.instructions;
+		var flat:Array<Int> = [];
+		for (inst in insts) {
+			flat.push(inst.op);
+			flat.push(inst.arg != null ? inst.arg : 0);
+		}
+		chunk.code = flat;
+		for (fc in chunk.functions)
+			if (fc.chunk.code == null)
+				buildFlatCode(fc.chunk);
 	}
 
 	function run():Value {
+		// Cache hot fields as locals — eliminates repeated field-chain dereferences in the hot loop
+		var chunk = currentFrame.chunk;
+		var code = chunk.code;
+		var codeLen = code.length;
+		var constants = chunk.constants;
+		var strings = chunk.strings;
+		var ip = currentFrame.ip;
+
+		// Cache array/map references (same objects, just avoids `this.x` field lookup each iteration)
+		var stack = this.stack;
+		var frames = this.frames;
+		var catchStack = this.catchStack;
+		var scopeVars = this.scopeVars;
+		var constVars = this.constVars;
+		var globals = this.globals;
+		var currentFrame = this.currentFrame;
+		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead
+
 		while (true) {
-			// Safety check
-			instructionCount++;
-			if (instructionCount > maxInstructions) {
-				throw 'Execution exceeded maximum instruction limit ($maxInstructions) - possible infinite loop';
+			if (frames.length > 10000) {
+				throw 'Execution exceeded maximum call depth - possible infinite recursion';
 			}
 
-			if (currentFrame.ip >= currentFrame.chunk.instructions.length) {
+			if (ip >= codeLen)
 				break;
-			}
 
-			var inst = currentFrame.chunk.instructions[currentFrame.ip];
-			currentInstruction = inst; // Store current instruction for native functions
-			currentFrame.ip++;
+			var op = code[ip];
+			var arg = code[ip + 1];
+			ip += 2;
+			currentFrame.ip = ip; // keep in sync for multi-run frame sharing (recursive call architecture)
 
 			if (debug) {
-				var varInfo = [for (k in letVariables.keys()) '$k=${letVariables.get(k)}'].join(", ");
-				trace('Stack: ${stack.length} | IP: ${currentFrame.ip - 1} | Op: ${Op.getName(inst.op)} | Vars: {$varInfo}');
+				var instIdx = (ip - 2) >> 1;
+				currentInstruction = currentFrame.chunk.instructions[instIdx];
+				var varInfo = [for (k in scopeVars.keys()) '$k=${scopeVars.get(k)}'].join(", ");
+				trace('Stack: $sp | IP: $instIdx | Op: ${Op.getName(op)} | Vars: {$varInfo}');
 			}
 
-			switch (inst.op) {
+			switch (op) {
 				case Op.LOAD_CONST:
-					push(currentFrame.chunk.constants[inst.arg]);
+					stack[sp++] = constants[arg];
 
+				case Op.LOAD_LOCAL:
+					stack[sp++] = stack[currentFrame.stackBase + arg];
+
+				case Op.STORE_LOCAL:
+					stack[currentFrame.stackBase + arg] = stack[sp - 1];
 				case Op.LOAD_VAR:
-					var name = currentFrame.chunk.strings[inst.arg];
-					var value = getVariable(name);
-					if (value == null)
-						throw 'Undefined variable: $name';
-					push(value);
+					var name = strings[arg];
+					// Inline getVariable with single .get() per map (no exists+get overhead)
+					var value:Value = currentFrame.localVars.get(name);
+					if (value == null) {
+						value = scopeVars.get(name);
+						if (value == null) {
+							value = constVars.get(name);
+							if (value == null) {
+								value = globals.get(name);
+								if (value == null) {
+									value = natives.get(name);
+									if (value == null)
+										throw 'Undefined variable: $name';
+								}
+							}
+						}
+					}
+					stack[sp++] = value;
 
 				case Op.STORE_VAR:
-					var name = currentFrame.chunk.strings[inst.arg];
-					setVariable(name, peek(), false);
+					var name = strings[arg];
+					var value = stack[sp - 1];
+					// Inline setVariable: update in-place if it's a scope var, otherwise global
+					if (constVars.exists(name))
+						throw 'Cannot reassign constant: $name';
+					if (scopeVars.exists(name)) {
+						scopeVars.set(name, value);
+						currentFrame.localVars.set(name, value);
+					} else {
+						globals.set(name, value);
+					}
 
 				case Op.STORE_LET:
-					var name = currentFrame.chunk.strings[inst.arg];
-					var value = peek();
-					letVariables.set(name, value);
+					var name = strings[arg];
+					var value = stack[sp - 1];
+					scopeVars.set(name, value);
 					currentFrame.localVars.set(name, value);
 
 				case Op.STORE_CONST:
-					var name = currentFrame.chunk.strings[inst.arg];
-					constVariables.set(name, peek());
+					constVars.set(strings[arg], stack[sp - 1]);
 
 				case Op.POP:
-					pop();
+					sp--;
 
 				case Op.DUP:
-					push(peek());
+					stack[sp] = stack[sp - 1];
+					sp++;
 
-				// Arithmetic
+				// Arithmetic - inlined hot paths
 				case Op.ADD:
-					binaryOp(add);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					switch [a, b] {
+						case [VNumber(x), VNumber(y)]: stack[sp++] = VNumber(x + y);
+						default: stack[sp++] = add(a, b);
+					}
+
 				case Op.SUB:
-					binaryOp(subtract);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					switch [a, b] {
+						case [VNumber(x), VNumber(y)]: stack[sp++] = VNumber(x - y);
+						default: throw 'Cannot subtract';
+					}
+
 				case Op.MUL:
-					binaryOp(multiply);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					switch [a, b] {
+						case [VNumber(x), VNumber(y)]: stack[sp++] = VNumber(x * y);
+						default: stack[sp++] = multiply(a, b);
+					}
+
 				case Op.DIV:
-					binaryOp(divide);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					switch [a, b] {
+						case [VNumber(x), VNumber(y)]:
+							if (y == 0)
+								throw 'Division by zero';
+							stack[sp++] = VNumber(x / y);
+						default: throw 'Cannot divide';
+					}
+
 				case Op.MOD:
-					binaryOp(modulo);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					switch [a, b] {
+						case [VNumber(x), VNumber(y)]:
+							if (y == 0)
+								throw 'Modulo by zero';
+							stack[sp++] = VNumber(x % y);
+						default: throw 'Cannot modulo';
+					}
+
 				case Op.NEG:
-					push(negate(pop()));
+					var a = stack[--sp];
+					switch (a) {
+						case VNumber(x): stack[sp++] = VNumber(-x);
+						default: throw 'Cannot negate';
+					}
 
 				// Bitwise
 				case Op.BIT_AND:
-					push(VNumber(toInt(pop()) & toInt(pop())));
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VNumber(toInt(a) & toInt(b));
 				case Op.BIT_OR:
-					push(VNumber(toInt(pop()) | toInt(pop())));
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VNumber(toInt(a) | toInt(b));
 				case Op.BIT_XOR:
-					push(VNumber(toInt(pop()) ^ toInt(pop())));
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VNumber(toInt(a) ^ toInt(b));
 				case Op.BIT_NOT:
-					push(VNumber(~toInt(pop())));
+					stack[sp - 1] = VNumber(~toInt(stack[sp - 1]));
 				case Op.SHIFT_LEFT:
-					var b = toInt(pop());
-					var a = toInt(pop());
-					push(VNumber(a << b));
+					var b = toInt(stack[--sp]);
+					var a = toInt(stack[--sp]);
+					stack[sp++] = VNumber(a << b);
 				case Op.SHIFT_RIGHT:
-					var b = toInt(pop());
-					var a = toInt(pop());
-					push(VNumber(a >> b));
+					var b = toInt(stack[--sp]);
+					var a = toInt(stack[--sp]);
+					stack[sp++] = VNumber(a >> b);
 
-				// Comparison
+				// Comparison — inlined to avoid this.sp sync with comparisonOp()
 				case Op.EQ:
-					var b = pop();
-					var a = pop();
-					push(VBool(equals(a, b)));
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(equals(a, b));
 				case Op.NEQ:
-					var b = pop();
-					var a = pop();
-					push(VBool(!equals(a, b)));
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(!equals(a, b));
 				case Op.LT:
-					comparisonOp((a, b) -> a < b);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(compare(a, b) < 0);
 				case Op.GT:
-					comparisonOp((a, b) -> a > b);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(compare(a, b) > 0);
 				case Op.LTE:
-					comparisonOp((a, b) -> a <= b);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(compare(a, b) <= 0);
 				case Op.GTE:
-					comparisonOp((a, b) -> a >= b);
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(compare(a, b) >= 0);
 
 				// Logical
 				case Op.AND:
-					var b = pop();
-					var a = pop();
-					push(VBool(isTruthy(a) && isTruthy(b)));
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(isTruthy(a) && isTruthy(b));
 				case Op.OR:
-					var b = pop();
-					var a = pop();
-					push(VBool(isTruthy(a) || isTruthy(b)));
+					var b = stack[--sp];
+					var a = stack[--sp];
+					stack[sp++] = VBool(isTruthy(a) || isTruthy(b));
 				case Op.NOT:
-					push(VBool(!isTruthy(pop())));
+					stack[sp - 1] = VBool(!isTruthy(stack[sp - 1]));
 
-				// Control flow
+				// Control flow — operate on local ip
 				case Op.JUMP:
-					currentFrame.ip += inst.arg;
+					ip += arg * 2;
+
 				case Op.JUMP_IF_FALSE:
-					if (!isTruthy(peek()))
-						currentFrame.ip += inst.arg;
-					pop();
+					if (!isTruthy(stack[sp - 1]))
+						ip += arg * 2;
+					sp--;
+
 				case Op.JUMP_IF_TRUE:
-					if (isTruthy(peek()))
-						currentFrame.ip += inst.arg;
-					pop();
+					if (isTruthy(stack[sp - 1]))
+						ip += arg * 2;
+					sp--;
 
 				// Functions
 				case Op.CALL:
-					var args:Array<Value> = [];
-					for (i in 0...inst.arg)
-						args.unshift(pop());
-					var callee = pop();
-					push(call(callee, args));
+					var args:Array<Value> = [for (_ in 0...arg) VNull];
+					var ai = arg;
+					while (ai > 0) {
+						ai--;
+						args[ai] = stack[--sp];
+					}
+					var callee = stack[--sp];
+					this.sp = sp; // sync sp so callee / inner run() see the correct stack top
+					try {
+						var r = call(callee, args);
+						sp = this.sp;
+						stack[sp++] = r;
+						this.sp = sp;
+					} catch (e:ScriptException) {
+						handleThrownValue(e.value, this.sp);
+						// Exception was caught — resync everything
+						this.currentFrame = this.frames[this.frames.length - 1];
+						currentFrame = this.currentFrame;
+						chunk = currentFrame.chunk;
+						code = chunk.code;
+						codeLen = code.length;
+						constants = chunk.constants;
+						strings = chunk.strings;
+					}
+					sp = this.sp;
+					ip = currentFrame.ip;
 
 				case Op.RETURN:
-					var result = pop();
+					var result = stack[--sp];
+					var savedBase = currentFrame.stackBase; // restore sp here after the frame exits
 					frames.pop();
-					if (frames.length == 0)
+					if (frames.length == 0) {
+						this.sp = savedBase;
 						return result;
-					currentFrame = frames[frames.length - 1];
-					push(result);
+					}
+					// Restore outer frame and refresh all locals
+					this.currentFrame = frames[frames.length - 1];
+					currentFrame = this.currentFrame;
+					chunk = currentFrame.chunk;
+					code = chunk.code;
+					codeLen = code.length;
+					constants = chunk.constants;
+					strings = chunk.strings;
+					ip = currentFrame.ip;
+					sp = savedBase; // unwind callee's locals from the shared stack
+					stack[sp++] = result;
 
 				case Op.MAKE_FUNC:
-					var funcChunk = currentFrame.chunk.functions[inst.arg];
-					var closure = new Map<String, Value>();
-					for (key in letVariables.keys())
-						closure.set(key, letVariables.get(key));
-					push(VFunction(funcChunk, closure));
+					var funcChk = chunk.functions[arg];
+					// Avoid allocating a Map when scopeVars is empty (common for top-level funcs)
+					var hasScopeVars = false;
+					for (_ in scopeVars.keys()) {
+						hasScopeVars = true;
+						break;
+					}
+					if (hasScopeVars) {
+						var closure = new Map<String, Value>();
+						for (key in scopeVars.keys())
+							closure.set(key, scopeVars.get(key));
+						stack[sp++] = VFunction(funcChk, closure);
+					} else {
+						// Cache VFunction(chunk, EMPTY_MAP) per function index —
+						// eliminates repeated VFunction alloc for inner functions with no captures.
+						var fc = chunk.funcCache;
+						if (fc == null) {
+							fc = [for (_ in 0...chunk.functions.length) null];
+							chunk.funcCache = fc;
+						}
+						var cv = fc[arg];
+						if (cv == null) {
+							cv = VFunction(funcChk, EMPTY_MAP);
+							fc[arg] = cv;
+						}
+						stack[sp++] = cv;
+					}
 
 				case Op.MAKE_LAMBDA:
-					var funcChunk = currentFrame.chunk.functions[inst.arg];
+					var funcChunk = chunk.functions[arg];
 					var closure = new Map<String, Value>();
-					for (key in letVariables.keys())
-						closure.set(key, letVariables.get(key));
-					for (key in currentFrame.localVars.keys())
-						closure.set(key, currentFrame.localVars.get(key));
-					push(VFunction(funcChunk, closure));
+					for (key in scopeVars.keys())
+						closure.set(key, scopeVars.get(key));
+					// Capture named local slots from the stack (stack-based locals)
+					var localNames = chunk.localNames;
+					if (localNames != null) {
+						var base = currentFrame.stackBase;
+						for (i in 0...localNames.length)
+							if (localNames[i] != "")
+								closure.set(localNames[i], stack[base + i]);
+					}
+					// Also copy any localVars (like 'this') not covered by slots
+					if (currentFrame.localVars != EMPTY_MAP)
+						for (key in currentFrame.localVars.keys())
+							closure.set(key, currentFrame.localVars.get(key));
+					stack[sp++] = VFunction(funcChunk, closure);
 
 				// Data structures
 				case Op.MAKE_ARRAY:
-					var elements:Array<Value> = [];
-					for (i in 0...inst.arg)
-						elements.unshift(pop());
-					push(VArray(elements));
+					var elements:Array<Value> = [for (_ in 0...arg) VNull];
+					var ei = arg;
+					while (ei > 0) {
+						ei--;
+						elements[ei] = stack[--sp];
+					}
+					stack[sp++] = VArray(elements);
 
 				case Op.MAKE_DICT:
 					var map = new Map<String, Value>();
-					for (i in 0...inst.arg) {
-						var value = pop();
-						var key = valueToString(pop());
+					for (i in 0...arg) {
+						var value = stack[--sp];
+						var key = valueToString(stack[--sp]);
 						map.set(key, value);
 					}
-					push(VDict(map));
+					stack[sp++] = VDict(map);
 
 				case Op.GET_MEMBER:
-					var field = currentFrame.chunk.strings[inst.arg];
-					var object = pop();
+					var field = strings[arg];
+					var object = stack[--sp];
 					if (debug)
 						trace('GET_MEMBER: field=$field, object type=${Type.enumConstructor(object)}');
-					push(getMember(object, field));
+					stack[sp++] = getMember(object, field);
 
 				case Op.SET_MEMBER:
-					var field = currentFrame.chunk.strings[inst.arg];
-					var object = pop(); // El objeto está arriba
-					var value = pop(); // El valor está debajo
+					var field = strings[arg];
+					var object = stack[--sp];
+					var value = stack[--sp];
 					setMember(object, field, value);
-					push(value);
+					stack[sp++] = value;
 
 				case Op.GET_INDEX:
-					var index = pop();
-					var object = pop();
-					push(getIndex(object, index));
+					var index = stack[--sp];
+					var object = stack[--sp];
+					stack[sp++] = getIndex(object, index);
 
 				case Op.SET_INDEX:
-					var value = pop();
-					var index = pop();
-					var object = pop();
+					var value = stack[--sp];
+					var index = stack[--sp];
+					var object = stack[--sp];
 					setIndex(object, index, value);
-					push(value);
+					stack[sp++] = value;
 
 				// Classes
 				case Op.MAKE_CLASS:
-					// Decode counts: methods = high 16 bits, fields = low 16 bits
-					var counts = inst.arg;
-					var methodCount = counts >> 16;
-					var fieldCount = counts & 0xFFFF;
-
-					// Pop fields (name, value pairs)
-					var fields = new Map<String, Value>();
-					for (i in 0...fieldCount) {
-						var value = pop();
-						var name = switch (pop()) {
-							case VString(s): s;
-							default: throw "Field name must be a string";
-						}
-						fields.set(name, value);
-					}
-
-					// Pop methods (name, function, isConstructor triples)
-					var methods = new Map<String, FunctionChunk>();
-					var constructor:Null<FunctionChunk> = null;
-					for (i in 0...methodCount) {
-						var isConstructor = switch (pop()) {
-							case VBool(b): b;
-							default: false;
-						}
-						var func = switch (pop()) {
-							case VFunction(f, _): f;
-							default: throw "Method must be a function";
-						}
-						var name = switch (pop()) {
-							case VString(s): s;
-							default: throw "Method name must be a string";
-						}
-						methods.set(name, func);
-						if (isConstructor) {
-							constructor = func;
-						}
-					}
-
-					// Pop super class
-					var superClass:Null<String> = switch (pop()) {
-						case VNull: null;
-						case VNativeObject(_): "HaxeNative"; // Placeholder for native inheritance
-						case VClass(c): c.name;
-						default: throw "Super class must be null or a class";
-					}
-
-					// Pop class name
-					var className = switch (pop()) {
-						case VString(s): s;
-						default: throw "Class name must be a string";
-					}
-
-					// Create class data
-					var classData:ClassData = {
-						name: className,
-						superClass: superClass,
-						methods: methods,
-						fields: fields,
-						constructor: constructor
-					};
-
-					// Register class in global registry
-					classes.set(className, classData);
-
-					push(VClass(classData));
+					this.sp = sp;
+					handleMakeClass(arg);
+					sp = this.sp;
 
 				case Op.INSTANTIATE:
-					var argCount = inst.arg;
-					var args:Array<Value> = [];
-					for (i in 0...argCount) {
-						args.unshift(pop());
+					this.sp = sp;
+					try {
+						handleInstantiate(arg);
+					} catch (e:ScriptException) {
+						handleThrownValue(e.value, this.sp);
+						this.currentFrame = this.frames[this.frames.length - 1];
+						currentFrame = this.currentFrame;
+						chunk = currentFrame.chunk;
+						code = chunk.code;
+						codeLen = code.length;
+						constants = chunk.constants;
+						strings = chunk.strings;
 					}
-
-					var classValue = pop();
-
-					var instance = switch (classValue) {
-						case VClass(classData):
-							// Create instance with fields from the entire inheritance chain
-							var instanceFields = new Map<String, Value>();
-
-							// Collect fields from parent classes first
-							var currentClass = classData;
-							var classChain:Array<ClassData> = [];
-							while (currentClass != null) {
-								classChain.unshift(currentClass); // Add to front
-								if (currentClass.superClass != null && classes.exists(currentClass.superClass)) {
-									currentClass = classes.get(currentClass.superClass);
-								} else {
-									currentClass = null;
-								}
-							}
-
-							// Apply fields from parent to child (so child overrides parent)
-							for (cls in classChain) {
-								for (field in cls.fields.keys()) {
-									instanceFields.set(field, cls.fields.get(field));
-								}
-							}
-
-							var inst = VInstance(classData.name, instanceFields, classData);
-
-							// Call constructor if it exists
-							if (classData.constructor != null) {
-								// Check argument count
-								if (args.length != classData.constructor.paramCount) {
-									throw 'Constructor expects ${classData.constructor.paramCount} arguments, got ${args.length}';
-								}
-
-								// Execute constructor by creating a temporary VM instance
-								// This is a hack to avoid frame management issues
-								var tempVM = new VM(debug);
-								tempVM.variables = this.variables;
-								tempVM.methods = this.methods;
-								tempVM.classes = this.classes;
-								tempVM.letVariables = new Map();
-								tempVM.constVariables = new Map();
-
-								// Create frame for constructor
-								tempVM.frames = [
-									{
-										chunk: classData.constructor.chunk,
-										ip: 0,
-										stackStart: 0,
-										localVars: new Map()
-									}
-								];
-								tempVM.currentFrame = tempVM.frames[0];
-
-								// Set 'this' and parameters
-								tempVM.currentFrame.localVars.set("this", inst);
-								for (i in 0...args.length) {
-									tempVM.currentFrame.localVars.set(classData.constructor.paramNames[i], args[i]);
-								}
-
-								// Run constructor (result is ignored)
-								tempVM.run();
-							}
-
-							inst;
-						default:
-							throw 'Cannot instantiate non-class value';
-					}
-
-					push(instance);
+					sp = this.sp;
+					ip = currentFrame.ip;
 
 				case Op.GET_THIS:
 					var thisValue = getVariable("this");
 					if (thisValue == null) {
 						throw "'this' is not defined in this context";
 					}
-					push(thisValue);
+					stack[sp++] = thisValue;
+
+				// Exception handling
+				case Op.THROW:
+					var throwVal = stack[--sp];
+					handleThrownValue(throwVal, sp);
+					// Exception was caught — resync all locals
+					this.currentFrame = this.frames[this.frames.length - 1];
+					currentFrame = this.currentFrame;
+					chunk = currentFrame.chunk;
+					code = chunk.code;
+					codeLen = code.length;
+					constants = chunk.constants;
+					strings = chunk.strings;
+					sp = this.sp;
+					ip = currentFrame.ip;
+
+				case Op.SETUP_TRY:
+					catchStack.push({
+						stackDepth: sp,
+						framesDepth: frames.length,
+						catchIP: ip + arg * 2 // ip already advanced past this opcode
+					});
+
+				case Op.POP_TRY:
+					catchStack.pop();
 
 				// Iteration
 				case Op.GET_ITER:
-					push(getIterator(pop()));
+					stack[sp - 1] = getIterator(stack[sp - 1]);
 
 				case Op.FOR_ITER:
-					var iterator = peek();
+					var iterator = stack[sp - 1];
 					var next = iteratorNext(iterator);
 					if (next == null) {
-						pop();
-						currentFrame.ip += inst.arg;
+						sp--;
+						ip += arg * 2;
 					} else {
-						push(next);
+						stack[sp++] = next;
 					}
 
 				// Special
 				case Op.LOAD_NULL:
-					push(VNull);
+					stack[sp++] = VNull;
 				case Op.LOAD_TRUE:
-					push(VBool(true));
+					stack[sp++] = VBool(true);
 				case Op.LOAD_FALSE:
-					push(VBool(false));
+					stack[sp++] = VBool(false);
 
 				default:
-					throw 'Unknown opcode: 0x${StringTools.hex(inst.op, 2)}';
+					throw 'Unknown opcode: 0x${StringTools.hex(op, 2)}';
 			}
 		}
 
-		return stack.length > 0 ? pop() : VNull;
+		var result = sp > 0 ? stack[--sp] : VNull;
+		this.sp = sp;
+		return result;
+	}
+
+	function handleMakeClass(counts:Int) {
+		// Decode counts: methods = high 16 bits, fields = low 16 bits
+		var methodCount = counts >> 16;
+		var fieldCount = counts & 0xFFFF;
+
+		// Pop fields (name, value pairs)
+		var fields = new Map<String, Value>();
+		for (i in 0...fieldCount) {
+			var value = pop();
+			var name = switch (pop()) {
+				case VString(s): s;
+				default: throw "Field name must be a string";
+			}
+			fields.set(name, value);
+		}
+
+		// Pop methods (name, function, isConstructor triples)
+		var methods = new Map<String, FunctionChunk>();
+		var constructor:Null<FunctionChunk> = null;
+		for (i in 0...methodCount) {
+			var isConstructor = switch (pop()) {
+				case VBool(b): b;
+				default: false;
+			}
+			var func = switch (pop()) {
+				case VFunction(f, _): f;
+				default: throw "Method must be a function";
+			}
+			var name = switch (pop()) {
+				case VString(s): s;
+				default: throw "Method name must be a string";
+			}
+			methods.set(name, func);
+			if (isConstructor) {
+				constructor = func;
+			}
+		}
+
+		// Pop super class
+		var superClass:Null<String> = switch (pop()) {
+			case VNull: null;
+			case VNativeObject(_): "HaxeNative";
+			case VClass(c): c.name;
+			default: throw "Super class must be null or a class";
+		}
+
+		// Pop class name
+		var className = switch (pop()) {
+			case VString(s): s;
+			default: throw "Class name must be a string";
+		}
+
+		// Create class data
+		var classData:ClassData = {
+			name: className,
+			superClass: superClass,
+			methods: methods,
+			fields: fields,
+			constructor: constructor
+		};
+
+		// Register class in global registry
+		classes.set(className, classData);
+
+		push(VClass(classData));
+	}
+
+	function handleThrownValue(val:Value, sp:Int) {
+		if (catchStack.length > 0) {
+			var handler = catchStack.pop();
+			while (frames.length > handler.framesDepth)
+				frames.pop();
+			if (frames.length > 0)
+				currentFrame = frames[frames.length - 1];
+			var newSp = handler.stackDepth;
+			stack[newSp] = val;
+			this.sp = newSp + 1;
+			currentFrame.ip = handler.catchIP;
+		} else {
+			this.sp = sp;
+			throw new ScriptException(val);
+		}
+	}
+
+	function handleInstantiate(argCount:Int) {
+		var args:Array<Value> = [for (_ in 0...argCount) VNull];
+		var ai = argCount;
+		while (ai > 0) {
+			ai--;
+			args[ai] = pop();
+		}
+
+		var classValue = pop();
+
+		var instance = switch (classValue) {
+			case VClass(classData):
+				// Create instance with fields from the entire inheritance chain
+				var instanceFields = new Map<String, Value>();
+
+				// Collect fields from parent classes first
+				var currentClass = classData;
+				var classChain:Array<ClassData> = [];
+				while (currentClass != null) {
+					classChain.unshift(currentClass);
+					if (currentClass.superClass != null && classes.exists(currentClass.superClass)) {
+						currentClass = classes.get(currentClass.superClass);
+					} else {
+						currentClass = null;
+					}
+				}
+
+				// Apply fields from parent to child (so child overrides parent)
+				for (cls in classChain) {
+					for (field in cls.fields.keys()) {
+						instanceFields.set(field, cls.fields.get(field));
+					}
+				}
+
+				var inst = VInstance(classData.name, instanceFields, classData);
+
+				// Call constructor if it exists
+				if (classData.constructor != null) {
+					// Check argument count
+					if (args.length != classData.constructor.paramCount) {
+						throw 'Constructor expects ${classData.constructor.paramCount} arguments, got ${args.length}';
+					}
+
+					// Use frame save/restore instead of creating a new VM (much cheaper)
+					var savedFrames = this.frames;
+					var savedCurrentFrame = this.currentFrame;
+					var savedScopeVars = this.scopeVars;
+					var savedConstVars = this.constVars;
+					var savedCatchStack = this.catchStack;
+
+					var ctor = classData.constructor;
+					var localCount = ctor.localCount != null ? ctor.localCount : 0;
+					// Stack-based locals: reserve stack[0..localCount-1] for ctor
+					for (i in 0...localCount)
+						stack[i] = VNull;
+					for (i in 0...args.length)
+						stack[i] = args[i];
+
+					var ctorVars = new Map<String, Value>();
+					ctorVars.set("this", inst);
+					var ctorFrame:CallFrame = {
+						chunk: ctor.chunk,
+						ip: 0,
+						stackBase: 0,
+						localVars: ctorVars
+					};
+
+					var savedSp = this.sp;
+					this.frames = [ctorFrame];
+					this.currentFrame = ctorFrame;
+					this.scopeVars = new Map();
+					this.constVars = new Map();
+					this.catchStack = [];
+					this.sp = localCount;
+
+					// constructor result is ignored
+					run();
+
+					this.frames = savedFrames;
+					this.currentFrame = savedCurrentFrame;
+					this.scopeVars = savedScopeVars;
+					this.constVars = savedConstVars;
+					this.catchStack = savedCatchStack;
+					this.sp = savedSp;
+				}
+
+				inst;
+			default:
+				throw 'Cannot instantiate non-class value';
+		}
+
+		push(instance);
 	}
 
 	function call(callee:Value, args:Array<Value>):Value {
@@ -454,20 +762,53 @@ class VM {
 					throw 'Function ${funcChunk.name} expects ${funcChunk.paramCount} arguments, got ${args.length}';
 				}
 
+				// Stack-based locals: reserve stack[localsBase..localsBase+localCount-1]
+				var localCount = funcChunk.localCount != null ? funcChunk.localCount : 0;
+				var localsBase = this.sp;
+				for (i in 0...localCount)
+					stack[localsBase + i] = VNull;
+				// Params occupy slots 0..paramCount-1
+				for (i in 0...args.length)
+					stack[localsBase + i] = args[i];
+				// Closure vars → slots: O(1) with localSlots map, O(n) fallback with indexOf
+				if (closure != EMPTY_MAP) {
+					var localSlots = funcChunk.localSlots;
+					if (localSlots != null) {
+						for (key in closure.keys()) {
+							var idx = localSlots.get(key);
+							if (idx != null)
+								stack[localsBase + idx] = closure.get(key);
+						}
+					} else {
+						var localNames = funcChunk.localNames;
+						if (localNames != null) {
+							for (key in closure.keys()) {
+								var idx = localNames.indexOf(key);
+								if (idx >= 0)
+									stack[localsBase + idx] = closure.get(key);
+							}
+						}
+					}
+				}
+
+				// Avoid new Map() when closure is empty — reuse EMPTY_MAP sentinel.
+				// setVariable will lazy-alloc if a 'let' binding is ever written.
+				var localVars:Map<String, Value>;
+				if (closure == EMPTY_MAP) {
+					localVars = EMPTY_MAP;
+				} else {
+					localVars = new Map<String, Value>();
+					for (key in closure.keys())
+						localVars.set(key, closure.get(key));
+				}
+
+				this.sp = localsBase + localCount;
 				var newFrame:CallFrame = {
 					chunk: funcChunk.chunk,
 					ip: 0,
-					stackStart: stack.length,
-					localVars: new Map()
+					stackBase: localsBase,
+					localVars: localVars
 				};
-
-				for (i in 0...args.length) {
-					newFrame.localVars.set(funcChunk.paramNames[i], args[i]);
-				}
-
-				for (key in closure.keys()) {
-					newFrame.localVars.set(key, closure.get(key));
-				}
 
 				frames.push(newFrame);
 				currentFrame = newFrame;
@@ -486,54 +827,49 @@ class VM {
 		}
 	}
 
-	// Variable management
 	function getVariable(name:String):Value {
-		if (currentFrame.localVars.exists(name))
+		if (currentFrame.localVars != EMPTY_MAP && currentFrame.localVars.exists(name))
 			return currentFrame.localVars.get(name);
-		if (letVariables.exists(name))
-			return letVariables.get(name);
-		if (constVariables.exists(name))
-			return constVariables.get(name);
-		if (variables.exists(name))
-			return variables.get(name);
-		if (methods.exists(name))
-			return methods.get(name);
+		if (scopeVars.exists(name))
+			return scopeVars.get(name);
+		if (constVars.exists(name))
+			return constVars.get(name);
+		if (globals.exists(name))
+			return globals.get(name);
+		if (natives.exists(name))
+			return natives.get(name);
 		return null;
 	}
 
 	function setVariable(name:String, value:Value, isConst:Bool) {
-		if (constVariables.exists(name))
+		if (constVars.exists(name))
 			throw 'Cannot reassign constant: $name';
 
 		// Check if it's a let variable first
-		if (letVariables.exists(name)) {
-			letVariables.set(name, value);
+		if (scopeVars.exists(name)) {
+			scopeVars.set(name, value);
+			// Lazy-alloc localVars if it was the shared EMPTY_MAP sentinel
+			if (currentFrame.localVars == EMPTY_MAP)
+				currentFrame.localVars = new Map<String, Value>();
 			currentFrame.localVars.set(name, value);
 			return;
 		}
 
 		if (isConst)
-			constVariables.set(name, value);
+			constVars.set(name, value);
 		else
-			variables.set(name, value);
+			globals.set(name, value);
 	}
 
-	// Stack operations
 	inline function push(value:Value)
-		stack.push(value);
+		stack[sp++] = value;
 
 	inline function pop():Value {
-		if (stack.length == 0) {
-			throw "Stack underflow at IP: " + currentFrame.ip;
-		}
-		return stack.pop();
+		return stack[--sp];
 	}
 
 	inline function peek():Value {
-		if (stack.length == 0) {
-			throw "Stack underflow (peek) at IP: " + currentFrame.ip;
-		}
-		return stack[stack.length - 1];
+		return stack[sp - 1];
 	}
 
 	// Conversion between Haxe and Script values
@@ -574,34 +910,80 @@ class VM {
 	}
 
 	/**
-	 * Call a script function with arguments (helper for external code)
+	 * Calls a script function from Haxe. Saves and restores all VM state around the call,
+	 * so you don't spin up a fresh VM (which was the old approach, and it was bad).
+	 * Locals go directly onto stack[0..localCount-1]; expression stack starts above them.
 	 */
 	public function callFunction(func:FunctionChunk, closure:Map<String, Value>, args:Array<Value>):Value {
-		var tempVM = new VM(debug);
-		tempVM.variables = this.variables;
-		tempVM.methods = this.methods;
-		tempVM.classes = this.classes;
-		tempVM.letVariables = new Map();
-		tempVM.constVariables = new Map();
-
-		tempVM.frames = [
-			{
-				chunk: func.chunk,
-				ip: 0,
-				stackStart: 0,
-				localVars: closure.copy()
-			}
-		];
-		tempVM.currentFrame = tempVM.frames[0];
-
-		// Set parameters
-		for (i in 0...args.length) {
-			if (i < func.paramNames.length) {
-				tempVM.currentFrame.localVars.set(func.paramNames[i], args[i]);
+		// Stack-based locals: reserve stack[0..localCount-1] for func frame
+		var localCount = func.localCount != null ? func.localCount : 0;
+		for (i in 0...localCount)
+			stack[i] = VNull;
+		for (i in 0...args.length)
+			stack[i] = args[i];
+		// O(1) closure-to-slot mapping with localSlots, O(n) fallback
+		if (closure != EMPTY_MAP) {
+			var localSlots = func.localSlots;
+			if (localSlots != null) {
+				for (key in closure.keys()) {
+					var idx = localSlots.get(key);
+					if (idx != null)
+						stack[idx] = closure.get(key);
+				}
+			} else {
+				var localNames = func.localNames;
+				if (localNames != null) {
+					for (key in closure.keys()) {
+						var idx = localNames.indexOf(key);
+						if (idx >= 0)
+							stack[idx] = closure.get(key);
+					}
+				}
 			}
 		}
 
-		return tempVM.run();
+		// Avoid closure.copy() when closure is empty
+		var localVars:Map<String, Value>;
+		if (closure == EMPTY_MAP) {
+			localVars = EMPTY_MAP;
+		} else {
+			localVars = closure.copy();
+		}
+		for (i in 0...args.length)
+			if (i < func.paramNames.length)
+				localVars.set(func.paramNames[i], args[i]);
+
+		var savedFrames = this.frames;
+		var savedCurrentFrame = this.currentFrame;
+		var savedScopeVars = this.scopeVars;
+		var savedConstVars = this.constVars;
+		var savedCatchStack = this.catchStack;
+		var savedSp = this.sp;
+
+		var funcFrame:CallFrame = {
+			chunk: func.chunk,
+			ip: 0,
+			stackBase: 0,
+			localVars: localVars
+		};
+
+		this.frames = [funcFrame];
+		this.currentFrame = funcFrame;
+		this.scopeVars = new Map();
+		this.constVars = new Map();
+		this.catchStack = [];
+		this.sp = localCount;
+
+		var result = run();
+
+		this.frames = savedFrames;
+		this.currentFrame = savedCurrentFrame;
+		this.scopeVars = savedScopeVars;
+		this.constVars = savedConstVars;
+		this.catchStack = savedCatchStack;
+		this.sp = savedSp;
+
+		return result;
 	}
 
 	// Arithmetic operations
@@ -738,7 +1120,14 @@ class VM {
 			case VNativeObject(obj):
 				// Access Haxe object field or method
 				try {
-					var value:Dynamic = Reflect.field(obj, field);
+					// Try getProperty first (works with getters/setters)
+					var value:Dynamic = null;
+					try {
+						value = Reflect.getProperty(obj, field);
+					} catch (e:Dynamic) {
+						// Fallback to field access
+						value = Reflect.field(obj, field);
+					}
 
 					// If it's a function, wrap it as a native function
 					if (Reflect.isFunction(value)) {
@@ -755,7 +1144,7 @@ class VM {
 					// Otherwise, convert the field value
 					return haxeToValue(value);
 				} catch (e:Dynamic) {
-					throw 'Cannot access field $field on native object';
+					throw 'Cannot access field $field on native object: $e';
 				}
 			default: throw 'Cannot access member $field';
 		}
@@ -769,9 +1158,15 @@ class VM {
 				// Set instance field
 				fields.set(field, value);
 			case VNativeObject(obj):
-				// Set Haxe object field
+				// Set Haxe object field/property
 				try {
-					Reflect.setField(obj, field, valueToHaxe(value));
+					// Try setProperty first (works with getters/setters like set_angle)
+					try {
+						Reflect.setProperty(obj, field, valueToHaxe(value));
+					} catch (e:Dynamic) {
+						// Fallback to setField
+						Reflect.setField(obj, field, valueToHaxe(value));
+					}
 				} catch (e:Dynamic) {
 					throw 'Cannot set field $field on native object: $e';
 				}
@@ -1081,13 +1476,7 @@ class VM {
 
 	// Initialize native functions
 	function initializeNativeFunctions() {
-		methods.set("print", VNativeFunction("print", 1, (args) -> {
-			var location = currentInstruction != null ? '[$scriptName - ${currentInstruction.line}:${currentInstruction.col}] ' : '';
-			// Sys.println(location + valueToString(args[0]));
-			return VNull;
-		}));
-
-		methods.set("len", VNativeFunction("len", 1, (args) -> {
+		natives.set("len", VNativeFunction("len", 1, (args) -> {
 			return switch (args[0]) {
 				case VString(s): VNumber(s.length);
 				case VArray(arr): VNumber(arr.length);
@@ -1096,7 +1485,7 @@ class VM {
 			}
 		}));
 
-		methods.set("type", VNativeFunction("type", 1, (args) -> {
+		natives.set("type", VNativeFunction("type", 1, (args) -> {
 			var typeName = switch (args[0]) {
 				case VNumber(_): "Number";
 				case VString(_): "String";
@@ -1118,6 +1507,23 @@ class VM {
 typedef CallFrame = {
 	chunk:Chunk,
 	ip:Int,
-	stackStart:Int,
+	// stackBase: index into VM.stack where this frame's locals start.
+	// Locals occupy stack[stackBase..stackBase+localCount-1];
+	// expression stack starts at stack[sp] (sp >= stackBase+localCount).
+	stackBase:Int,
 	localVars:Map<String, Value>
+}
+
+typedef CatchHandler = {
+	stackDepth:Int,
+	framesDepth:Int,
+	catchIP:Int
+}
+
+class ScriptException {
+	public var value:Value;
+
+	public function new(v:Value) {
+		value = v;
+	}
 }

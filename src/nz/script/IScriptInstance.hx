@@ -1,47 +1,44 @@
 package nz.script;
 
 /**
- * Base interface for all script class instances.
- * Extend this interface when defining type-safe interfaces for your script classes.
- * 
- * **Auto-Synchronization:**
- * Fields are automatically synchronized when you call methods on the instance.
- * You rarely need to call `__syncToScript__()` manually.
- * 
- * **Important for Interpreter Mode:**
- * When using `--interp`, you must use `Dynamic` type for the variable that performs
- * operations. Only use the typed interface for temporary autocomplete assistance.
- * 
- * Example (Interpreter Mode):
+ * Typed interface for script class instances.
+ * Extend this when you want autocomplete on your script objects without losing your mind.
+ *
+ * **How syncing works:**
+ * Fields are synced from Haxe → script automatically when you call any method.
+ * You almost never need to call `__syncToScript__()` yourself. Almost.
+ *
+ * **Interpreter mode gotcha:**
+ * On `--interp`, you MUST use `Dynamic` for the variable that performs operations.
+ * Use the typed interface only for temporary autocomplete help.
+ *
+ * Example (interpreter mode — Neko, neko, neko):
  * ```haxe
  * interface MyCat extends IScriptInstance {
  *     var meow:Bool;
  *     function speak():String;
  * }
- * 
- * // Use Dynamic for operations
+ *
  * var cat:Dynamic = interp.createInstance("MyCat");
  * cat.meow = false;
- * cat.speak(); // Auto-syncs fields before calling!
- * 
- * // Temporarily assign to typed variable for autocomplete
- * var typedCat:MyCat = cat;
- * trace(typedCat.meow); // IDE autocomplete works on 'meow'
+ * cat.speak(); // auto-syncs fields before calling
+ *
+ * var typedCat:MyCat = cat; // only for autocomplete, don't store this long-term on interp
+ * trace(typedCat.meow);
  * ```
- * 
- * Example (Compiled Mode - Neko, HL, JS, C++):
+ *
+ * Example (compiled targets — HL, C++, JS, etc.):
  * ```haxe
- * // In compiled mode, you can use typed variables directly
  * var cat:MyCat = interp.createInstance("MyCat");
  * cat.meow = false;
- * cat.speak(); // Auto-syncs!
+ * cat.speak(); // just works
  * ```
  */
 interface IScriptInstance {
 	/**
-	 * Manually synchronizes field changes from the Haxe proxy back to the script instance.
-	 * Usually not needed - fields auto-sync when you call methods.
-	 * Only call this if you need to force sync before accessing fields from within script code.
+	 * Force-syncs Haxe-side field changes back into the script instance.
+	 * You don't need this unless you modified a field from Haxe and need the script
+	 * to see the new value BEFORE calling any method. Which is an unusual situation.
 	 */
 	public function __syncToScript__():Void;
 

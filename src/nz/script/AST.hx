@@ -3,7 +3,9 @@ package nz.script;
 import nz.script.Token;
 
 /**
- * Abstract Syntax Tree nodes
+ * Abstract Syntax Tree node types.
+ * The compiler walks these. The parser produces them.
+ * You stare at them when something doesn't compile right.
  */
 enum Expr {
 	// Literals
@@ -67,6 +69,10 @@ enum Stmt {
 	SBreak;
 	SContinue;
 
+	// Exception handling
+	STryCatch(body:Array<Stmt>, catchVar:String, catchBody:Array<Stmt>);
+	SThrow(expr:Expr);
+
 	// Expression statement
 	SExpr(expr:Expr);
 
@@ -107,6 +113,7 @@ enum TypeHint {
 	TArray(elementType:TypeHint);
 	TDict(keyType:TypeHint, valueType:TypeHint);
 	TFunc(params:Array<TypeHint>, returnType:TypeHint);
+	TCustom(className:String); // Para clases externas como FlxSound
 }
 
 // Helper type for Either

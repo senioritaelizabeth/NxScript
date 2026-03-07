@@ -4,8 +4,11 @@ import nz.script.Token;
 import nz.script.AST;
 
 /**
- * Parser for the script language
- * Converts tokens into an Abstract Syntax Tree
+ * Recursive descent parser. Reads tokens, produces an AST.
+ * It's not fancy. It doesn't need to be.
+ *
+ * Error recovery strategy: throw immediately. You get one error at a time.
+ * Parse errors will tell you the line and column. Fix the line. Re-run. You know the drill.
  */
 class Parser {
 	var tokens:Array<TokenPos>;
@@ -50,6 +53,8 @@ class Parser {
 			case TKeyword(KFor): parseFor();
 			case TKeyword(KBreak): {advance(); SBreak;}
 			case TKeyword(KContinue): {advance(); SContinue;}
+			case TKeyword(KTry): parseTryCatch();
+			case TKeyword(KThrow): parseThrow();
 			case TLeftBrace: parseBlock();
 			default: SExpr(parseExpression());
 		}
@@ -253,6 +258,10 @@ class Parser {
 				var elementType = parseTypeHint();
 				expect(TRightBracket, "Expected ']' after array type");
 				TArray(elementType);
+			case TIdentifier(name):
+				advance();
+				// Soporte para clases externas (FlxSound, etc)
+				TCustom(name);
 			default:
 				throw 'Expected type hint at line ${token.line}, col ${token.col}';
 		}
@@ -334,6 +343,29 @@ class Parser {
 		return SBlock(stmts);
 	}
 
+	function parseTryCatch():Stmt {
+		advance(); // consume 'try'
+		expect(TLeftBrace, "Expected '{' after 'try'");
+		var body = parseBlockBody();
+		expect(TRightBrace, "Expected '}' after try body");
+
+		skipNewlines();
+		expect(TKeyword(KCatch), "Expected 'catch' after try body");
+		expect(TLeftParen, "Expected '(' after 'catch'");
+		var catchVar = expectIdentifier();
+		expect(TRightParen, "Expected ')' after catch variable");
+		expect(TLeftBrace, "Expected '{' after catch clause");
+		var catchBody = parseBlockBody();
+		expect(TRightBrace, "Expected '}' after catch body");
+
+		return STryCatch(body, catchVar, catchBody);
+	}
+
+	function parseThrow():Stmt {
+		advance(); // consume 'throw'
+		return SThrow(parseExpression());
+	}
+
 	function parseBlockBody():Array<Stmt> {
 		var stmts:Array<Stmt> = [];
 		skipNewlines();
@@ -357,6 +389,32 @@ class Parser {
 		if (match(TOperator(OAssign))) {
 			var value = parseAssignment();
 			return EAssign(expr, value);
+		}
+
+		// Compound assignment operators (+=, -=, etc.)
+		var compoundOp = switch (peek().token) {
+			case TOperator(OAddAssign):
+				advance();
+				OAdd;
+			case TOperator(OSubAssign):
+				advance();
+				OSub;
+			case TOperator(OMulAssign):
+				advance();
+				OMul;
+			case TOperator(ODivAssign):
+				advance();
+				ODiv;
+			case TOperator(OModAssign):
+				advance();
+				OMod;
+			default: null;
+		}
+
+		if (compoundOp != null) {
+			var value = parseAssignment();
+			// Transform: x += y  =>  x = x + y
+			return EAssign(expr, EBinary(compoundOp, expr, value));
 		}
 
 		return expr;
@@ -528,6 +586,14 @@ class Parser {
 				}
 				advance();
 				EUnary(op, parseUnary());
+			case TOperator(OIncrement):
+				advance();
+				var target = parsePostfix();
+				EAssign(target, EBinary(OAdd, target, ENumber(1)));
+			case TOperator(ODecrement):
+				advance();
+				var target = parsePostfix();
+				EAssign(target, EBinary(OSub, target, ENumber(1)));
 			default:
 				parsePostfix();
 		}
@@ -535,10 +601,10 @@ class Parser {
 
 	function parsePostfix():Expr {
 		var expr = parsePrimary();
+		var running = true;
 
-		while (true) {
+		while (running) {
 			var token = peek().token;
-
 			expr = switch (token) {
 				case TDot:
 					advance();
@@ -557,8 +623,19 @@ class Parser {
 					expect(TRightParen, "Expected ')' after arguments");
 					ECall(expr, args);
 
+				case TOperator(OIncrement):
+					advance();
+					running = false;
+					EAssign(expr, EBinary(OAdd, expr, ENumber(1)));
+
+				case TOperator(ODecrement):
+					advance();
+					running = false;
+					EAssign(expr, EBinary(OSub, expr, ENumber(1)));
+
 				default:
-					break;
+					running = false;
+					expr;
 			}
 		}
 

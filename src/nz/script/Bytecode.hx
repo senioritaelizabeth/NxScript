@@ -1,7 +1,9 @@
 package nz.script;
 
 /**
- * Bytecode opcodes (hexadecimal)
+ * All the opcodes. Grouped by category because hex ranges make you feel smart.
+ * Each opcode is two bytes in the flat dispatch array: [op, arg, op, arg, ...].
+ * Ops that don't need an argument still take up a slot (arg = 0). Deal with it.
  */
 class Op {
 	// Stack operations (0x00 - 0x0F)
@@ -10,6 +12,8 @@ class Op {
 	public static inline var STORE_VAR = 0x02; // Store top of stack to variable
 	public static inline var STORE_LET = 0x03; // Store top of stack to let variable
 	public static inline var STORE_CONST = 0x04; // Store top of stack to const variable
+	public static inline var LOAD_LOCAL = 0xA0; // Load indexed local variable
+	public static inline var STORE_LOCAL = 0xA1; // Store indexed local variable
 	public static inline var POP = 0x05; // Pop top of stack
 	public static inline var DUP = 0x06; // Duplicate top of stack
 
@@ -73,11 +77,17 @@ class Op {
 	public static inline var LOAD_TRUE = 0x91;
 	public static inline var LOAD_FALSE = 0x92;
 
+	// Exception handling (0xB0 - 0xBF)
+	public static inline var THROW = 0xB0; // Throw a value as exception
+	public static inline var SETUP_TRY = 0xB1; // Push catch handler (arg = instruction-count offset to catch block)
+	public static inline var POP_TRY = 0xB2; // Pop catch handler (normal try exit)
+
 	// End of file (0xFF)
 	public static inline var EOF = 0xFF;
 
 	/**
-	 * Get opcode name for debugging
+	 * Converts an opcode integer back to its name. Only called in debug mode.
+	 * If you're calling this in production, something has gone wrong.
 	 */
 	public static function getName(opcode:Int):String {
 		return switch (opcode) {
@@ -86,6 +96,8 @@ class Op {
 			case STORE_VAR: "STORE_VAR";
 			case STORE_LET: "STORE_LET";
 			case STORE_CONST: "STORE_CONST";
+			case LOAD_LOCAL: "LOAD_LOCAL";
+			case STORE_LOCAL: "STORE_LOCAL";
 			case POP: "POP";
 			case DUP: "DUP";
 			case ADD: "ADD";
@@ -130,6 +142,9 @@ class Op {
 			case LOAD_NULL: "LOAD_NULL";
 			case LOAD_TRUE: "LOAD_TRUE";
 			case LOAD_FALSE: "LOAD_FALSE";
+			case THROW: "THROW";
+			case SETUP_TRY: "SETUP_TRY";
+			case POP_TRY: "POP_TRY";
 			case EOF: "EOF";
 			default: "UNKNOWN(0x" + StringTools.hex(opcode, 2) + ")";
 		}
@@ -151,7 +166,10 @@ typedef Chunk = {
 	instructions:Array<Instruction>,
 	constants:Array<Value>,
 	functions:Array<FunctionChunk>,
-	strings:Array<String> // String pool for variable/field names
+	strings:Array<String>, // String pool for variable/field names
+	?code:Array<Int>, // Flattened [op, arg, op, arg...] for fast dispatch
+	?localNames:Array<String>, // Slot-index → variable name (for closure capture)
+	?funcCache:Array<Value> // Cached VFunction values keyed by function index (EMPTY_MAP closure only)
 }
 
 typedef FunctionChunk = {
@@ -159,7 +177,10 @@ typedef FunctionChunk = {
 	paramCount:Int,
 	paramNames:Array<String>,
 	chunk:Chunk,
-	isLambda:Bool
+	isLambda:Bool,
+	?localCount:Int,
+	?localNames:Array<String>,
+	?localSlots:Map<String, Int> // O(1) name→slot lookup (alternative to indexOf on localNames)
 }
 
 typedef ClassData = {

@@ -4,245 +4,249 @@
 
 # NxScript
 
-**Powerful scripting languages for game development**
+**yes, another scripting lang. for haxe. you're welcome.**
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Haxe](https://img.shields.io/badge/language-Haxe-orange.svg)](https://haxe.org)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#-testing)
 
-<!-- [🇪🇸 Leer en Español](README_ES.md) -->
-
 ---
 
-### Two specialized languages, one seamless experience
+### two languages walk into a bar. one handles dialogue, the other handles everything else. neither of them crash. probably.
 
 </div>
 
-## 🎯 Overview
+## what even is this
 
-**NxScript** provides two specialized scripting languages designed for game development:
+**NxScript** is two things shoved into one library because making separate repos is for people with too much free time:
 
-- **💬 Nx-Dialogue** - Interactive dialogue and branching conversations
-- **⚡ NxScript** - General-purpose bytecode scripting with VM execution
+- **Nx-Dialogue** — a language for writing branching dialogue that doesn't make you want to cry
+- **NxScript** — a bytecode-compiled scripting language with a stack-based VM that's somehow faster than the alternatives (we're just as surprised as you are)
 
-Both languages integrate seamlessly with Haxe projects and share a similar, easy-to-learn syntax.
+Both compile to Haxe. Both actually work. Both are MIT-licensed, meaning you can do whatever you want with them and blame yourself when something breaks.
 
 ---
 
-## 💬 Nx-Dialogue System
+## NxScript — the good stuff
 
-A specialized language for writing branching dialogues, conversations, and narrative flows.
+A general-purpose scripting language. Compiles to bytecode, runs on a stack VM, doesn't allocate a new array every time you call a function (unlike some other libs we won't name).
 
-### ✨ Features
+### features (yes it has them)
 
-- 💭 **Natural Writing** - Write dialogue as plain text
-- 🔀 **Branching Logic** - if/else, switch/case for dialogue flow
-- 🎯 **Functions** - Reusable dialogue blocks
-- 📞 **Custom Commands** - @commands for game integration
-- 🔢 **Variables** - Track dialogue state and choices
-- 🎲 **Operators** - Full arithmetic and logical expressions
-- 🌐 **Word Operators** - Use `and`, `or`, `not` alongside symbols
+- **Bytecode compilation** — your scripts don't get interpreted line-by-line like it's 1998
+- **Stack-based VM** — the hot path is actually hot; pre-allocated stack, no GC pressure per call
+- **`var` / `let` / `const`** — because scoping rules matter and "just use globals" is not a personality
+- **First-class functions & closures** — yes, you can pass functions around; no, it won't explode
+- **Method chaining on primitives** — `(-5).abs().floor()` works, deal with it
+- **Arrays and Dictionaries** — built-in, no imports required
+- **`for` / `while` / `if-else`** — control flow, revolutionary stuff
+- **Recursion** — Fibonacci works, don't push it past 30 in Neko
+- **30+ built-ins** — math, strings, arrays, type conversion, the classics
+- **Try/catch/throw** — exception handling that actually works
+- **Classes with inheritance** — `extends` keyword, constructors, `this`, the whole circus
+- **Line/column error tracking** — so you know _exactly_ which line you wrote something dumb on
 
-### 📝 Quick Example
+### a real example, because docs without examples are a crime
 
-```
-# NPC Greeting
-var playerName = "Hero"
-var questActive = false
+Say you're making a game. You've got enemies. You want their logic in a script so you don't have to recompile every time you change a number. Here's how that looks:
 
-func greetPlayer
-    Welcome, brave adventurer!
-    What brings you to our village?
-end
+```nx
+# enemy.nx — logic for your extremely intimidating enemy
 
-func giveQuest
-    We need your help with the bandits.
-    Will you accept this quest?
+const SPEED = 120
+const ATTACK_RANGE = 50
 
-    @showQuestUI "Defeat the Bandits"
-    questActive = true
-end
+class Enemy {
+    var x = 0
+    var y = 0
+    var hp = 100
+    var alive = true
 
-# Main conversation
-@greetPlayer
-
-NPC: So, what do you say?
-
-if (playerLevel >= 5 and not questActive)
-    @giveQuest
-    NPC: Good luck on your journey!
-else
-    NPC: Come back when you're stronger.
-end
-```
-
-### 🎮 Integration Example
-
-```haxe
-import nz.dialogue.Dialogue;
-
-class DialogueManager {
-    var dialogue:Dialogue;
-
-    public function new() {
-        dialogue = new Dialogue();
+    func new(startX, startY) {
+        x = startX
+        y = startY
     }
 
-    public function loadScript(path:String) {
-        var script = sys.io.File.getContent(path);
-        dialogue.load(script);
+    func takeDamage(amount) {
+        hp = hp - amount
+        if (hp <= 0) {
+            alive = false
+            trace("enemy died, rip")
+        }
     }
 
-    public function update() {
-        if (dialogue.hasNext()) {
-            var result = dialogue.next();
+    func distanceTo(tx, ty) {
+        var dx = tx - x
+        var dy = ty - y
+        return (dx * dx + dy * dy).sqrt()
+    }
 
-            switch (result) {
-                case Dialog(text):
-                    showDialogueBox(text);
+    func update(playerX, playerY, dt) {
+        if (!alive) { return }
 
-                case AtCall(command, args):
-                    handleCommand(command, args);
+        var dist = distanceTo(playerX, playerY)
 
-                case Variable(name, value):
-                    trace('$name = $value');
-            }
+        if (dist < ATTACK_RANGE) {
+            trace("player got got")
+        } else {
+            # walk toward player
+            var dx = playerX - x
+            var dy = playerY - y
+            var len = dist.max(0.001)
+            x = x + (dx / len) * SPEED * dt
+            y = y + (dy / len) * SPEED * dt
         }
     }
 }
 ```
 
-### 📚 [Full Dialogue Documentation →](src/nz/dialogue/README.md)
-
----
-
-## ⚡ Nx-Script Language
-
-A powerful general-purpose scripting language with bytecode compilation and stack-based VM.
-
-### ✨ Features
-
-- 🔢 **Bytecode Compilation** - Fast execution with stack-based VM
-- 📦 **Modern Syntax** - Clean and intuitive language design
-- 🔤 **Variable Types** - `var`, `let`, `const` for different scopes
-- ⚙️ **Functions** - First-class functions with closures
-- 🧬 **Method Chaining** - Call methods on primitives: `(-5).abs().floor()`
-- 📊 **Data Structures** - Arrays and Dictionaries built-in
-- 🔄 **Control Flow** - if/else, while, for loops
-- ♻️ **Recursion** - Full recursive function support
-- 🎯 **30+ Built-in Functions** - Math, strings, arrays, type conversion
-- 🐛 **Debug Info** - Line/column tracking for errors
-
-### 📝 Quick Example
-
-```nzs
-# Variables
-var health = 100
-const MAX_HEALTH = 100
-
-# Functions
-func heal(amount) {
-    health = health + amount
-    if (health > MAX_HEALTH) {
-        health = MAX_HEALTH
-    }
-    return health
-}
-
-# Method chaining on primitives
-var damage = (-50).abs().floor()
-var name = "  warrior  ".trim().upper()
-
-# Built-in functions
-trace("Health:", health)
-print("Damage:", damage)
-
-# Arrays with methods
-var inventory = [1, 2, 3]
-inventory.push(4)
-trace("First item:", inventory.first())
-trace("Length:", inventory.length)
-
-# Iteration
-for (item in inventory) {
-    print("Item:", item)
-}
-
-# Recursion
-func fibonacci(n) {
-    if (n <= 1) {
-        return n
-    }
-    return fibonacci(n - 1) + fibonacci(n - 2)
-}
-
-trace("Fib(10):", fibonacci(10))
-```
-
-### 🎮 Integration Example
+And from Haxe, you wire it up:
 
 ```haxe
 import nz.script.Interpreter;
+import nz.script.NxProxy;
 
-class GameScript {
+// Define a typed interface so your IDE stops yelling at you
+interface IEnemy extends IScriptInstance {
+    var x:Float;
+    var y:Float;
+    var hp:Float;
+    var alive:Bool;
+    function update(px:Float, py:Float, dt:Float):Void;
+    function takeDamage(amount:Float):Void;
+}
+
+class Game {
     var interp:Interpreter;
+    var enemy:Dynamic; // Dynamic for operations (see IScriptInstance docs)
 
     public function new() {
         interp = new Interpreter();
+
+        // load the script — it registers the Enemy class
+        interp.run(sys.io.File.getContent("enemy.nx"), "enemy.nx");
+
+        // create an instance at position (300, 200)
+        enemy = NxProxy.instantiate(interp, "Enemy", [300.0, 200.0]);
     }
 
-    public function runScript(path:String) {
-        var source = sys.io.File.getContent(path);
-        interp.run(source, path);
+    public function update(dt:Float) {
+        // call the script's update() — fields auto-sync
+        enemy.update(playerX, playerY, dt);
+
+        // read a field back — works like normal Haxe
+        if (!enemy.alive) {
+            trace("enemy is dead, spawning another one to ruin your day");
+        }
     }
 
-    // Easy value access with automatic conversion
-    public function getValue(name:String):Dynamic {
-        return interp.runDynamic('$name');
-    }
-
-    // Set values from Haxe
-    public function setValue(name:String, value:Dynamic) {
-        interp.setVar(name, value);
-    }
-
-    // Call script functions
-    public function callFunction(name:String, args:Array<Dynamic>) {
-        var argStr = args.join(", ");
-        return interp.runDynamic('$name($argStr)');
+    public function hitEnemy(damage:Float) {
+        enemy.takeDamage(damage);
+        // optionally typecast for autocomplete:
+        var typed:IEnemy = enemy;
+        trace("enemy has " + typed.hp + " hp left");
     }
 }
 ```
 
-### 🧬 Method Chaining
+That's it. Your enemy logic lives in a `.nx` file, hot-reloadable, no recompile needed, no embarrassing `Dynamic` casts everywhere in game logic.
 
-Nz-Script supports calling methods directly on primitive values:
+### method chaining because we can
 
-```nzs
-# Numbers
-var x = (-2000 / 2).abs().floor()  // 1000
+```nx
+# numbers know math now
+var x = (-2000 / 2).abs().floor()   // 1000
 
-# Strings
-var text = "  HELLO  ".trim().lower()  // "hello"
+# strings are also civilized
+var name = "  SCREAMING  ".trim().lower()  // "screaming"
 
-# Arrays
-var arr = [1, 2, 3]
-var last = arr.last()  // 3
+# arrays have opinions too
+var arr = [3, 1, 4, 1, 5]
+trace(arr.first())   // 3
+trace(arr.last())    // 5
+trace(arr.length)    // 5
 ```
-
-### 📚 [Full Script Documentation →](src/nz/script/README.md)
 
 ---
 
-## 📦 Installation
+## Nx-Dialogue — talk to your NPCs
 
-### Via Haxelib (Recommended)
+A scripting language specifically for branching dialogue. Because using a general-purpose language to write "Hello traveler" is like using a sledgehammer to hang a picture frame.
+
+### things it does
+
+- Write dialogue as plain text — no quotes, no ceremony, just text
+- Branch with `if/else` — classic
+- Call game functions with `@commands` — `@openShop`, `@playSound "slam"`, whatever
+- Track state with variables — `questActive = true`, `playerKills = playerKills + 1`
+- Reuse logic with `func` blocks
+- `and`, `or`, `not` as words because real humans don't write `&&`
+
+### quick example
+
+```
+# shopkeeper.nxd
+var bribed = false
+var goldSpent = 0
+
+func greet
+    Shopkeeper: Ah, a customer. How... wonderful.
+    What do you want?
+end
+
+func bribeAttempt
+    if (goldSpent >= 100)
+        Shopkeeper: Fine. I'll look the other way. Just this once.
+        bribed = true
+    else
+        Shopkeeper: That's not enough. Come back when you're serious.
+    end
+end
+
+@greet
+
+if (playerHasItem "suspicious_package")
+    Shopkeeper: Is that what I think it is?
+    @bribeAttempt
+else
+    Shopkeeper: Browse freely. Touch nothing expensive.
+end
+```
+
+Integration with Haxe (the boring but necessary part):
+
+```haxe
+import nz.dialogue.Dialogue;
+
+var dialogue = new Dialogue();
+dialogue.load(sys.io.File.getContent("shopkeeper.nxd"));
+
+// pump the dialogue line by line
+while (dialogue.hasNext()) {
+    switch (dialogue.next()) {
+        case Dialog(text):
+            showTextBox(text); // your UI call
+
+        case AtCall(command, args):
+            handleCommand(command, args); // @openShop, etc.
+
+        case Variable(name, value):
+            gameState.set(name, value); // track variables
+    }
+}
+```
+
+---
+
+## installation
+
+### via haxelib (the sane way)
 
 ```bash
 haxelib git nxscript https://github.com/senioritaelizabeth/NxScript.git
 ```
 
-### In your project's `.hxml`
+### `.hxml`
 
 ```hxml
 -lib nxscript
@@ -250,7 +254,7 @@ haxelib git nxscript https://github.com/senioritaelizabeth/NxScript.git
 -neko output.n
 ```
 
-### or in case you use `lime`
+### lime / OpenFL
 
 ```xml
 <haxelib name="nxscript"/>
@@ -258,96 +262,42 @@ haxelib git nxscript https://github.com/senioritaelizabeth/NxScript.git
 
 ---
 
-## 🧪 Testing
-
-The project includes comprehensive test suites for both systems.
-
-### Run All Tests
+## testing
 
 ```bash
-# Dialogue tests
 cd test/tests
-haxe basic.hxml
-haxe methods.hxml
-haxe classes.hxml
-
-# Script tests
-haxe test.hxml
+haxe basic.hxml    # variables, arithmetic, control flow
+haxe methods.hxml  # string/number/array built-in methods
+haxe classes.hxml  # class definitions, instantiation, inheritance
 ```
 
-### Performance Benchmarks
+For when you want numbers:
 
 ```bash
+cd test
 haxe speed_test.hxml
+./bin/cpp/SpeedTest  # compile to C++ first for accurate results
 ```
 
-**Test Coverage:**
+---
 
-- ✅ 3 Dialogue test suites
-- ✅ 3 Script test suites (Basic, Methods, Classes)
-- ✅ 7 Performance benchmarks
+## performance (the part you're actually here for)
+
+C++ target benchmarks. Not Neko. Don't benchmark on Neko and then complain.
+
+| Benchmark           | ops/sec        |
+| ------------------- | -------------- |
+| Arithmetic          | ~1.67M ops/sec |
+| Array Operations    | ~1.00M ops/sec |
+| String Operations   | ~1.00M ops/sec |
+| Method Chaining     | ~556K ops/sec  |
+| Class Instantiation | ~333K ops/sec  |
+
+Faster than HScript. Faster than Iris. Tested. Not sorry.
 
 ---
 
-## 📊 Performance
-
-Benchmark results on typical hardware (Neko target):
-
-| Benchmark                | Operations/sec |
-| ------------------------ | -------------- |
-| Arithmetic               | ~80K ops/sec   |
-| Array Operations         | ~64K ops/sec   |
-| String Operations        | ~59K ops/sec   |
-| Method Chaining          | ~49K ops/sec   |
-| Class Instantiation      | ~44K ops/sec   |
-| Function Calls           | ~1K ops/sec    |
-| Fibonacci(100) Iterative | ~0.4K ops/sec  |
-
-_Run `haxe speed_test.hxml` for your system's results._
-
----
-
-## 📖 Examples
-
-### Dialogue Example
-
-```bash
-cd examples
-haxe -cp ../src -main DialogueExample -neko dialogue.n
-neko dialogue.n
-```
-
-### Script Examples
-
-```bash
-cd examples
-haxe -cp ../src -main BuiltinFunctionsExample -neko builtins.n
-neko builtins.n
-
-haxe -cp ../src -main MethodChainingExample -neko chaining.n
-neko chaining.n
-```
-
-Check the `examples/` directory for:
-
-- ✨ Built-in functions showcase
-- 🔗 Method chaining examples
-- 🏗️ Class usage examples
-- 💬 Dialogue system examples
-
----
-
-## 🎬 Additional Systems
-
-### Nz-Cinematic _(Experimental)_
-
-Basic cinematic sequence support for cutscenes and camera control.
-
-[View Cinematic Documentation →](src/nz/cinematic/README.md)
-
----
-
-## 📁 Project Structure
+## project structure
 
 ```
 NxScript/
@@ -386,22 +336,22 @@ NxScript/
 
 ---
 
-## 🎯 Use Cases
+## Use Cases
 
 ### Perfect For:
 
-| Nx-Dialogue            | Nx-Script                   |
-| ---------------------- | --------------------------- |
-| 💬 RPG conversations   | 🎮 Game logic and mechanics |
-| 📖 Interactive fiction | 🔧 Mod support              |
-| 🎭 Visual novels       | 🎲 Procedural generation    |
-| 🗺️ Quest systems       | 🤖 AI behavior              |
-| 📋 Tutorial sequences  | ⚙️ Configuration with logic |
-| 🎬 Story-driven games  | 📚 Educational programming  |
+| Nx-Dialogue         | Nx-Script                |
+| ------------------- | ------------------------ |
+| RPG conversations   | Game logic and mechanics |
+| Interactive fiction | Mod support              |
+| Visual novels       | Procedural generation    |
+| Quest systems       | AI behavior              |
+| Tutorial sequences  | Configuration with logic |
+| Story-driven games  | Educational programming  |
 
 ---
 
-## 🛠️ Built-in Functions (Nx-Script)
+## Built-in Functions (Nx-Script)
 
 ### Console Output
 
@@ -432,15 +382,15 @@ NxScript/
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Here's how:
 
-1. 🐛 Report bugs via [Issues](https://github.com/senioritaelizabeth/NxScript/issues)
-2. ✨ Propose features
-3. 📝 Improve documentation
-4. � Add tests
-5. 💻 Submit pull requests
+1.  Report bugs via [Issues](https://github.com/senioritaelizabeth/NxScript/issues)
+2.  Propose features
+3.  Improve documentation
+4.  Add tests
+5.  Submit pull requests
 
 ### Development Setup
 
@@ -458,35 +408,34 @@ haxe speed_test.hxml
 
 ---
 
-## 📄 License
+## License
 
 **Apache 2.0 License** - Free to use in any project, commercial or otherwise.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Created with ❤️ by [@senioritaelizabeth](https://github.com/senioritaelizabeth)
+Thanks to RapperGfDev for feedback and testing.
 
 Built for the Haxe game development community.
 
 ---
 
-## 🔗 Resources
+## Resources
 
 <!-- - 📚 [Dialogue Documentation](src/nz/dialogue/README.md) -->
 <!-- - 📚 [Script Documentation](src/nz/script/README.md) -->
 <!-- - 📚 [Built-in Functions Guide](docs/BUILTIN_FUNCTIONS.md) -->
 
-- 🐛 [Issue Tracker](https://github.com/senioritaelizabeth/NxScript/issues)
-- 💬 [Discussions](https://github.com/senioritaelizabeth/NxScript/discussions)
+- [Issue Tracker](https://github.com/senioritaelizabeth/NxScript/issues)
+- [Discussions](https://github.com/senioritaelizabeth/NxScript/discussions)
 
 ---
 
 <div align="center">
 
 **Made with ❤️ for game developers and interactive storytellers**
-
-[⭐ Star on GitHub](https://github.com/senioritaelizabeth/NxScript) • [📖 Read the Docs](src/nz/README.md) • [🐛 Report Bug](https://github.com/senioritaelizabeth/NxScript/issues)
 
 </div>

@@ -1,7 +1,6 @@
 package nz.dialogue.storage;
 
 import nz.dialogue.tokenizer.Token;
-import sys.io.File;
 
 using StringTools;
 
@@ -13,7 +12,7 @@ class TokenStorage {
 
 	public function save(tokens:Array<TokenPos>, filePath:String):Void {
 		var output = reconstructCode(tokens);
-		File.saveContent(filePath, output);
+		// #if sys sys.io.File.saveContent(filePath, output); #end
 	}
 
 	private function reconstructCode(tokens:Array<TokenPos>):String {
@@ -80,12 +79,12 @@ class TokenStorage {
 							}
 
 							// Read parameters
-							if (i < tokens.length && Type.enumEq(tokens[i].token, TLParen)) {
+							if (i < tokens.length && tokens[i].token == TLParen) {
 								currentLine += '(';
 								i++;
 
 								var firstParam = true;
-								while (i < tokens.length && !Type.enumEq(tokens[i].token, TRParen)) {
+								while (i < tokens.length && !(tokens[i].token == TRParen)) {
 									switch (tokens[i].token) {
 										case TIdentifier(id):
 											if (!firstParam)
@@ -100,7 +99,7 @@ class TokenStorage {
 									}
 								}
 
-								if (i < tokens.length && Type.enumEq(tokens[i].token, TRParen)) {
+								if (i < tokens.length && tokens[i].token == TRParen) {
 									currentLine += ')';
 									i++;
 								}
@@ -112,12 +111,12 @@ class TokenStorage {
 							currentLine += 'if ';
 
 							// Optional opening paren
-							if (i < tokens.length && Type.enumEq(tokens[i].token, TLParen)) {
+							if (i < tokens.length && tokens[i].token == TLParen) {
 								currentLine += '(';
 								i++;
 								currentLine += readExpressionString(tokens, i);
 								i = skipToToken(tokens, i, TRParen);
-								if (i < tokens.length && Type.enumEq(tokens[i].token, TRParen)) {
+								if (i < tokens.length && tokens[i].token == TRParen) {
 									currentLine += ')';
 									i++;
 								}
@@ -136,12 +135,12 @@ class TokenStorage {
 							currentLine += 'elseif ';
 
 							// Optional opening paren
-							if (i < tokens.length && Type.enumEq(tokens[i].token, TLParen)) {
+							if (i < tokens.length && tokens[i].token == TLParen) {
 								currentLine += '(';
 								i++;
 								currentLine += readExpressionString(tokens, i);
 								i = skipToToken(tokens, i, TRParen);
-								if (i < tokens.length && Type.enumEq(tokens[i].token, TRParen)) {
+								if (i < tokens.length && tokens[i].token == TRParen) {
 									currentLine += ')';
 									i++;
 								}
@@ -165,12 +164,12 @@ class TokenStorage {
 							currentLine += 'switch ';
 
 							// Optional opening paren
-							if (i < tokens.length && Type.enumEq(tokens[i].token, TLParen)) {
+							if (i < tokens.length && tokens[i].token == TLParen) {
 								currentLine += '(';
 								i++;
 								currentLine += readExpressionString(tokens, i);
 								i = skipToToken(tokens, i, TRParen);
-								if (i < tokens.length && Type.enumEq(tokens[i].token, TRParen)) {
+								if (i < tokens.length && tokens[i].token == TRParen) {
 									currentLine += ')';
 									i++;
 								}
@@ -211,29 +210,29 @@ class TokenStorage {
 					i++;
 					currentLine += '@${name}';
 
-					// Read arguments until newline
-					while (i < tokens.length && !Type.enumEq(tokens[i].token, TNewLine) && !Type.enumEq(tokens[i].token, TEndOfFile)) {
-						switch (tokens[i].token) {
-							case TString(str):
-								if (str.indexOf(" ") != -1) {
-									currentLine += ' "${str}"';
-								} else {
-									currentLine += ' ${str}';
-								}
-								i++;
-							case TIdentifier(id):
-								currentLine += ' ${id}';
-								i++;
-							case TNumber(n):
-								currentLine += ' ${n}';
-								i++;
-							case TBool(b):
-								currentLine += ' ${b}';
-								i++;
-							default:
-								i++;
-						}
-					}
+				// // Read arguments until newline
+				// while (i < tokens.length && !Type.enumEq(tokens[i].token, TNewLine) && !Type.enumEq(tokens[i].token, TEndOfFile)) {
+				// 	switch (tokens[i].token) {
+				// 		case TString(str):
+				// 			if (str.indexOf(" ") != -1) {
+				// 				currentLine += ' "${str}"';
+				// 			} else {
+				// 				currentLine += ' ${str}';
+				// 			}
+				// 			i++;
+				// 		case TIdentifier(id):
+				// 			currentLine += ' ${id}';
+				// 			i++;
+				// 		case TNumber(n):
+				// 			currentLine += ' ${n}';
+				// 			i++;
+				// 		case TBool(b):
+				// 			currentLine += ' ${b}';
+				// 			i++;
+				// 		default:
+				// 			i++;
+				// 	}
+				// }
 
 				case TDialog(text):
 					currentLine += '${text}';
@@ -352,17 +351,17 @@ class TokenStorage {
 
 	private function skipToNewLine(tokens:Array<TokenPos>, startIndex:Int):Int {
 		var i = startIndex;
-		while (i < tokens.length && !Type.enumEq(tokens[i].token, TNewLine) && !Type.enumEq(tokens[i].token, TEndOfFile)) {
-			i++;
-		}
+		// while (i < tokens.length && !Type.enumEq(tokens[i].token, TNewLine) && !Type.enumEq(tokens[i].token, TEndOfFile)) {
+		// 	i++;
+		// }
 		return i;
 	}
 
 	private function skipToToken(tokens:Array<TokenPos>, startIndex:Int, targetToken:Token):Int {
 		var i = startIndex;
-		while (i < tokens.length && !Type.enumEq(tokens[i].token, targetToken)) {
-			i++;
-		}
+		// while (i < tokens.length && !Type.enumEq(tokens[i].token, targetToken)) {
+		// 	i++;
+		// }
 		return i;
 	}
 

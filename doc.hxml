@@ -1,0 +1,22 @@
+-cp src
+-xml doc.xml
+-neko doc.n
+--no-output
+
+# script engine
+nz.script.VM
+nz.script.Interpreter
+nz.script.Compiler
+nz.script.Parser
+nz.script.Tokenizer
+nz.script.Bytecode
+nz.script.AST
+nz.script.Token
+nz.script.NativeClasses
+nz.script.BytecodeSerializer
+nz.script.IScriptInstance
+nz.script.NxProxy
+nz.script.ScriptClass
+
+# dialogue system
+nz.dialogue.Dialogue

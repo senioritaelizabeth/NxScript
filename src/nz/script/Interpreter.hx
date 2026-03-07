@@ -1,24 +1,36 @@
 package nz.script;
 
-import nz.script.Tokenizer;
-import nz.script.Parser;
-import nz.script.Compiler;
-import nz.script.VM;
 import nz.script.Bytecode;
+import nz.script.BytecodeSerializer;
+import nz.script.Compiler;
+import nz.script.NxProxy;
+import nz.script.Parser;
+import nz.script.Tokenizer;
+import nz.script.VM;
 
 /**
- * Main interpreter class for the scripting language
- * Usage:
- * ```
- * var interp = new Interpreter();
- * interp.variables.set("x", VNumber(10));
- * var result = interp.run(sourceCode);
- * trace(result);
- * ```
+ * The front door. Tokenizes, parses, compiles, and runs your script in one call.
+ *
+ * For most use cases you just need:
+ *   var interp = new Interpreter();
+ *   interp.globals.set("someValue", VNumber(42));
+ *   interp.run(sourceCode);
+ *
+ * If you need class instances from script code, use NxProxy — don't access
+ * VInstance fields manually unless you enjoy pain.
+ *
+ * `variables` and `methods` still work but are deprecated.
+ * Update your code. They're going away eventually.
  */
 class Interpreter {
 	public var vm:VM;
+	public var globals(get, never):Map<String, Value>;
+	public var natives(get, never):Map<String, Value>;
+
+	@:deprecated("Use 'globals' instead")
 	public var variables(get, never):Map<String, Value>;
+
+	@:deprecated("Use 'natives' instead")
 	public var methods(get, never):Map<String, Value>;
 
 	var debug:Bool = false;
@@ -32,11 +44,12 @@ class Interpreter {
 	}
 
 	/**
-	 * Register all built-in global functions
+	 * Registers all built-in global functions (trace, print, len, range, type, math stuff, etc).
+	 * Called once in new(). Don't call it again unless you like duplicate registrations.
 	 */
 	private function registerBuiltins():Void {
 		// Console output
-		registerFunction("trace", -1, function(args:Array<Value>):Value {
+		register("trace", -1, function(args:Array<Value>):Value {
 			var parts:Array<Dynamic> = [];
 			for (arg in args) {
 				parts.push(vm.valueToHaxe(arg));
@@ -47,31 +60,31 @@ class Interpreter {
 			if (vm.currentInstruction != null) {
 				lineInfo = '${vm.scriptName}:${vm.currentInstruction.line}: ';
 			}
+			Sys.print(lineInfo + parts.join(" ") + "\n");
 
-			trace(lineInfo + parts.join(" "));
 			return VNull;
 		});
 
-		registerFunction("print", -1, function(args:Array<Value>):Value {
+		register("print", -1, function(args:Array<Value>):Value {
 			var parts:Array<Dynamic> = [];
 			for (arg in args) {
 				parts.push(vm.valueToHaxe(arg));
 			}
-			// Sys.print(parts.join(" "));
+			Sys.print(parts.join(" "));
 			return VNull;
 		});
 
-		registerFunction("println", -1, function(args:Array<Value>):Value {
+		register("println", -1, function(args:Array<Value>):Value {
 			var parts:Array<Dynamic> = [];
 			for (arg in args) {
 				parts.push(vm.valueToHaxe(arg));
 			}
-			// Sys.println(parts.join(" "));
+			Sys.println(parts.join(" "));
 			return VNull;
 		});
 
 		// Type checking
-		registerFunction("typeof", 1, function(args:Array<Value>):Value {
+		register("typeof", 1, function(args:Array<Value>):Value {
 			return VString(switch (args[0]) {
 				case VNull: "null";
 				case VBool(_): "bool";
@@ -88,7 +101,7 @@ class Interpreter {
 		});
 
 		// Type conversion
-		registerFunction("int", 1, function(args:Array<Value>):Value {
+		register("int", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.floor(n);
 				case VString(s): Std.parseInt(s);
@@ -97,7 +110,7 @@ class Interpreter {
 			});
 		});
 
-		registerFunction("float", 1, function(args:Array<Value>):Value {
+		register("float", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): n;
 				case VString(s): Std.parseFloat(s);
@@ -106,11 +119,11 @@ class Interpreter {
 			});
 		});
 
-		registerFunction("str", 1, function(args:Array<Value>):Value {
+		register("str", 1, function(args:Array<Value>):Value {
 			return VString(vm.valueToString(args[0]));
 		});
 
-		registerFunction("bool", 1, function(args:Array<Value>):Value {
+		register("bool", 1, function(args:Array<Value>):Value {
 			return VBool(switch (args[0]) {
 				case VNull: false;
 				case VBool(b): b;
@@ -121,42 +134,42 @@ class Interpreter {
 		});
 
 		// Math functions
-		registerFunction("abs", 1, function(args:Array<Value>):Value {
+		register("abs", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.abs(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("floor", 1, function(args:Array<Value>):Value {
+		register("floor", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.floor(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("ceil", 1, function(args:Array<Value>):Value {
+		register("ceil", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.ceil(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("round", 1, function(args:Array<Value>):Value {
+		register("round", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.round(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("sqrt", 1, function(args:Array<Value>):Value {
+		register("sqrt", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.sqrt(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("pow", 2, function(args:Array<Value>):Value {
+		register("pow", 2, function(args:Array<Value>):Value {
 			var base = switch (args[0]) {
 				case VNumber(n): n;
 				default: 0.0;
@@ -168,28 +181,28 @@ class Interpreter {
 			return VNumber(Math.pow(base, exp));
 		});
 
-		registerFunction("sin", 1, function(args:Array<Value>):Value {
+		register("sin", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.sin(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("cos", 1, function(args:Array<Value>):Value {
+		register("cos", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.cos(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("tan", 1, function(args:Array<Value>):Value {
+		register("tan", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VNumber(n): Math.tan(n);
 				default: 0;
 			});
 		});
 
-		registerFunction("min", 2, function(args:Array<Value>):Value {
+		register("min", 2, function(args:Array<Value>):Value {
 			var a = switch (args[0]) {
 				case VNumber(n): n;
 				default: 0.0;
@@ -201,7 +214,7 @@ class Interpreter {
 			return VNumber(Math.min(a, b));
 		});
 
-		registerFunction("max", 2, function(args:Array<Value>):Value {
+		register("max", 2, function(args:Array<Value>):Value {
 			var a = switch (args[0]) {
 				case VNumber(n): n;
 				default: 0.0;
@@ -213,12 +226,12 @@ class Interpreter {
 			return VNumber(Math.max(a, b));
 		});
 
-		registerFunction("random", 0, function(args:Array<Value>):Value {
+		register("random", 0, function(args:Array<Value>):Value {
 			return VNumber(Math.random());
 		});
 
 		// Array functions
-		registerFunction("len", 1, function(args:Array<Value>):Value {
+		register("len", 1, function(args:Array<Value>):Value {
 			return VNumber(switch (args[0]) {
 				case VArray(arr): arr.length;
 				case VString(s): s.length;
@@ -227,7 +240,7 @@ class Interpreter {
 			});
 		});
 
-		registerFunction("push", 2, function(args:Array<Value>):Value {
+		register("push", 2, function(args:Array<Value>):Value {
 			switch (args[0]) {
 				case VArray(arr):
 					arr.push(args[1]);
@@ -237,7 +250,7 @@ class Interpreter {
 			}
 		});
 
-		registerFunction("pop", 1, function(args:Array<Value>):Value {
+		register("pop", 1, function(args:Array<Value>):Value {
 			return switch (args[0]) {
 				case VArray(arr): arr.length > 0 ? arr.pop() : VNull;
 				default: throw "pop() requires an array";
@@ -245,21 +258,21 @@ class Interpreter {
 		});
 
 		// String functions
-		registerFunction("upper", 1, function(args:Array<Value>):Value {
+		register("upper", 1, function(args:Array<Value>):Value {
 			return VString(switch (args[0]) {
 				case VString(s): s.toUpperCase();
 				default: "";
 			});
 		});
 
-		registerFunction("lower", 1, function(args:Array<Value>):Value {
+		register("lower", 1, function(args:Array<Value>):Value {
 			return VString(switch (args[0]) {
 				case VString(s): s.toLowerCase();
 				default: "";
 			});
 		});
 
-		registerFunction("trim", 1, function(args:Array<Value>):Value {
+		register("trim", 1, function(args:Array<Value>):Value {
 			return VString(switch (args[0]) {
 				case VString(s): StringTools.trim(s);
 				default: "";
@@ -267,10 +280,10 @@ class Interpreter {
 		});
 
 		// Constants
-		variables.set("PI", VNumber(Math.PI));
-		variables.set("E", VNumber(Math.exp(1)));
-		variables.set("NaN", VNumber(Math.NaN));
-		variables.set("Infinity", VNumber(Math.POSITIVE_INFINITY));
+		globals.set("PI", VNumber(Math.PI));
+		globals.set("E", VNumber(Math.exp(1)));
+		globals.set("NaN", VNumber(Math.NaN));
+		globals.set("Infinity", VNumber(Math.POSITIVE_INFINITY));
 	}
 
 	/**
@@ -331,8 +344,11 @@ class Interpreter {
 	 * Run source code from a file
 	 */
 	public function runFile(path:String):Value {
-		// var content = sys.io.File.getContent(path);
-		return run("content");
+		#if sys
+		var content = sys.io.File.getContent(path);
+		return run(content, path);
+		#end
+		return null;
 	}
 
 	/**
@@ -352,50 +368,123 @@ class Interpreter {
 		return vm.valueToString(result);
 	}
 
+	/** Set a global variable (Haxe value auto-converted to script Value) */
+	public function set(name:String, value:Dynamic) {
+		globals.set(name, vm.haxeToValue(value));
+	}
+
+	@:deprecated("Use 'set' instead")
+	public inline function setVar(name:String, value:Dynamic)
+		set(name, value);
+
 	/**
-	 * Set a variable with a Haxe value (auto-converted to script Value)
+	 * Compila código fuente a bytecode (sin ejecutar)
 	 */
-	public function setVar(name:String, value:Dynamic) {
-		variables.set(name, vm.haxeToValue(value));
+	public function compile(source:String, ?scriptName:String = "script"):Chunk {
+		// Tokenize
+		var tokenizer = new Tokenizer(source);
+		var tokens = tokenizer.tokenize();
+
+		// Parse
+		var parser = new Parser(tokens);
+		var ast = parser.parse();
+
+		// Compile to bytecode
+		var compiler = new Compiler();
+		var chunk = compiler.compile(ast);
+
+		return chunk;
 	}
 
 	/**
-	 * Get a variable value (auto-converted to Haxe Dynamic)
+	 * Ejecuta bytecode pre-compilado
 	 */
-	public function getVarDynamic(name:String):Dynamic {
-		var value = variables.get(name);
+	public function runChunk(chunk:Chunk, ?scriptName:String = "script"):Value {
+		vm.scriptName = scriptName;
+		return vm.execute(chunk);
+	}
+
+	/**
+	 * Compila y guarda bytecode a un archivo
+	 */
+	public function compileToFile(source:String, outputPath:String):Void {
+		var chunk = compile(source);
+		BytecodeSerializer.saveToFile(chunk, outputPath);
+	}
+
+	/**
+	 * Carga y ejecuta bytecode desde un archivo
+	 */
+	public function runFromBytecode(bytecodeFile:String, ?scriptName:String = "script"):Value {
+		var chunk = BytecodeSerializer.loadFromFile(bytecodeFile);
+		return runChunk(chunk, scriptName);
+	}
+
+	/** Serialize a chunk to bytes */
+	public function serialize(chunk:Chunk):haxe.io.Bytes {
+		return BytecodeSerializer.serialize(chunk);
+	}
+
+	@:deprecated("Use 'serialize' instead")
+	public inline function serializeChunk(chunk:Chunk):haxe.io.Bytes
+		return serialize(chunk);
+
+	/** Deserialize a chunk from bytes */
+	public function deserialize(bytes:haxe.io.Bytes):Chunk {
+		return BytecodeSerializer.deserialize(bytes);
+	}
+
+	@:deprecated("Use 'deserialize' instead")
+	public inline function deserializeChunk(bytes:haxe.io.Bytes):Chunk
+		return deserialize(bytes);
+
+	/** Get a global variable as Haxe Dynamic (auto-converted) */
+	public function getDynamic(name:String):Dynamic {
+		var value = globals.get(name);
 		if (value == null)
 			return null;
 		return vm.valueToHaxe(value);
 	}
 
-	/**
-	 * Get a variable value as script Value
-	 */
-	public function getVar(name:String):Null<Value> {
-		return variables.get(name);
+	@:deprecated("Use 'getDynamic' instead")
+	public inline function getVarDynamic(name:String):Dynamic
+		return getDynamic(name);
+
+	/** Get a global variable as script Value */
+	public function get(name:String):Null<Value> {
+		return globals.get(name);
 	}
 
-	/**
-	 * Check if a variable exists
-	 */
-	public function hasVar(name:String):Bool {
-		return variables.exists(name);
+	@:deprecated("Use 'get' instead")
+	public inline function getVar(name:String):Null<Value>
+		return get(name);
+
+	/** Check if a global variable exists */
+	public function has(name:String):Bool {
+		return globals.exists(name);
 	}
 
-	/**
-	 * Register a native function
-	 */
-	public function registerFunction(name:String, arity:Int, fn:Array<Value>->Value) {
-		methods.set(name, VNativeFunction(name, arity, fn));
+	@:deprecated("Use 'has' instead")
+	public inline function hasVar(name:String):Bool
+		return has(name);
+
+	/** Register a native function callable from scripts */
+	public function register(name:String, arity:Int, fn:Array<Value>->Value) {
+		natives.set(name, VNativeFunction(name, arity, fn));
 	}
 
-	/**
-	 * Call a function defined in the script or native method
-	 */
-	public function callFunction(name:String, args:Array<Value>):Value {
+	@:deprecated("Use 'register' instead")
+	public inline function registerFunction(name:String, arity:Int, fn:Array<Value>->Value)
+		register(name, arity, fn);
+
+	/** Call a named function from scripts or native methods */
+	public function call(name:String, args:Array<Value>):Value {
 		return vm.callMethod(name, args);
 	}
+
+	@:deprecated("Use 'call' instead")
+	public inline function callFunction(name:String, args:Array<Value>):Value
+		return call(name, args);
 
 	/**
 	 * Create a type-safe instance of a script class
@@ -439,9 +528,9 @@ class Interpreter {
 			args = [];
 
 		var proxy:Dynamic = if (args.length > 0) {
-			ScriptClass.instantiate(this, className, args);
+			NxProxy.instantiate(this, className, args);
 		} else {
-			ScriptClass.get(this, className);
+			NxProxy.get(this, className);
 		}
 
 		return proxy;
@@ -463,13 +552,17 @@ class Interpreter {
 	}
 
 	// Getters
-	function get_variables():Map<String, Value> {
-		return vm.variables;
-	}
+	inline function get_globals():Map<String, Value>
+		return vm.globals;
 
-	function get_methods():Map<String, Value> {
-		return vm.methods;
-	}
+	inline function get_natives():Map<String, Value>
+		return vm.natives;
+
+	inline function get_variables():Map<String, Value>
+		return globals;
+
+	inline function get_methods():Map<String, Value>
+		return natives;
 
 	// Debug utilities
 	function disassemble(chunk:Chunk) {

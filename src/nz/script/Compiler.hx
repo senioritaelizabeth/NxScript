@@ -5,19 +5,45 @@ import nz.script.Bytecode;
 import nz.script.Token;
 
 /**
- * Compiler that converts AST to bytecode
+ * Walks the AST and emits bytecode. One pass, no regrets.
+ *
+ * Local variables inside functions get integer slot indices instead of string map lookups.
+ * This means LOAD_LOCAL/STORE_LOCAL are O(1) array accesses instead of O(1) hash lookups
+ * with extra overhead. Yes, there is a difference. The benchmarks said so.
+ *
+ * Module-level code (outside any func) has no slot system — globals only.
+ * Try to use module-level `var` inside a function and you'll get a STORE_VAR. Intentional.
  */
 class Compiler {
+	// The instruction stream we're building. One Chunk per compilation.
 	var chunk:Chunk;
 	var constants:Array<Value>;
 	var functions:Array<FunctionChunk>;
 	var strings:Array<String>;
-	var stringMap:Map<String, Int>;
+	var stringMap:Map<String, Int>; // dedup string constants so we don't store "x" 500 times
 	var currentLine:Int = 0;
 	var currentCol:Int = 0;
 
-	// For break/continue
+	// Jump target stacks for break/continue. Push on loop enter, pop on loop exit.
+	// If this is empty inside a break statement, the parser already messed up.
 	var loopStack:Array<LoopContext> = [];
+
+	// How deep we are in try blocks. Used to emit the right number of POP_TRY on return.
+	var tryDepth:Int = 0;
+
+	// Slot allocator for function-local variables. null means we're at module level.
+	// Slots are integer indices into stack[stackBase..stackBase+localCount-1].
+	var localSlots:Map<String, Int> = null;
+	var nextLocalSlot:Int = 0;
+
+	// Get or create a slot for a local variable. Slots are never reused (simple but fine for scripts).
+	inline function allocSlot(name:String):Int {
+		if (localSlots.exists(name))
+			return localSlots.get(name);
+		var slot = nextLocalSlot++;
+		localSlots.set(name, slot);
+		return slot;
+	}
 
 	public function new() {
 		constants = [];
@@ -56,7 +82,11 @@ class Compiler {
 				} else {
 					emit(Op.LOAD_NULL);
 				}
-				emitWithString(Op.STORE_LET, name);
+				if (localSlots != null) {
+					emitWithArg(Op.STORE_LOCAL, allocSlot(name));
+				} else {
+					emitWithString(Op.STORE_LET, name);
+				}
 				if (!isLast)
 					emit(Op.POP);
 
@@ -66,7 +96,12 @@ class Compiler {
 				} else {
 					emit(Op.LOAD_NULL);
 				}
-				emitWithString(Op.STORE_VAR, name);
+				if (localSlots != null) {
+					// Inside a function, treat var as function-local slot (avoids global Map overhead)
+					emitWithArg(Op.STORE_LOCAL, allocSlot(name));
+				} else {
+					emitWithString(Op.STORE_VAR, name);
+				}
 				if (!isLast)
 					emit(Op.POP);
 
@@ -131,6 +166,8 @@ class Compiler {
 				} else {
 					emit(Op.LOAD_NULL);
 				}
+				for (_ in 0...tryDepth)
+					emit(Op.POP_TRY);
 				emit(Op.RETURN);
 
 			case SIf(condition, thenBody, elseBody):
@@ -162,7 +199,8 @@ class Compiler {
 				var loop = {
 					start: loopStart,
 					breaks: [],
-					continues: []
+					continues: [],
+					tryDepth: tryDepth
 				};
 				loopStack.push(loop);
 
@@ -195,12 +233,17 @@ class Compiler {
 				var loop = {
 					start: loopStart,
 					breaks: [],
-					continues: []
+					continues: [],
+					tryDepth: tryDepth
 				};
 				loopStack.push(loop);
 
 				var exitJump = emitJump(Op.FOR_ITER);
-				emitWithString(Op.STORE_LET, variable);
+				if (localSlots != null) {
+					emitWithArg(Op.STORE_LOCAL, allocSlot(variable));
+				} else {
+					emitWithString(Op.STORE_LET, variable);
+				}
 				emit(Op.POP);
 
 				// Inside a loop, no statement is "last" - they all need to pop their values
@@ -226,6 +269,9 @@ class Compiler {
 				if (loopStack.length == 0) {
 					throw "Break outside of loop";
 				}
+				var loopTryDepth = tryDepth - loopStack[loopStack.length - 1].tryDepth;
+				for (_ in 0...loopTryDepth)
+					emit(Op.POP_TRY);
 				var breakJump = emitJump(Op.JUMP);
 				loopStack[loopStack.length - 1].breaks.push(breakJump);
 
@@ -233,6 +279,9 @@ class Compiler {
 				if (loopStack.length == 0) {
 					throw "Continue outside of loop";
 				}
+				var loopTryDepth = tryDepth - loopStack[loopStack.length - 1].tryDepth;
+				for (_ in 0...loopTryDepth)
+					emit(Op.POP_TRY);
 				var continueJump = emitJump(Op.JUMP);
 				loopStack[loopStack.length - 1].continues.push(continueJump);
 
@@ -247,6 +296,36 @@ class Compiler {
 					var stmtIsLast = isLast && (i == stmts.length - 1);
 					compileStatement(stmts[i], stmtIsLast);
 				}
+
+			case STryCatch(body, catchVar, catchBody):
+				// Emit SETUP_TRY pointing to the catch block
+				var setupTryPos = emitJump(Op.SETUP_TRY);
+				tryDepth++;
+				for (s in body)
+					compileStatement(s, false);
+				tryDepth--;
+				// Normal exit: remove catch handler then jump over catch block
+				emit(Op.POP_TRY);
+				var jumpOverCatch = emitJump(Op.JUMP);
+				// Patch SETUP_TRY to point here (start of catch block)
+				patchJump(setupTryPos);
+				// Catch block: caught value is on top of stack
+				if (localSlots != null) {
+					emitWithArg(Op.STORE_LOCAL, allocSlot(catchVar));
+				} else {
+					emitWithString(Op.STORE_LET, catchVar);
+				}
+				emit(Op.POP);
+				for (s in catchBody)
+					compileStatement(s, false);
+				// Patch jump to after catch block
+				patchJump(jumpOverCatch);
+				if (isLast)
+					emit(Op.LOAD_NULL);
+
+			case SThrow(expr):
+				compileExpression(expr);
+				emit(Op.THROW);
 		}
 	}
 
@@ -265,7 +344,11 @@ class Compiler {
 				emit(Op.LOAD_NULL);
 
 			case EIdentifier(name):
-				emitWithString(Op.LOAD_VAR, name);
+				if (localSlots != null && localSlots.exists(name)) {
+					emitWithArg(Op.LOAD_LOCAL, localSlots.get(name));
+				} else {
+					emitWithString(Op.LOAD_VAR, name);
+				}
 
 			case EThis:
 				emit(Op.GET_THIS);
@@ -281,9 +364,30 @@ class Compiler {
 				emitWithArg(Op.INSTANTIATE, args.length);
 
 			case EBinary(op, left, right):
-				compileExpression(left);
-				compileExpression(right);
-				compileBinaryOp(op);
+				switch (op) {
+					case OAnd:
+						// Short-circuit &&: if left is falsy, skip right entirely
+						// Stack trace: left → DUP → [left,left] → JUMP_IF_FALSE(pops top, jumps) → [left(false)]
+						//              or: [left(true)] → POP → [] → right → [right]
+						compileExpression(left);
+						emit(Op.DUP);
+						var skip = emitJump(Op.JUMP_IF_FALSE);
+						emit(Op.POP);
+						compileExpression(right);
+						patchJump(skip);
+					case OOr:
+						// Short-circuit ||: if left is truthy, skip right entirely
+						compileExpression(left);
+						emit(Op.DUP);
+						var skip = emitJump(Op.JUMP_IF_TRUE);
+						emit(Op.POP);
+						compileExpression(right);
+						patchJump(skip);
+					default:
+						compileExpression(left);
+						compileExpression(right);
+						compileBinaryOp(op);
+				}
 
 			case EUnary(op, e):
 				compileExpression(e);
@@ -330,21 +434,26 @@ class Compiler {
 				emitWithArg(Op.MAKE_LAMBDA, funcIndex);
 
 			case EAssign(target, value):
-				compileExpression(value);
-
 				switch (target) {
 					case EIdentifier(name):
-						emitWithString(Op.STORE_VAR, name);
+						compileExpression(value);
+						if (localSlots != null && localSlots.exists(name)) {
+							emitWithArg(Op.STORE_LOCAL, localSlots.get(name));
+						} else {
+							emitWithString(Op.STORE_VAR, name);
+						}
 
 					case EMember(object, field):
-						emit(Op.DUP);
+						// Stack: [value, object] → SET_MEMBER pops object then value, pushes value
+						compileExpression(value);
 						compileExpression(object);
 						emitWithString(Op.SET_MEMBER, field);
 
 					case EIndex(object, index):
-						emit(Op.DUP);
+						// SET_INDEX pops: value (top), index, object (bottom) → stack [object, index, value]
 						compileExpression(object);
 						compileExpression(index);
+						compileExpression(value);
 						emit(Op.SET_INDEX);
 
 					default:
@@ -415,6 +524,18 @@ class Compiler {
 		var savedFunctions = functions;
 		var savedStrings = strings;
 		var savedStringMap = stringMap;
+		var savedTryDepth = tryDepth;
+		var savedLocalSlots = localSlots;
+		var savedNextLocalSlot = nextLocalSlot;
+		tryDepth = 0;
+
+		// Set up fresh slot tracking for this function
+		localSlots = new Map();
+		nextLocalSlot = 0;
+		// Pre-register params as slots 0..N-1
+		for (p in params) {
+			localSlots.set(p.name, nextLocalSlot++);
+		}
 
 		constants = [];
 		functions = [];
@@ -434,19 +555,33 @@ class Compiler {
 		emit(Op.LOAD_NULL);
 		emit(Op.RETURN);
 
+		// Build localNames array indexed by slot number
+		var slotCount = nextLocalSlot;
+		var localNames:Array<String> = [for (_ in 0...slotCount) ""];
+		for (varName in localSlots.keys())
+			localNames[localSlots.get(varName)] = varName;
+
 		var funcChunk:FunctionChunk = {
 			name: name,
 			paramCount: params.length,
 			paramNames: [for (p in params) p.name],
 			chunk: chunk,
-			isLambda: isLambda
+			isLambda: isLambda,
+			localCount: slotCount,
+			localNames: localNames,
+			localSlots: localSlots // preserve Map<String,Int> for O(1) slot lookup in call()
 		};
+		// Also store localNames on the Chunk so run() can access it for closure building
+		chunk.localNames = localNames;
 
 		chunk = savedChunk;
 		constants = savedConstants;
 		functions = savedFunctions;
 		strings = savedStrings;
 		stringMap = savedStringMap;
+		tryDepth = savedTryDepth;
+		localSlots = savedLocalSlots;
+		nextLocalSlot = savedNextLocalSlot;
 
 		return funcChunk;
 	}
@@ -522,5 +657,6 @@ class Compiler {
 typedef LoopContext = {
 	start:Int,
 	breaks:Array<Int>,
-	continues:Array<Int>
+	continues:Array<Int>,
+	tryDepth:Int
 }

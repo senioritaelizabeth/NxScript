@@ -5,12 +5,19 @@ import nz.script.Bytecode.ClassData;
 import nz.script.Bytecode.FunctionChunk;
 
 /**
- * Built-in native classes for the script runtime.
- * These classes provide methods for primitive types like String, Number, Bool, etc.
+ * Registers the built-in class hierarchy (Object, String, Number, Bool, Array, Function)
+ * into the VM's class/globals registry.
+ *
+ * These aren't full implementations — they're class shells so that method dispatch on
+ * primitive values (`"hi".upper()`, `(3.5).floor()`, etc.) resolves correctly.
+ * The actual method bodies live in VM's GET_MEMBER/CALL dispatch.
+ *
+ * Extending these from script code is technically allowed. Results may vary.
  */
 class NativeClasses {
 	/**
-	 * Register all native classes in the VM
+	 * Registers all native classes. Call once per VM. Calling it twice will overwrite the first
+	 * registration and waste a few microseconds. Don't do that.
 	 */
 	public static function registerAll(vm:VM):Void {
 		registerObject(vm);
@@ -41,7 +48,7 @@ class NativeClasses {
 		};
 
 		vm.classes.set("Object", classData);
-		vm.variables.set("Object", VClass(classData));
+		vm.globals.set("Object", VClass(classData));
 	}
 
 	// ========================================
@@ -62,7 +69,7 @@ class NativeClasses {
 		};
 
 		vm.classes.set("String", classData);
-		vm.variables.set("String", VClass(classData));
+		vm.globals.set("String", VClass(classData));
 	}
 
 	// ========================================
@@ -83,7 +90,7 @@ class NativeClasses {
 		};
 
 		vm.classes.set("Number", classData);
-		vm.variables.set("Number", VClass(classData));
+		vm.globals.set("Number", VClass(classData));
 	}
 
 	// ========================================
@@ -104,7 +111,7 @@ class NativeClasses {
 		};
 
 		vm.classes.set("Bool", classData);
-		vm.variables.set("Bool", VClass(classData));
+		vm.globals.set("Bool", VClass(classData));
 	}
 
 	// ========================================
@@ -125,7 +132,7 @@ class NativeClasses {
 		};
 
 		vm.classes.set("Array", classData);
-		vm.variables.set("Array", VClass(classData));
+		vm.globals.set("Array", VClass(classData));
 	}
 
 	// ========================================
@@ -146,6 +153,6 @@ class NativeClasses {
 		};
 
 		vm.classes.set("Function", classData);
-		vm.variables.set("Function", VClass(classData));
+		vm.globals.set("Function", VClass(classData));
 	}
 }

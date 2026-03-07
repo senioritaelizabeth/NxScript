@@ -17,6 +17,14 @@ class Parser {
 		this.tokens = tokens;
 	}
 
+	private function current():TokenPos {
+		return tokens[pos];
+	}
+
+	private function advance():Void {
+		if (pos < tokens.length) pos++;
+	}
+
 	public function parse():Array<Block> {
 		var blocks:Array<Block> = [];
 
@@ -98,7 +106,7 @@ class Parser {
 
 		// Check for assignment
 		var value:Dynamic = null;
-		if (!isEOF() && Type.enumEq(current().token, TAssign)) {
+		if (!isEOF() && current().token == TAssign) {
 			advance(); // skip '='
 			skipWhitespace();
 			value = readExpression();
@@ -122,11 +130,11 @@ class Parser {
 
 		// Read parameters
 		var params:Array<String> = [];
-		if (!isEOF() && Type.enumEq(current().token, TLParen)) {
+		if (!isEOF() && current().token == TLParen) {
 			advance(); // skip '('
 			skipWhitespace();
 
-			while (!isEOF() && !Type.enumEq(current().token, TRParen)) {
+			while (!isEOF() && !(current().token == TRParen)) {
 				switch (current().token) {
 					case TIdentifier(id):
 						params.push(id);
@@ -137,13 +145,13 @@ class Parser {
 
 				skipWhitespace();
 
-				if (!isEOF() && Type.enumEq(current().token, TComma)) {
+				if (!isEOF() && current().token == TComma) {
 					advance();
 					skipWhitespace();
 				}
 			}
 
-			if (!isEOF() && Type.enumEq(current().token, TRParen)) {
+			if (!isEOF() && current().token == TRParen) {
 				advance(); // skip ')'
 			}
 		}
@@ -166,7 +174,7 @@ class Parser {
 
 		// Read all arguments until newline
 		var args:Array<String> = [];
-		while (!isEOF() && !Type.enumEq(current().token, TNewLine) && !Type.enumEq(current().token, TEndOfFile)) {
+		while (!isEOF() && !(current().token == TNewLine) && !(current().token == TEndOfFile)) {
 			switch (current().token) {
 				case TString(str):
 					args.push(str);
@@ -283,14 +291,14 @@ class Parser {
 		skipWhitespace();
 
 		// Read condition - might have optional parentheses
-		if (!isEOF() && Type.enumEq(current().token, TLParen)) {
+		if (!isEOF() && current().token == TLParen) {
 			advance(); // skip '('
 		}
 
 		var condition = readExpression();
 
 		skipWhitespace();
-		if (!isEOF() && Type.enumEq(current().token, TRParen)) {
+		if (!isEOF() && current().token == TRParen) {
 			advance(); // skip ')'
 		}
 
@@ -316,14 +324,14 @@ class Parser {
 			skipWhitespace();
 
 			// Read condition
-			if (!isEOF() && Type.enumEq(current().token, TLParen)) {
+			if (!isEOF() && current().token == TLParen) {
 				advance(); // skip '('
 			}
 
 			var elseIfCondition = readExpression();
 
 			skipWhitespace();
-			if (!isEOF() && Type.enumEq(current().token, TRParen)) {
+			if (!isEOF() && current().token == TRParen) {
 				advance(); // skip ')'
 			}
 
@@ -375,14 +383,14 @@ class Parser {
 		skipWhitespace();
 
 		// Read value - might have optional parentheses
-		if (!isEOF() && Type.enumEq(current().token, TLParen)) {
+		if (!isEOF() && current().token == TLParen) {
 			advance(); // skip '('
 		}
 
 		var value = readExpression();
 
 		skipWhitespace();
-		if (!isEOF() && Type.enumEq(current().token, TRParen)) {
+		if (!isEOF() && current().token == TRParen) {
 			advance(); // skip ')'
 		}
 
@@ -451,28 +459,12 @@ class Parser {
 		return blocks;
 	}
 
-	// Helper functions
-	private function current():TokenPos {
-		return tokens[pos];
-	}
-
-	private function peek(offset:Int = 1):TokenPos {
-		var p = pos + offset;
-		return (p < tokens.length) ? tokens[p] : tokens[tokens.length - 1];
-	}
-
-	private function advance():Void {
-		if (pos < tokens.length) {
-			pos++;
-		}
-	}
-
 	private function isEOF():Bool {
-		return pos >= tokens.length || Type.enumEq(current().token, TEndOfFile);
+		return pos >= tokens.length || current().token == TEndOfFile;
 	}
 
 	private function skipNewLines():Void {
-		while (!isEOF() && Type.enumEq(current().token, TNewLine)) {
+		while (!isEOF() && current().token == TNewLine) {
 			advance();
 		}
 	}

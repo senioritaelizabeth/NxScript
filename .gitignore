@@ -4,7 +4,12 @@
 *.swf
 *.cpp/
 *.cs/
-
+test/bin
+test/test_flixel
+nxscript-vsext/
+docs/
+doc.xml
+*.ignore/
 # IDE
 .vscode/
 .idea/

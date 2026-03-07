@@ -5,8 +5,12 @@ import nz.script.Token;
 using StringTools;
 
 /**
- * Tokenizer for the script language
- * Converts source code into a stream of tokens
+ * Turns a string of source code into a flat list of tokens.
+ * Handles `#` line comments, string literals (with escape sequences),
+ * numbers (int and float), operators, and keywords.
+ *
+ * Normalizes all line endings to `\n` up front because Windows exists
+ * and `\r\n` in error messages is deeply unpleasant.
  */
 class Tokenizer {
 	var input:String;
@@ -34,7 +38,10 @@ class Tokenizer {
 		"in" => KIn,
 		"true" => KTrue,
 		"false" => KFalse,
-		"null" => KNull
+		"null" => KNull,
+		"try" => KTry,
+		"catch" => KCatch,
+		"throw" => KThrow
 	];
 
 	public function new(input:String) {
@@ -241,10 +248,26 @@ class Tokenizer {
 				return TDot;
 
 			case '+':
+				if (peek() == '+') {
+					advance();
+					return TOperator(OIncrement);
+				}
+				if (peek() == '=') {
+					advance();
+					return TOperator(OAddAssign);
+				}
 				return TOperator(OAdd);
 			case '*':
+				if (peek() == '=') {
+					advance();
+					return TOperator(OMulAssign);
+				}
 				return TOperator(OMul);
 			case '%':
+				if (peek() == '=') {
+					advance();
+					return TOperator(OModAssign);
+				}
 				return TOperator(OMod);
 			case '~':
 				return TOperator(OBitNot);
@@ -252,13 +275,25 @@ class Tokenizer {
 				return TOperator(OBitXor);
 
 			case '-':
+				if (peek() == '-') {
+					advance();
+					return TOperator(ODecrement);
+				}
 				if (peek() == '>') {
 					advance();
 					return TArrow;
 				}
+				if (peek() == '=') {
+					advance();
+					return TOperator(OSubAssign);
+				}
 				return TOperator(OSub);
 
 			case '/':
+				if (peek() == '=') {
+					advance();
+					return TOperator(ODivAssign);
+				}
 				return TOperator(ODiv);
 
 			case '=':

@@ -37,7 +37,7 @@ class Tokenizer {
 			var token = nextToken();
 			if (token != null) {
 				// Skip consecutive newlines
-				if (Type.enumEq(token, TNewLine)) {
+				if (token == TNewLine) {
 					if (!lastWasNewLine) {
 						tokens.push({token: token, line: line, col: col});
 						lastWasNewLine = true;

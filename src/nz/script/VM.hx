@@ -76,7 +76,6 @@ class VM {
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
 	}
-
 	/**
 	 * Runs a compiled Chunk from the top level.
 	 * Resets all execution state — don't call this mid-execution expecting continuity.
@@ -87,18 +86,12 @@ class VM {
 		frames = [];
 		catchStack = [];
 
-		// Build flat dispatch array once. Haxe Instruction objects are cute but slow in a hot loop.
 		if (chunk.code == null)
 			buildFlatCode(chunk);
 
-		// Top-level frame has no locals. Stack starts fresh at 0.
-		currentFrame = {
-			chunk: chunk,
-			ip: 0,
-			stackBase: 0,
-			localVars: new Map()
-		};
-		frames.push(currentFrame);
+		var frame = new CallFrame(chunk, 0, 0, new Map());
+		currentFrame = frame;
+		frames.push(frame);
 
 		try {
 			return run();
@@ -108,15 +101,25 @@ class VM {
 	}
 
 	/** Flatten Instruction objects into [op, arg, op, arg...] to eliminate object indirection in hot loop */
+
 	function buildFlatCode(chunk:Chunk) {
 		var insts = chunk.instructions;
-		var flat:Array<Int> = [];
+		var len = insts.length;
+
+		var flat = new Array<Int>();
+		flat.resize(len * 2);
+
+		var fi = 0;
+
 		for (inst in insts) {
-			flat.push(inst.op);
-			flat.push(inst.arg != null ? inst.arg : 0);
+			flat[fi++] = inst.op;
+			flat[fi++] = inst.arg != null ? inst.arg : 0;
 		}
+
 		chunk.code = flat;
-		for (fc in chunk.functions)
+
+		var funcs = chunk.functions;
+		for (fc in funcs)
 			if (fc.chunk.code == null)
 				buildFlatCode(fc.chunk);
 	}
@@ -130,15 +133,20 @@ class VM {
 		var strings = chunk.strings;
 		var ip = currentFrame.ip;
 
-		// Cache array/map references (same objects, just avoids `this.x` field lookup each iteration)
-		var stack = this.stack;
-		var frames = this.frames;
-		var catchStack = this.catchStack;
+		// Even as these are typed they become Dynamic this is likely due to Bytecode.Value enum having a Dynamic field or some cast.
+		//var constVars = this.constVars;::Array< ::Dynamic> 
+		/*stack = this->stack; -> ::Array< ::Dynamic> 
+		frames = this->frames;_> ::Array< ::Dynamic> 
+		catchStack = this->catchStack; -> ::Array< ::Dynamic>*/
+
+		var stack:Array<Value> = this.stack; 
+		var frames:Array<CallFrame> = this.frames;
+		var catchStack:Array<CatchHandler> = this.catchStack;
 		var scopeVars = this.scopeVars;
 		var constVars = this.constVars;
 		var globals = this.globals;
 		var currentFrame = this.currentFrame;
-		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead
+		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead*/
 
 		while (true) {
 			if (frames.length > 10000) {
@@ -169,6 +177,7 @@ class VM {
 
 				case Op.STORE_LOCAL:
 					stack[currentFrame.stackBase + arg] = stack[sp - 1];
+					//  Might want to change this nesting its somewhat expensive.
 				case Op.LOAD_VAR:
 					var name = strings[arg];
 					// Inline getVariable with single .get() per map (no exists+get overhead)
@@ -215,61 +224,106 @@ class VM {
 					sp--;
 
 				case Op.DUP:
-					stack[sp] = stack[sp - 1];
-					sp++;
+					var v = stack[sp - 1];
+					stack[sp++] = v;
 
-				// Arithmetic - inlined hot paths
 				case Op.ADD:
 					var b = stack[--sp];
 					var a = stack[--sp];
-					switch [a, b] {
-						case [VNumber(x), VNumber(y)]: stack[sp++] = VNumber(x + y);
-						default: stack[sp++] = add(a, b);
+
+					switch (a) {
+						case VNumber(x):
+							switch (b) {
+								case VNumber(y):
+									stack[sp++] = VNumber(x + y);
+								default:
+									stack[sp++] = add(a, b);
+							}
+						default:
+							stack[sp++] = add(a, b);
 					}
+
 
 				case Op.SUB:
 					var b = stack[--sp];
 					var a = stack[--sp];
-					switch [a, b] {
-						case [VNumber(x), VNumber(y)]: stack[sp++] = VNumber(x - y);
-						default: throw 'Cannot subtract';
+
+					switch (a) {
+						case VNumber(x):
+							switch (b) {
+								case VNumber(y):
+									stack[sp++] = VNumber(x - y);
+								default:
+									throw 'Cannot subtract';
+							}
+						default:
+							throw 'Cannot subtract';
 					}
+
 
 				case Op.MUL:
 					var b = stack[--sp];
 					var a = stack[--sp];
-					switch [a, b] {
-						case [VNumber(x), VNumber(y)]: stack[sp++] = VNumber(x * y);
-						default: stack[sp++] = multiply(a, b);
+
+					switch (a) {
+						case VNumber(x):
+							switch (b) {
+								case VNumber(y):
+									stack[sp++] = VNumber(x * y);
+								default:
+									stack[sp++] = multiply(a, b);
+							}
+						default:
+							stack[sp++] = multiply(a, b);
 					}
+
 
 				case Op.DIV:
 					var b = stack[--sp];
 					var a = stack[--sp];
-					switch [a, b] {
-						case [VNumber(x), VNumber(y)]:
-							if (y == 0)
-								throw 'Division by zero';
-							stack[sp++] = VNumber(x / y);
-						default: throw 'Cannot divide';
+
+					switch (a) {
+						case VNumber(x):
+							switch (b) {
+								case VNumber(y):
+									if (y == 0)
+										throw 'Division by zero';
+									stack[sp++] = VNumber(x / y);
+								default:
+									throw 'Cannot divide';
+							}
+						default:
+							throw 'Cannot divide';
 					}
+
 
 				case Op.MOD:
 					var b = stack[--sp];
 					var a = stack[--sp];
-					switch [a, b] {
-						case [VNumber(x), VNumber(y)]:
-							if (y == 0)
-								throw 'Modulo by zero';
-							stack[sp++] = VNumber(x % y);
-						default: throw 'Cannot modulo';
+
+					switch (a) {
+						case VNumber(x):
+							switch (b) {
+								case VNumber(y):
+									if (y == 0)
+										throw 'Modulo by zero';
+									stack[sp++] = VNumber(x % y);
+								default:
+									throw 'Cannot modulo';
+							}
+						default:
+							throw 'Cannot modulo';
 					}
+
 
 				case Op.NEG:
 					var a = stack[--sp];
+
 					switch (a) {
-						case VNumber(x): stack[sp++] = VNumber(-x);
-						default: throw 'Cannot negate';
+						case VNumber(x):
+							stack[sp++] = VNumber(-x);
+						default:
+							throw 'Cannot negate';
 					}
 
 				// Bitwise
@@ -350,32 +404,58 @@ class VM {
 
 				// Functions
 				case Op.CALL:
-					var args:Array<Value> = [for (_ in 0...arg) VNull];
-					var ai = arg;
-					while (ai > 0) {
-						ai--;
-						args[ai] = stack[--sp];
+					var argc = arg;
+					var callee = stack[sp - argc - 1];
+
+					switch (callee) {
+
+						case VFunction(funcChunk, closure):
+
+							var localCount = funcChunk.localCount != null ? funcChunk.localCount : 0;
+							var localsBase = sp - argc - 1;
+
+							// shift args down
+							for (i in 0...argc)
+								stack[localsBase + i] = stack[localsBase + 1 + i];
+
+							for (i in argc...localCount)
+								stack[localsBase + i] = VNull;
+
+							sp = localsBase + localCount;
+
+							var newFrame = new CallFrame(
+								funcChunk.chunk,
+								0,
+								localsBase,
+								closure
+							);
+
+							frames.push(newFrame);
+							currentFrame = newFrame;
+
+							chunk = newFrame.chunk;
+							code = chunk.code;
+							constants = chunk.constants;
+							strings = chunk.strings;
+
+							ip = 0;
+							codeLen = code.length;
+
+						case VNativeFunction(name, arity, fn):
+
+							if (arity != -1 && argc != arity)
+								throw 'Native function $name expects $arity arguments, got $argc';
+
+							var start = sp - argc;
+							var args = stack.slice(start, sp);
+
+							sp = start - 1;
+
+							stack[sp++] = fn(args);
+
+						default:
+							throw 'Value is not callable: $callee';
 					}
-					var callee = stack[--sp];
-					this.sp = sp; // sync sp so callee / inner run() see the correct stack top
-					try {
-						var r = call(callee, args);
-						sp = this.sp;
-						stack[sp++] = r;
-						this.sp = sp;
-					} catch (e:ScriptException) {
-						handleThrownValue(e.value, this.sp);
-						// Exception was caught — resync everything
-						this.currentFrame = this.frames[this.frames.length - 1];
-						currentFrame = this.currentFrame;
-						chunk = currentFrame.chunk;
-						code = chunk.code;
-						codeLen = code.length;
-						constants = chunk.constants;
-						strings = chunk.strings;
-					}
-					sp = this.sp;
-					ip = currentFrame.ip;
 
 				case Op.RETURN:
 					var result = stack[--sp];
@@ -1504,20 +1584,26 @@ class VM {
 	}
 }
 
-typedef CallFrame = {
-	chunk:Chunk,
-	ip:Int,
-	// stackBase: index into VM.stack where this frame's locals start.
-	// Locals occupy stack[stackBase..stackBase+localCount-1];
-	// expression stack starts at stack[sp] (sp >= stackBase+localCount).
-	stackBase:Int,
-	localVars:Map<String, Value>
-}
+// Switch to Types, Structures are Dynamic and for properties expensive.
+@:structInit
+class CallFrame {
+    public var chunk:Chunk;
+    public var ip:Int;
+    public var stackBase:Int;
+    public var localVars:Map<String, Value>;
 
-typedef CatchHandler = {
-	stackDepth:Int,
-	framesDepth:Int,
-	catchIP:Int
+    public function new(chunk, ip, stackBase, localVars) {
+        this.chunk = chunk;
+        this.ip = ip;
+        this.stackBase = stackBase;
+        this.localVars = localVars;
+    }
+}
+@:structInit
+class CatchHandler {
+	public var stackDepth:Int;
+	public var framesDepth:Int;
+	public var catchIP:Int;
 }
 
 class ScriptException {

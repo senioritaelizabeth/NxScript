@@ -133,12 +133,6 @@ class VM {
 		var strings = chunk.strings;
 		var ip = currentFrame.ip;
 
-		// Even as these are typed they become Dynamic this is likely due to Bytecode.Value enum having a Dynamic field or some cast.
-		//var constVars = this.constVars;::Array< ::Dynamic> 
-		/*stack = this->stack; -> ::Array< ::Dynamic> 
-		frames = this->frames;_> ::Array< ::Dynamic> 
-		catchStack = this->catchStack; -> ::Array< ::Dynamic>*/
-
 		var stack:Array<Value> = this.stack; 
 		var frames:Array<CallFrame> = this.frames;
 		var catchStack:Array<CatchHandler> = this.catchStack;
@@ -405,49 +399,90 @@ class VM {
 				// Functions
 				case Op.CALL:
 					var argc = arg;
-					var callee = stack[sp - argc - 1];
+					var calleeIndex = sp - argc - 1;
+					var callee = stack[calleeIndex];
 
 					switch (callee) {
-
 						case VFunction(funcChunk, closure):
+							var paramCount = funcChunk.paramCount;
+							if (argc != paramCount)
+								throw 'Function ${funcChunk.name} expects $paramCount arguments, got $argc';
 
-							var localCount = funcChunk.localCount != null ? funcChunk.localCount : 0;
-							var localsBase = sp - argc - 1;
+							//var localCount = funcChunk.localCount != null ? funcChunk.localCount : 0;
+							var localCount = funcChunk.localCount;
+							var localsBase = calleeIndex;
 
-							// shift args down
+							// shift args over callee
+							var src = localsBase + 1;
 							for (i in 0...argc)
-								stack[localsBase + i] = stack[localsBase + 1 + i];
+								stack[localsBase + i] = stack[src + i];
 
+							// init remaining locals
 							for (i in argc...localCount)
 								stack[localsBase + i] = VNull;
 
+							// closure injection
+							if (closure != EMPTY_MAP) {
+								var localSlots = funcChunk.localSlots;
+
+								if (localSlots != null) {
+									for (key in closure.keys()) {
+										var idx = localSlots.get(key);
+										if (idx != null)
+											stack[localsBase + idx] = closure.get(key);
+									}
+								} else {
+									var localNames = funcChunk.localNames;
+
+									if (localNames != null) {
+										for (key in closure.keys()) {
+											var idx = localNames.indexOf(key);
+											if (idx >= 0)
+												stack[localsBase + idx] = closure.get(key);
+										}
+									}
+								}
+							}
+
+							// clone closure only if needed
+							var localVars:Map<String, Value>;
+							if (closure == EMPTY_MAP) {
+								localVars = EMPTY_MAP;
+							} else {
+								localVars = new Map();
+								for (key in closure.keys())
+									localVars.set(key, closure.get(key));
+							}
+
 							sp = localsBase + localCount;
 
-							var newFrame = new CallFrame(
-								funcChunk.chunk,
-								0,
-								localsBase,
-								closure
-							);
+							var newFrame = new CallFrame(funcChunk.chunk, 0, localsBase, localVars);
 
 							frames.push(newFrame);
-							currentFrame = newFrame;
 
-							chunk = newFrame.chunk;
-							code = chunk.code;
-							constants = chunk.constants;
-							strings = chunk.strings;
+							currentFrame = newFrame;
+							this.currentFrame = newFrame;
+
+							var newChunk = newFrame.chunk;
+
+							chunk = newChunk;
+							code = newChunk.code;
+							constants = newChunk.constants;
+							strings = newChunk.strings;
 
 							ip = 0;
 							codeLen = code.length;
 
 						case VNativeFunction(name, arity, fn):
-
 							if (arity != -1 && argc != arity)
 								throw 'Native function $name expects $arity arguments, got $argc';
 
 							var start = sp - argc;
-							var args = stack.slice(start, sp);
+
+							// small manual copy avoids slice allocation in some targets
+							var args = [];
+							for (i in 0...argc)
+								args.push(stack[start + i]);
 
 							sp = start - 1;
 
@@ -792,7 +827,8 @@ class VM {
 					var savedCatchStack = this.catchStack;
 
 					var ctor = classData.constructor;
-					var localCount = ctor.localCount != null ? ctor.localCount : 0;
+					//var localCount = ctor.localCount != null ? ctor.localCount : 0;
+					var localCount = ctor.localCount;
 					// Stack-based locals: reserve stack[0..localCount-1] for ctor
 					for (i in 0...localCount)
 						stack[i] = VNull;
@@ -843,7 +879,8 @@ class VM {
 				}
 
 				// Stack-based locals: reserve stack[localsBase..localsBase+localCount-1]
-				var localCount = funcChunk.localCount != null ? funcChunk.localCount : 0;
+				//var localCount = funcChunk.localCount != null ? funcChunk.localCount : 0;
+				var localCount = funcChunk.localCount;
 				var localsBase = this.sp;
 				for (i in 0...localCount)
 					stack[localsBase + i] = VNull;
@@ -996,7 +1033,8 @@ class VM {
 	 */
 	public function callFunction(func:FunctionChunk, closure:Map<String, Value>, args:Array<Value>):Value {
 		// Stack-based locals: reserve stack[0..localCount-1] for func frame
-		var localCount = func.localCount != null ? func.localCount : 0;
+		//var localCount = func.localCount != null ? func.localCount : 0;
+		var localCount = func.localCount;
 		for (i in 0...localCount)
 			stack[i] = VNull;
 		for (i in 0...args.length)

@@ -1,6 +1,7 @@
 <div align="center">
 
 <img src="assets/logo.png" alt="NxScript Logo" width="200"/>
+
 # NxScript
 
 **yes, another scripting lang. for haxe. you're welcome.**

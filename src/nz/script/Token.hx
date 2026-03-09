@@ -8,6 +8,9 @@ enum Keyword {
 	KVar; // var - external variable
 	KConst; // const - constant
 	KFunc; // func - function
+	KFn; // fn - function alias
+	KFun; // fun - function alias
+	KFunction; // function - function alias
 	KClass; // class - class declaration
 	KExtends; // extends - class inheritance
 	KNew; // new - instantiation
@@ -21,6 +24,9 @@ enum Keyword {
 	KBreak; // break
 	KContinue; // continue
 	KIn; // in (for loops)
+	KOf; // of (for-of loops)
+	KFrom; // from (for-range loops)
+	KTo; // to (for-range loops)
 	KTrue; // true
 	KFalse; // false
 	KNull; // null
@@ -102,6 +108,7 @@ enum Token {
 	TSemicolon; // ;
 	TColon; // :
 	TDot; // .
+	TRange; // ...
 	TArrow; // ->
 
 	// Special

@@ -1,0 +1,15 @@
+# Shared helpers for rhythm scripts
+
+func secondsPerBeat(bpm:Number):Number {
+	if (bpm <= 0) {
+		return 0.5
+	}
+	return 60.div(bpm)
+}
+
+func laneWrap(index:Number, laneCount:Number):Number {
+	if (laneCount <= 0) {
+		return 0
+	}
+	return index.mod(laneCount).int()
+}

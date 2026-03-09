@@ -1,7 +1,6 @@
 <div align="center">
 
 <img src="assets/logo.png" alt="NxScript Logo" width="200"/>
-
 # NxScript
 
 **yes, another scripting lang. for haxe. you're welcome.**
@@ -30,6 +29,10 @@ Both compile to Haxe. Both actually work. Both are MIT-licensed, meaning you can
 ## NxScript — the good stuff
 
 A general-purpose scripting language. Compiles to bytecode, runs on a stack VM, doesn't allocate a new array every time you call a function (unlike some other libs we won't name).
+
+### Speeds
+
+- Go to [speed](./speed.md) for the latest benchmark results. Spoiler: it's fast.
 
 ### features (yes it has them)
 
@@ -275,8 +278,8 @@ For when you want numbers:
 
 ```bash
 cd test
-haxe speed_test.hxml
-./bin/cpp/SpeedTest  # compile to C++ first for accurate results
+haxe -cp test -cp src -main ScriptTargetBench -lib hscript-improved -lib hscript-iris -cpp test/bin/cpp_scriptbench
+./test/bin/cpp_scriptbench/ScriptTargetBench
 ```
 
 ---
@@ -330,7 +333,7 @@ NxScript/
 │   ├── MethodChainingExample.hx
 │   └── ClassExample.hx
 │
-├── SpeedTest.hx       # Performance benchmarks
+├── ScriptTargetBench.hx # Consolidated performance benchmark suite
 └── README.md
 ```
 
@@ -403,7 +406,7 @@ cd NxScript
 haxe test.hxml
 
 # Run benchmarks
-haxe speed_test.hxml
+haxe -cp test -cp src -main ScriptTargetBench -lib hscript-improved -lib hscript-iris -cpp test/bin/cpp_scriptbench
 ```
 
 ---
@@ -417,7 +420,119 @@ haxe speed_test.hxml
 ## Acknowledgments
 
 Created with ❤️ by [@senioritaelizabeth](https://github.com/senioritaelizabeth)
-Thanks to RapperGfDev for feedback and testing.
+Thanks to RapperGfDev for feedback, testing and optimizations.
+
+---
+
+## Demos
+
+### Rhythm Demo (Flixel + NxScript)
+
+Location: `demos/rythm`
+
+```bash
+cd demos/rythm
+lime test hl
+```
+
+The gameplay logic is scripted in:
+
+- `demos/rythm/assets/scripts/game.nx`
+- `demos/rythm/assets/scripts/rhythm_core.nx`
+- `demos/rythm/assets/scripts/rhythm_flow.nx`
+
+Main runtime bridge classes:
+
+- `demos/rythm/source/PlayState.hx` (minimal wrapper)
+- `demos/rythm/source/RhythmGameState.hx` (Flixel bridge + script calls)
+
+### Rhythm demo controls
+
+- `D F J K`: hit notes / chart lanes
+- `TAB`: toggle chart mode
+- `ENTER`: save chart
+- `R`: restart song/chart timeline
+- `F3/F4`: speed down/up
+
+### Rhythm demo data
+
+- Chart file: `demos/rythm/assets/data/chart_steps16.json`
+- Quantization: 16th steps (`division: 16`)
+- Audio tracks: `tv_time` + `tv_time_guitar` (guitar mutes on miss)
+- BPM: `148`
+
+### Recent rhythm changes
+
+- Script-driven gameplay rules (hit window, score, combo, speed clamps, sync thresholds).
+- Script-driven lane layout and flow helpers.
+- Chart/debug mode that records DFJK lanes and saves JSON charts.
+- Time-based chart spawning with pre-roll so notes can arrive in sync.
+- Runtime debug traces (`RHYTHM-DBG`) for lane/spawn diagnostics.
+
+### Script imports and loader
+
+NxScript now supports script file imports directly:
+
+```nx
+import "./rhythm_core.nx"
+```
+
+You can also load scripts at runtime from script code:
+
+```nx
+convokeScript("assets/scripts/other.nx")
+```
+
+Runtime loading tries OpenFL/Lime assets first and falls back to `sys.io.File`.
+
+Also supported from scripts:
+
+- `convokeScript("path/to/file.nx")`
+
+---
+
+## VS Code Extension Release
+
+- Manual/publish by tag workflow: `.github/workflows/vscode-extension-release.yml`
+- Nightly minimal branch sync/checks: `.github/workflows/nightly-minimal.yml`
+- Docs validation in CI: `.github/workflows/ci.yml` (`docs-check` job)
+- Docs publishing to GitHub Pages: `.github/workflows/docs-publish.yml`
+
+Required secret for Marketplace publish:
+
+- `VSCE_PAT`
+
+GitHub Pages docs are published automatically from `main` (or manually via workflow dispatch).
+
+## VS Code Extension Install
+
+Extension source in this repo:
+
+- `nxscript-vsext`
+
+### Local install (development)
+
+```bash
+cd nxscript-vsext
+npm install
+npm run compile
+```
+
+Then in VS Code:
+
+1. Open `nxscript-vsext`.
+2. Press `F5` to launch an Extension Development Host.
+3. Open a `.nx` file in the dev host and verify features.
+
+### VSIX package/install
+
+```bash
+cd nxscript-vsext
+npm install -g @vscode/vsce
+vsce package
+```
+
+Install the generated `.vsix` from the Extensions menu (`Install from VSIX...`).
 
 Built for the Haxe game development community.
 

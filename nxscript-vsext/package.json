@@ -1,0 +1,52 @@
+{
+  "name": "nxscript",
+  "displayName": "NxScript",
+  "description": "Language support for NxScript (.nx files) — syntax highlighting, diagnostics, autocomplete",
+  "version": "0.1.0",
+  "publisher": "JohannaDev",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/senioritaelizabeth/NxScript.git"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [],
+  "main": "./client/out/extension",
+  "contributes": {
+    "languages": [
+      {
+        "id": "nxscript",
+        "aliases": [
+          "NxScript",
+          "nxscript"
+        ],
+        "extensions": [
+          ".nx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nxscript",
+        "scopeName": "source.nxscript",
+        "path": "./syntaxes/nxscript.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}

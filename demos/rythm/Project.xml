@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://lime.openfl.org/project/1.0.4"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://lime.openfl.org/project/1.0.4 http://lime.openfl.org/xsd/project-1.0.4.xsd">
+
+    <app title="nxscript_rythm_demo" file="nxscript_rythm_demo" main="Main" version="0.1.0"
+        company="Nz" />
+    <window width="960" height="640" fps="1000" background="#111827" hardware="true" vsync="false" />
+
+    <source path="source" />
+    <assets path="assets" />
+    <set name="BUILD_DIR" value="export" />
+
+    <haxelib name="flixel" />
+    <source path="../../src" />
+</project>

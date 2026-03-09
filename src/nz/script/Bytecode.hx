@@ -196,6 +196,7 @@ class FunctionChunk {
 typedef ClassData = {
 	name:String,
 	superClass:Null<String>,
+	nativeSuper:Null<Value>,
 	methods:Map<String, FunctionChunk>,
 	fields:Map<String, Value>, // Default field values
 	constructor:Null<FunctionChunk>

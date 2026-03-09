@@ -23,6 +23,9 @@ class Tokenizer {
 		"var" => KVar,
 		"const" => KConst,
 		"func" => KFunc,
+		"fn" => KFn,
+		"fun" => KFun,
+		"function" => KFunction,
 		"class" => KClass,
 		"extends" => KExtends,
 		"new" => KNew,
@@ -36,6 +39,9 @@ class Tokenizer {
 		"break" => KBreak,
 		"continue" => KContinue,
 		"in" => KIn,
+		"of" => KOf,
+		"from" => KFrom,
+		"to" => KTo,
 		"true" => KTrue,
 		"false" => KFalse,
 		"null" => KNull,
@@ -186,6 +192,9 @@ class Tokenizer {
 
 		while (!isEOF() && (isDigit(peek()) || peek() == '.')) {
 			if (peek() == '.') {
+				// Range operator support: stop number token before `...`
+				if (peekNext() == '.')
+					break;
 				if (hasDot)
 					break;
 				hasDot = true;
@@ -245,6 +254,11 @@ class Tokenizer {
 			case ':':
 				return TColon;
 			case '.':
+				if (peek() == '.' && peekNext() == '.') {
+					advance();
+					advance();
+					return TRange;
+				}
 				return TDot;
 
 			case '+':

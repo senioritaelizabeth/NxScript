@@ -42,6 +42,7 @@ class NativeClasses {
 		var classData:ClassData = {
 			name: "Object",
 			superClass: null,
+			nativeSuper: null,
 			methods: methods,
 			fields: fields,
 			constructor: null
@@ -63,6 +64,7 @@ class NativeClasses {
 		var classData:ClassData = {
 			name: "String",
 			superClass: "Object",
+			nativeSuper: null,
 			methods: methods,
 			fields: fields,
 			constructor: null
@@ -84,6 +86,7 @@ class NativeClasses {
 		var classData:ClassData = {
 			name: "Number",
 			superClass: "Object",
+			nativeSuper: null,
 			methods: methods,
 			fields: fields,
 			constructor: null
@@ -105,6 +108,7 @@ class NativeClasses {
 		var classData:ClassData = {
 			name: "Bool",
 			superClass: "Object",
+			nativeSuper: null,
 			methods: methods,
 			fields: fields,
 			constructor: null
@@ -126,6 +130,7 @@ class NativeClasses {
 		var classData:ClassData = {
 			name: "Array",
 			superClass: "Object",
+			nativeSuper: null,
 			methods: methods,
 			fields: fields,
 			constructor: null
@@ -147,6 +152,7 @@ class NativeClasses {
 		var classData:ClassData = {
 			name: "Function",
 			superClass: "Object",
+			nativeSuper: null,
 			methods: methods,
 			fields: fields,
 			constructor: null

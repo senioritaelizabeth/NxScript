@@ -21,6 +21,7 @@ class Tokenizer {
 	static var keywords = [
 		"let" => KLet,
 		"var" => KVar,
+		"moewvar" => KVar,
 		"const" => KConst,
 		"func" => KFunc,
 		"fn" => KFn,

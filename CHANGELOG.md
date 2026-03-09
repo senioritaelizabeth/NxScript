@@ -60,6 +60,10 @@ All notable changes to this project are documented in this file.
   - stores chunk-level global const mask
   - stores function-level upvalue name tables
   - remains backward compatible with v1/v2 deserialization
+- Compiler now performs constant folding for pure literal expressions (e.g. `2 + 3` -> `5`) during bytecode emission.
+- Member invocation compilation/runtime now includes `CALL_MEMBER` fast path to avoid `GET_MEMBER + CALL` overhead in common cases.
+- VM call paths now reuse native argument buffers and include direct array-method fast routes for member calls.
+- Script keyword alias added: `moewvar` behaves like `var`.
 
 ### Fixed
 

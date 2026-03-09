@@ -56,6 +56,8 @@ All notable changes to this project are documented in this file.
 - Lane-resolution and spawn debugging issues in rhythm runtime bridge.
 - Multiple rhythm sync regressions around chart spawn timing and startup lead behavior.
 - Runtime handling for script-call fallback paths used by rhythm flow logic.
+- Import alias false-positive parsing where `i = i + 1` could be misread as an import line.
+- VM frame unwind bug where host calls (e.g. `call0("update")`) could resume stale `<main>` frame and re-run top-level script code.
 
 ### Docs
 

@@ -179,8 +179,30 @@ class VM {
 		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead*/
 
 		while (true) {
-			if (ip >= codeLen)
-				break;
+			if (ip >= codeLen) {
+				// Implicit frame end (no explicit RETURN reached): unwind like RETURN.
+				var result = sp > 0 ? stack[--sp] : VNull;
+				var savedBase = frameBase;
+				frames.pop();
+				if (frames.length == 0) {
+					this.sp = savedBase;
+					return result;
+				}
+
+				this.currentFrame = frames[frames.length - 1];
+				currentFrame = this.currentFrame;
+				currentLocalVars = currentFrame.localVars;
+				frameBase = currentFrame.stackBase;
+				chunk = currentFrame.chunk;
+				code = chunk.code;
+				codeLen = code.length;
+				constants = chunk.constants;
+				strings = chunk.strings;
+				ip = currentFrame.ip;
+				sp = savedBase;
+				stack[sp++] = result;
+				continue;
+			}
 
 			var op = code[ip];
 			var arg = code[ip + 1];
@@ -733,9 +755,8 @@ class VM {
 			}
 		}
 
-		var result = sp > 0 ? stack[--sp] : VNull;
-		this.sp = sp;
-		return result;
+		// Unreachable: loop exits via returns in RETURN/opcode or implicit frame end above.
+		return VNull;
 	}
 
 	function handleMakeClass(counts:Int) {

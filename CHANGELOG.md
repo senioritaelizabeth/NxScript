@@ -49,6 +49,11 @@ All notable changes to this project are documented in this file.
 - Runtime diagnostics improved for script paths and stack output formatting.
 - `PlayState` reduced to a minimal wrapper delegating to `RhythmGameState`.
 - Rhythm spawn timing migrated to time-based scheduling with pre-roll alignment to reduce music/note desync.
+- VM dispatch hot loop optimized:
+  - inline opcode/arg fetch (`ip++` form)
+  - cached `natives` map in loop locals
+  - removed per-instruction `codeLen` bounds branch
+- Compiler now guarantees top-level chunks end with `RETURN` to support branchless VM dispatch.
 
 ### Fixed
 

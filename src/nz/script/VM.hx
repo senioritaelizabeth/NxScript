@@ -161,7 +161,6 @@ class VM {
 		// Cache hot fields as locals — eliminates repeated field-chain dereferences in the hot loop
 		var chunk = currentFrame.chunk;
 		var code = chunk.code;
-		var codeLen = code.length;
 		var constants = chunk.constants;
 		var strings = chunk.strings;
 		var ip = currentFrame.ip;
@@ -172,6 +171,7 @@ class VM {
 		var scopeVars = this.scopeVars;
 		var constVars = this.constVars;
 		var globals = this.globals;
+		var natives = this.natives;
 		var currentFrame = this.currentFrame;
 		var currentLocalVars = currentFrame.localVars;
 		var frameBase = currentFrame.stackBase;
@@ -179,34 +179,8 @@ class VM {
 		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead*/
 
 		while (true) {
-			if (ip >= codeLen) {
-				// Implicit frame end (no explicit RETURN reached): unwind like RETURN.
-				var result = sp > 0 ? stack[--sp] : VNull;
-				var savedBase = frameBase;
-				frames.pop();
-				if (frames.length == 0) {
-					this.sp = savedBase;
-					return result;
-				}
-
-				this.currentFrame = frames[frames.length - 1];
-				currentFrame = this.currentFrame;
-				currentLocalVars = currentFrame.localVars;
-				frameBase = currentFrame.stackBase;
-				chunk = currentFrame.chunk;
-				code = chunk.code;
-				codeLen = code.length;
-				constants = chunk.constants;
-				strings = chunk.strings;
-				ip = currentFrame.ip;
-				sp = savedBase;
-				stack[sp++] = result;
-				continue;
-			}
-
-			var op = code[ip];
-			var arg = code[ip + 1];
-			ip += 2;
+			var op = code[ip++];
+			var arg = code[ip++];
 
 			if (debug) {
 				var instIdx = (ip - 2) >> 1;
@@ -532,7 +506,6 @@ class VM {
 							strings = newChunk.strings;
 
 							ip = 0;
-							codeLen = code.length;
 
 						case VNativeFunction(name, arity, fn):
 							if (arity != -1 && argc != arity)
@@ -568,7 +541,6 @@ class VM {
 					frameBase = currentFrame.stackBase;
 					chunk = currentFrame.chunk;
 					code = chunk.code;
-					codeLen = code.length;
 					constants = chunk.constants;
 					strings = chunk.strings;
 					ip = currentFrame.ip;
@@ -682,7 +654,6 @@ class VM {
 						frameBase = currentFrame.stackBase;
 						chunk = currentFrame.chunk;
 						code = chunk.code;
-						codeLen = code.length;
 						constants = chunk.constants;
 						strings = chunk.strings;
 					}
@@ -707,7 +678,6 @@ class VM {
 					frameBase = currentFrame.stackBase;
 					chunk = currentFrame.chunk;
 					code = chunk.code;
-					codeLen = code.length;
 					constants = chunk.constants;
 					strings = chunk.strings;
 					sp = this.sp;

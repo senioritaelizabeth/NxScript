@@ -75,6 +75,7 @@ class Compiler {
 		if (statements.length == 0) {
 			emit(Op.LOAD_NULL);
 		}
+		emit(Op.RETURN);
 		return chunk;
 	}
 

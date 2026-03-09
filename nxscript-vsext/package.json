@@ -3,7 +3,7 @@
   "displayName": "NxScript",
   "description": "Language support for NxScript (.nx files) — syntax highlighting, diagnostics, autocomplete",
   "version": "0.1.0",
-  "publisher": "niz",
+  "publisher": "JohannaDev",
   "icon": "icon.png",
   "repository": {
     "type": "git",

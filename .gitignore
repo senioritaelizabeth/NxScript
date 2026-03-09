@@ -17,7 +17,7 @@ doc.xml
 .idea/
 export/
 node_modules/
-
+*vsix
 # Haxe
 .haxelib/
 

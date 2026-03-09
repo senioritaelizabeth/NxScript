@@ -25,7 +25,7 @@ import haxe.io.Path;
  */
 class Interpreter {
 	static var EMPTY_ARGS:Array<Value> = [];
-	static var IMPORT_RE = ~/^\s*(?:i|import)\s+(?:"([^"]+)"|'([^']+)'|([A-Za-z_][A-Za-z0-9_\.]*))\s*;?\s*$/;
+	static var IMPORT_RE = ~/^\s*import\s+(?:"([^"]+)"|'([^']+)'|([A-Za-z_][A-Za-z0-9_\.]*))\s*;?\s*$/;
 
 	public var vm:VM;
 	public var globals(get, never):Map<String, Value>;
@@ -559,7 +559,7 @@ class Interpreter {
 		}
 
 		var trimmed = StringTools.trim(line);
-		if (!StringTools.startsWith(trimmed, "import ") && !StringTools.startsWith(trimmed, "i "))
+		if (!StringTools.startsWith(trimmed, "import "))
 			return null;
 
 		var spaceIdx = trimmed.indexOf(" ");

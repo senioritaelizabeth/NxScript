@@ -80,6 +80,7 @@ class VM {
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
 	}
+
 	/**
 	 * Runs a compiled Chunk from the top level.
 	 * Resets all execution state — don't call this mid-execution expecting continuity.
@@ -134,7 +135,6 @@ class VM {
 	}
 
 	/** Flatten Instruction objects into [op, arg, op, arg...] to eliminate object indirection in hot loop */
-
 	function buildFlatCode(chunk:Chunk) {
 		var insts = chunk.instructions;
 		var len = insts.length;
@@ -298,7 +298,6 @@ class VM {
 							stack[sp++] = add(a, b);
 					}
 
-
 				case Op.SUB:
 					var b = stack[--sp];
 					var a = stack[--sp];
@@ -315,7 +314,6 @@ class VM {
 							throw 'Cannot subtract';
 					}
 
-
 				case Op.MUL:
 					var b = stack[--sp];
 					var a = stack[--sp];
@@ -331,7 +329,6 @@ class VM {
 						default:
 							stack[sp++] = multiply(a, b);
 					}
-
 
 				case Op.DIV:
 					var b = stack[--sp];
@@ -351,7 +348,6 @@ class VM {
 							throw 'Cannot divide';
 					}
 
-
 				case Op.MOD:
 					var b = stack[--sp];
 					var a = stack[--sp];
@@ -369,7 +365,6 @@ class VM {
 						default:
 							throw 'Cannot modulo';
 					}
-
 
 				case Op.NEG:
 					var a = stack[--sp];

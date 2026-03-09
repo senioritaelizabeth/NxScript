@@ -36,6 +36,10 @@ class Compiler {
 	var localSlots:Map<String, Int> = null;
 	var nextLocalSlot:Int = 0;
 
+	// When compiling a class method body, this holds all method names so
+	// bare calls like foo() can resolve to this.foo() if no local shadows it.
+	var currentClassMethodNames:Map<String, Bool> = null;
+
 	// Get or create a slot for a local variable. Slots are never reused (simple but fine for scripts).
 	inline function allocSlot(name:String):Int {
 		if (localSlots.exists(name))
@@ -112,7 +116,7 @@ class Compiler {
 					emit(Op.POP);
 
 			case SFunc(name, params, returnType, body):
-				var funcChunk = compileFunction(name, params, body, false);
+				var funcChunk = compileFunction(name, params, body, false, null);
 				var funcIndex = functions.length;
 				functions.push(funcChunk);
 				emitWithArg(Op.MAKE_FUNC, funcIndex);
@@ -121,6 +125,10 @@ class Compiler {
 					emit(Op.POP);
 
 			case SClass(className, superClass, methods, fields):
+				var classMethodNames = new Map<String, Bool>();
+				for (m in methods)
+					classMethodNames.set(m.name, true);
+
 				// Push class name
 				emitConstant(VString(className));
 				// Push super class (or null)
@@ -134,7 +142,7 @@ class Compiler {
 					// Push method name
 					emitConstant(VString(method.name));
 					// Push method function
-					var funcChunk = compileFunction(method.name, method.params, method.body, false);
+					var funcChunk = compileFunction(method.name, method.params, method.body, false, classMethodNames);
 					var funcIndex = functions.length;
 					functions.push(funcChunk);
 					emitWithArg(Op.MAKE_FUNC, funcIndex);
@@ -403,7 +411,17 @@ class Compiler {
 				emit(Op.GET_INDEX);
 
 			case ECall(callee, args):
-				compileExpression(callee);
+				switch (callee) {
+					case EIdentifier(name)
+						if (currentClassMethodNames != null
+							&& currentClassMethodNames.exists(name)
+							&& (localSlots == null || !localSlots.exists(name))):
+						// Inside class methods, allow bare method calls: foo() => this.foo()
+						emit(Op.GET_THIS);
+						emitWithString(Op.GET_MEMBER, name);
+					default:
+						compileExpression(callee);
+				}
 				for (arg in args) {
 					compileExpression(arg);
 				}
@@ -428,7 +446,7 @@ class Compiler {
 					case Left(e): [SReturn(e)];
 					case Right(stmts): stmts;
 				}
-				var funcChunk = compileFunction(funcName, params, funcBody, true);
+				var funcChunk = compileFunction(funcName, params, funcBody, true, null);
 				var funcIndex = functions.length;
 				functions.push(funcChunk);
 				emitWithArg(Op.MAKE_LAMBDA, funcIndex);
@@ -518,7 +536,7 @@ class Compiler {
 		}
 	}
 
-	function compileFunction(name:String, params:Array<Param>, body:Array<Stmt>, isLambda:Bool):FunctionChunk {
+	function compileFunction(name:String, params:Array<Param>, body:Array<Stmt>, isLambda:Bool, classMethodNames:Map<String, Bool>):FunctionChunk {
 		var savedChunk = chunk;
 		var savedConstants = constants;
 		var savedFunctions = functions;
@@ -527,7 +545,9 @@ class Compiler {
 		var savedTryDepth = tryDepth;
 		var savedLocalSlots = localSlots;
 		var savedNextLocalSlot = nextLocalSlot;
+		var savedClassMethodNames = currentClassMethodNames;
 		tryDepth = 0;
+		currentClassMethodNames = classMethodNames;
 
 		// Set up fresh slot tracking for this function
 		localSlots = new Map();
@@ -582,6 +602,7 @@ class Compiler {
 		tryDepth = savedTryDepth;
 		localSlots = savedLocalSlots;
 		nextLocalSlot = savedNextLocalSlot;
+		currentClassMethodNames = savedClassMethodNames;
 
 		return funcChunk;
 	}

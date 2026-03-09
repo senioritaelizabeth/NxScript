@@ -162,30 +162,41 @@ typedef Instruction = {
 	col:Int
 }
 
-typedef Chunk = {
-	instructions:Array<Instruction>,
-	constants:Array<Value>,
-	functions:Array<FunctionChunk>,
-	strings:Array<String>, // String pool for variable/field names
-	?code:Array<Int>, // Flattened [op, arg, op, arg...] for fast dispatch
-	?localNames:Array<String>, // Slot-index → variable name (for closure capture)
-	?funcCache:Array<Value> // Cached VFunction values keyed by function index (EMPTY_MAP closure only)
+/**
+ * Chunk and FunctionChunk should be CLASSES not typedefs.
+ * On C++ targets, typedef anonymous structs become Dynamic, every field
+ * access goes through __Field() hash lookup (~50-100ns each).
+ * Classes get direct typed field access (~1ns).
+ *
+ * This is the single biggest C++ target performance fix possible.
+ */
+@:structInit
+class Chunk {
+	public var instructions:Array<Instruction> = [];
+	public var constants:Array<Value> = [];
+	public var functions:Array<FunctionChunk> = [];
+	public var strings:Array<String> = [];
+	@:optional public var code:Array<Int> = null;
+	@:optional public var localNames:Array<String> = null;
+	@:optional public var funcCache:Array<Value> = null;
 }
 
-typedef FunctionChunk = {
-	name:String,
-	paramCount:Int,
-	paramNames:Array<String>,
-	chunk:Chunk,
-	isLambda:Bool,
-	?localCount:Int,
-	?localNames:Array<String>,
-	?localSlots:Map<String, Int> // O(1) name→slot lookup (alternative to indexOf on localNames)
+@:structInit
+class FunctionChunk {
+	public var name:String;
+	public var paramCount:Int;
+	public var paramNames:Array<String>;
+	public var chunk:Chunk;
+	public var isLambda:Bool;
+	@:optional public var localCount:Int = 0;
+	@:optional public var localNames:Array<String> = null;
+	@:optional public var localSlots:Map<String, Int> = null;
 }
 
 typedef ClassData = {
 	name:String,
 	superClass:Null<String>,
+	nativeSuper:Null<Value>,
 	methods:Map<String, FunctionChunk>,
 	fields:Map<String, Value>, // Default field values
 	constructor:Null<FunctionChunk>

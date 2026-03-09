@@ -62,8 +62,12 @@ class BytecodeSerializer {
 	 * Reads a .nxb file and returns a ready-to-execute Chunk.
 	 */
 	public static function loadFromFile(path:String):Chunk {
+		#if sys
 		var bytes = sys.io.File.getBytes(path);
 		return deserialize(bytes);
+		#else
+		throw "BytecodeSerializer.loadFromFile is only available on sys targets";
+		#end
 	}
 
 	// === SERIALIZACIÓN ===

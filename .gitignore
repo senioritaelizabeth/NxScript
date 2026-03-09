@@ -1,4 +1,5 @@
 # Build outputs
+snapshot
 *.n
 *.js
 *.swf
@@ -6,13 +7,16 @@
 *.cs/
 test/bin
 test/test_flixel
-nxscript-vsext/
+# nxscript-vsext/
+out/
 docs/
 doc.xml
 *.ignore/
 # IDE
 .vscode/
 .idea/
+export/
+node_modules/
 
 # Haxe
 .haxelib/

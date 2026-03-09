@@ -1,6 +1,6 @@
 # Cinematic Module
 
-(Coming soon)
+(Coming soon, not yet implemented)
 
 This module will provide tools for creating in-game cinematics and cutscenes.
 

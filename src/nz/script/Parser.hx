@@ -13,26 +13,29 @@ import nz.script.AST;
 class Parser {
 	var tokens:Array<TokenPos>;
 	var pos:Int = 0;
+	var strictSemicolons:Bool;
+	var syntheticCounter:Int = 0;
 
-	public function new(tokens:Array<TokenPos>) {
+	public function new(tokens:Array<TokenPos>, strictSemicolons:Bool = false) {
 		this.tokens = tokens;
+		this.strictSemicolons = strictSemicolons;
 	}
 
 	public function parse():Array<StmtWithPos> {
 		var statements:Array<StmtWithPos> = [];
 
 		while (!isEOF()) {
-			skipNewlines();
+			skipSeparators();
 			if (isEOF())
 				break;
 			var startToken = peek();
 			var stmt = parseStatement();
+			consumeStatementTerminator(stmt);
 			statements.push({
 				stmt: stmt,
 				line: startToken.line,
 				col: startToken.col
 			});
-			skipNewlines();
 		}
 
 		return statements;
@@ -45,7 +48,7 @@ class Parser {
 			case TKeyword(KLet): parseLet();
 			case TKeyword(KVar): parseVar();
 			case TKeyword(KConst): parseConst();
-			case TKeyword(KFunc): parseFunc();
+			case TKeyword(KFunc), TKeyword(KFn), TKeyword(KFun), TKeyword(KFunction): parseFunc();
 			case TKeyword(KClass): parseClass();
 			case TKeyword(KReturn): parseReturn();
 			case TKeyword(KIf): parseIf();
@@ -118,7 +121,7 @@ class Parser {
 		expect(TRightParen, "Expected ')' after parameters");
 
 		var returnType = null;
-		if (match(TArrow)) {
+		if (match(TArrow) || match(TColon)) {
 			returnType = parseTypeHint();
 		}
 
@@ -143,7 +146,7 @@ class Parser {
 		var fields:Array<ClassField> = [];
 		var methods:Array<ClassMethod> = [];
 
-		skipNewlines();
+		skipSeparators();
 		while (!check(TRightBrace) && !isEOF()) {
 			var token = peek();
 
@@ -169,7 +172,7 @@ class Parser {
 						init: fieldInit
 					});
 
-				case TKeyword(KFunc):
+				case TKeyword(KFunc), TKeyword(KFn), TKeyword(KFun), TKeyword(KFunction):
 					// Method declaration
 					advance(); // consume 'func'
 
@@ -195,7 +198,7 @@ class Parser {
 					expect(TRightParen, "Expected ')' after parameters");
 
 					var returnType:Null<TypeHint> = null;
-					if (match(TArrow)) {
+					if (match(TArrow) || match(TColon)) {
 						returnType = parseTypeHint();
 					}
 
@@ -215,7 +218,7 @@ class Parser {
 					error("Expected 'var' or 'func' in class body");
 			}
 
-			skipNewlines();
+			skipSeparators();
 		}
 
 		expect(TRightBrace, "Expected '}' after class body");
@@ -289,10 +292,10 @@ class Parser {
 		expect(TRightBrace, "Expected '}' after if body");
 
 		var elseBody = null;
-		skipNewlines();
+		skipSeparators();
 
 		if (match(TKeyword(KElse))) {
-			skipNewlines();
+			skipSeparators();
 			if (check(TKeyword(KIf))) {
 				// elseif
 				elseBody = [parseIf()];
@@ -325,15 +328,50 @@ class Parser {
 
 		expect(TLeftParen, "Expected '(' after 'for'");
 		var variable = expectIdentifier();
-		expect(TKeyword(KIn), "Expected 'in' in for loop");
-		var iterable = parseExpression();
-		expect(TRightParen, "Expected ')' after for header");
 
-		expect(TLeftBrace, "Expected '{' after for header");
-		var body = parseBlockBody();
-		expect(TRightBrace, "Expected '}' after for body");
+		var forKind = peek().token;
+		var loopStmt:Stmt;
+		switch (forKind) {
+			case TKeyword(KIn), TKeyword(KOf):
+				advance();
+				var iterable = parseExpression();
+				expect(TRightParen, "Expected ')' after for header");
+				expect(TLeftBrace, "Expected '{' after for header");
+				var body = parseBlockBody();
+				expect(TRightBrace, "Expected '}' after for body");
+				loopStmt = SFor(variable, iterable, body);
 
-		return SFor(variable, iterable, body);
+			case TKeyword(KFrom):
+				advance();
+				var fromExpr = parseExpression();
+				expect(TKeyword(KTo), "Expected 'to' in for-from-to loop");
+				var toExpr = parseExpression();
+				expect(TRightParen, "Expected ')' after for header");
+				expect(TLeftBrace, "Expected '{' after for header");
+				var body = parseBlockBody();
+				expect(TRightBrace, "Expected '}' after for body");
+
+				// Lower: for (i from a to b) { body }
+				// into: {
+				//   var i = a;
+				//   const __for_end_n = b;
+				//   while (i < __for_end_n) { body; i = i + 1; }
+				// }
+				var endName = '__for_end_${syntheticCounter++}';
+				var loweredBody = body.copy();
+				loweredBody.push(SExpr(EAssign(EIdentifier(variable), EBinary(OAdd, EIdentifier(variable), ENumber(1)))));
+				loopStmt = SBlock([
+					SVar(variable, null, fromExpr),
+					SConst(endName, null, toExpr),
+					SWhile(EBinary(OLess, EIdentifier(variable), EIdentifier(endName)), loweredBody)
+				]);
+
+			default:
+				error("Expected 'in', 'of', or 'from' in for loop");
+				return null;
+		}
+
+		return loopStmt;
 	}
 
 	function parseBlock():Stmt {
@@ -368,11 +406,12 @@ class Parser {
 
 	function parseBlockBody():Array<Stmt> {
 		var stmts:Array<Stmt> = [];
-		skipNewlines();
+		skipSeparators();
 
 		while (!check(TRightBrace) && !isEOF()) {
-			stmts.push(parseStatement());
-			skipNewlines();
+			var stmt = parseStatement();
+			consumeStatementTerminator(stmt);
+			stmts.push(stmt);
 		}
 
 		return stmts;
@@ -383,8 +422,17 @@ class Parser {
 		return parseAssignment();
 	}
 
+	function parseRange():Expr {
+		var left = parseLogicalOr();
+		while (match(TRange)) {
+			var right = parseLogicalOr();
+			left = ECall(EIdentifier("range"), [left, right]);
+		}
+		return left;
+	}
+
 	function parseAssignment():Expr {
-		var expr = parseLogicalOr();
+		var expr = parseRange();
 
 		if (match(TOperator(OAssign))) {
 			var value = parseAssignment();
@@ -860,6 +908,33 @@ class Parser {
 
 	function skipNewlines() {
 		while (match(TNewLine)) {}
+	}
+
+	function skipSeparators() {
+		while (match(TNewLine) || match(TSemicolon)) {}
+	}
+
+	function statementNeedsTerminator(stmt:Stmt):Bool {
+		return switch (stmt) {
+			case SIf(_, _, _), SWhile(_, _), SFor(_, _, _), SBlock(_), STryCatch(_, _, _), SFunc(_, _, _, _), SClass(_, _, _, _): false;
+			default: true;
+		}
+	}
+
+	function consumeStatementTerminator(stmt:Stmt):Void {
+		if (!statementNeedsTerminator(stmt)) {
+			skipSeparators();
+			return;
+		}
+
+		if (strictSemicolons) {
+			if (check(TRightBrace) || isEOF())
+				return;
+			expect(TSemicolon, "Expected ';' in strict mode");
+			skipSeparators();
+		} else {
+			skipSeparators();
+		}
 	}
 
 	function isEOF():Bool {

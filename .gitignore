@@ -8,6 +8,7 @@ snapshot
 test/bin
 test/test_flixel
 # nxscript-vsext/
+*.nxb
 out/
 docs/
 doc.xml

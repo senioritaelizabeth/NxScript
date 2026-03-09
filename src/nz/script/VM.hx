@@ -63,6 +63,7 @@ class VM {
 	var globalSlotConstInit:Array<Bool>;
 	var arrayMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 	var instanceMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
+	var nativeArgBuffers:Map<Int, Array<Value>>;
 
 	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
@@ -91,6 +92,7 @@ class VM {
 		globalSlotConstInit = [];
 		arrayMethodCache = new ObjectMap();
 		instanceMethodCache = new ObjectMap();
+		nativeArgBuffers = new Map();
 
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
@@ -560,11 +562,7 @@ class VM {
 								throw 'Native function $name expects $arity arguments, got $argc';
 
 							var start = sp - argc;
-
-							// small manual copy avoids slice allocation in some targets
-							var args = [];
-							for (i in 0...argc)
-								args.push(stack[start + i]);
+							var args = getNativeArgs(argc, start, stack);
 
 							sp = start - 1;
 
@@ -580,6 +578,100 @@ class VM {
 					var memberField = strings[memberFieldIdx];
 					var objectIndex = sp - memberArgc - 1;
 					var objectValue = stack[objectIndex];
+
+					switch (objectValue) {
+						case VArray(arr):
+							var argStart = objectIndex + 1;
+							switch (memberField) {
+								case "push":
+									if (memberArgc != 1)
+										throw 'Native function push expects 1 arguments, got $memberArgc';
+									arr.push(stack[argStart]);
+									sp = objectIndex;
+									stack[sp++] = VNull;
+									continue;
+								case "pop":
+									if (memberArgc != 0)
+										throw 'Native function pop expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length == 0 ? VNull : arr.pop();
+									continue;
+								case "shift":
+									if (memberArgc != 0)
+										throw 'Native function shift expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length == 0 ? VNull : arr.shift();
+									continue;
+								case "unshift":
+									if (memberArgc != 1)
+										throw 'Native function unshift expects 1 arguments, got $memberArgc';
+									arr.unshift(stack[argStart]);
+									sp = objectIndex;
+									stack[sp++] = VNull;
+									continue;
+								case "first":
+									if (memberArgc != 0)
+										throw 'Native function first expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length > 0 ? arr[0] : VNull;
+									continue;
+								case "last":
+									if (memberArgc != 0)
+										throw 'Native function last expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length > 0 ? arr[arr.length - 1] : VNull;
+									continue;
+								case "contains":
+									if (memberArgc != 1)
+										throw 'Native function contains expects 1 arguments, got $memberArgc';
+									var searchValue = stack[argStart];
+									var found = false;
+									for (item in arr) {
+										if (valuesEqual(item, searchValue)) {
+											found = true;
+											break;
+										}
+									}
+									sp = objectIndex;
+									stack[sp++] = VBool(found);
+									continue;
+								case "indexOf":
+									if (memberArgc != 1)
+										throw 'Native function indexOf expects 1 arguments, got $memberArgc';
+									var idxValue = stack[argStart];
+									var idx = -1;
+									for (i in 0...arr.length) {
+										if (valuesEqual(arr[i], idxValue)) {
+											idx = i;
+											break;
+										}
+									}
+									sp = objectIndex;
+									stack[sp++] = VNumber(idx);
+									continue;
+								case "reverse":
+									if (memberArgc != 0)
+										throw 'Native function reverse expects 0 arguments, got $memberArgc';
+									arr.reverse();
+									sp = objectIndex;
+									stack[sp++] = VArray(arr);
+									continue;
+								case "join":
+									if (memberArgc != 1)
+										throw 'Native function join expects 1 arguments, got $memberArgc';
+									var delim = switch (stack[argStart]) {
+										case VString(s): s;
+										default: ",";
+									}
+									var parts = [for (v in arr) valueToString(v)];
+									sp = objectIndex;
+									stack[sp++] = VString(parts.join(delim));
+									continue;
+								default:
+							}
+						default:
+					}
+
 					var memberCallee = getMember(objectValue, memberField);
 
 					switch (memberCallee) {
@@ -646,9 +738,7 @@ class VM {
 								throw 'Native function $name expects $arity arguments, got $memberArgc';
 
 							var start = objectIndex + 1;
-							var memberArgs = [];
-							for (i in 0...memberArgc)
-								memberArgs.push(stack[start + i]);
+							var memberArgs = getNativeArgs(memberArgc, start, stack);
 
 							sp = objectIndex;
 							stack[sp++] = fn(memberArgs);
@@ -1145,6 +1235,17 @@ class VM {
 			}
 		}
 		return values;
+	}
+
+	inline function getNativeArgs(argc:Int, start:Int, stack:Array<Value>):Array<Value> {
+		var args = nativeArgBuffers.get(argc);
+		if (args == null) {
+			args = [for (_ in 0...argc) VNull];
+			nativeArgBuffers.set(argc, args);
+		}
+		for (i in 0...argc)
+			args[i] = stack[start + i];
+		return args;
 	}
 
 	function getVariable(name:String):Value {

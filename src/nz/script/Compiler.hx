@@ -393,6 +393,12 @@ class Compiler {
 	}
 
 	function compileExpression(expr:Expr) {
+		var folded = tryFoldConstant(expr);
+		if (folded != null) {
+			emitFoldedConstant(folded);
+			return;
+		}
+
 		switch (expr) {
 			case ENumber(v):
 				emitConstant(VNumber(v));
@@ -555,6 +561,180 @@ class Compiler {
 						throw "Invalid assignment target";
 				}
 		}
+	}
+
+	function emitFoldedConstant(value:Value):Void {
+		switch (value) {
+			case VNull:
+				emit(Op.LOAD_NULL);
+			case VBool(v):
+				emit(v ? Op.LOAD_TRUE : Op.LOAD_FALSE);
+			case VNumber(_) | VString(_):
+				emitConstant(value);
+			default:
+				// Mutable/complex values should never be constant-folded in this compiler pass.
+				emitConstant(value);
+		}
+	}
+
+	function tryFoldConstant(expr:Expr):Null<Value> {
+		return switch (expr) {
+			case ENumber(v): VNumber(v);
+			case EString(v): VString(v);
+			case EBool(v): VBool(v);
+			case ENull: VNull;
+
+			case EUnary(op, e):
+				var v = tryFoldConstant(e);
+				if (v == null) {
+					null;
+				} else {
+					switch (op) {
+						case OSub:
+							switch (v) {
+								case VNumber(n): VNumber(-n);
+								default: null;
+							}
+						case ONot:
+							VBool(!constTruthy(v));
+						case OBitNot:
+							switch (v) {
+								case VNumber(n): VNumber(~Std.int(n));
+								default: null;
+							}
+						default:
+							null;
+					}
+				}
+
+			case EBinary(op, left, right):
+				var lv = tryFoldConstant(left);
+				var rv = tryFoldConstant(right);
+				if (lv == null || rv == null) {
+					null;
+				} else {
+					switch (op) {
+						case OAdd:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(a + b);
+								case [VString(a), VString(b)]: VString(a + b);
+								case [VString(a), _]: VString(a + constToString(rv));
+								case [_, VString(b)]: VString(constToString(lv) + b);
+								default: null;
+							}
+						case OSub:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(a - b);
+								default: null;
+							}
+						case OMul:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(a * b);
+								default: null;
+							}
+						case ODiv:
+							switch ([lv, rv]) {
+								case [VNumber(_), VNumber(0)]: null;
+								case [VNumber(a), VNumber(b)]: VNumber(a / b);
+								default: null;
+							}
+						case OMod:
+							switch ([lv, rv]) {
+								case [VNumber(_), VNumber(0)]: null;
+								case [VNumber(a), VNumber(b)]: VNumber(a % b);
+								default: null;
+							}
+						case OBitAnd:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(Std.int(a) & Std.int(b));
+								default: null;
+							}
+						case OBitOr:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(Std.int(a) | Std.int(b));
+								default: null;
+							}
+						case OBitXor:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(Std.int(a) ^ Std.int(b));
+								default: null;
+							}
+						case OShiftLeft:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(Std.int(a) << Std.int(b));
+								default: null;
+							}
+						case OShiftRight:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VNumber(Std.int(a) >> Std.int(b));
+								default: null;
+							}
+						case OEqual:
+							VBool(constEquals(lv, rv));
+						case ONotEqual:
+							VBool(!constEquals(lv, rv));
+						case OLess:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VBool(a < b);
+								case [VString(a), VString(b)]: VBool(a < b);
+								default: null;
+							}
+						case OGreater:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VBool(a > b);
+								case [VString(a), VString(b)]: VBool(a > b);
+								default: null;
+							}
+						case OLessEq:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VBool(a <= b);
+								case [VString(a), VString(b)]: VBool(a <= b);
+								default: null;
+							}
+						case OGreaterEq:
+							switch ([lv, rv]) {
+								case [VNumber(a), VNumber(b)]: VBool(a >= b);
+								case [VString(a), VString(b)]: VBool(a >= b);
+								default: null;
+							}
+						default:
+							null;
+					}
+				}
+
+			default:
+				null;
+		};
+	}
+
+	inline function constTruthy(v:Value):Bool {
+		return switch (v) {
+			case VNull: false;
+			case VBool(b): b;
+			case VNumber(n): n != 0;
+			case VString(s): s.length > 0;
+			default: true;
+		}
+	}
+
+	inline function constEquals(a:Value, b:Value):Bool {
+		return switch ([a, b]) {
+			case [VNumber(x), VNumber(y)]: x == y;
+			case [VString(x), VString(y)]: x == y;
+			case [VBool(x), VBool(y)]: x == y;
+			case [VNull, VNull]: true;
+			default: false;
+		};
+	}
+
+	inline function constToString(v:Value):String {
+		return switch (v) {
+			case VNumber(n): Std.string(n);
+			case VString(s): s;
+			case VBool(b): b ? "true" : "false";
+			case VNull: "null";
+			default: "null";
+		};
 	}
 
 	function compileBinaryOp(op:Operator) {

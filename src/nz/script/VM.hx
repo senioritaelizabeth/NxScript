@@ -1,6 +1,7 @@
 package nz.script;
 
 import nz.script.Bytecode;
+import haxe.ds.ObjectMap;
 
 using StringTools;
 
@@ -60,6 +61,8 @@ class VM {
 	var globalSlotByName:Map<String, Int>;
 	var globalSlotIsConst:Array<Bool>;
 	var globalSlotConstInit:Array<Bool>;
+	var arrayMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
+	var instanceMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 
 	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
@@ -86,6 +89,8 @@ class VM {
 		globalSlotByName = new Map();
 		globalSlotIsConst = [];
 		globalSlotConstInit = [];
+		arrayMethodCache = new ObjectMap();
+		instanceMethodCache = new ObjectMap();
 
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
@@ -100,6 +105,8 @@ class VM {
 		sp = 0;
 		frames = [];
 		catchStack = [];
+		arrayMethodCache = new ObjectMap();
+		instanceMethodCache = new ObjectMap();
 		bindGlobalSlots(chunk);
 
 		if (chunk.code == null)
@@ -565,6 +572,89 @@ class VM {
 
 						default:
 							throw 'Value is not callable: $callee';
+					}
+
+				case Op.CALL_MEMBER:
+					var memberArgc = arg & 0xFFFF;
+					var memberFieldIdx = arg >>> 16;
+					var memberField = strings[memberFieldIdx];
+					var objectIndex = sp - memberArgc - 1;
+					var objectValue = stack[objectIndex];
+					var memberCallee = getMember(objectValue, memberField);
+
+					switch (memberCallee) {
+						case VFunction(funcChunk, closure):
+							currentFrame.ip = ip;
+							var paramCount = funcChunk.paramCount;
+							if (memberArgc != paramCount)
+								throw 'Function ${funcChunk.name} expects $paramCount arguments, got $memberArgc';
+
+							var localCount = funcChunk.localCount;
+							var localsBase = objectIndex;
+
+							var src = localsBase + 1;
+							for (i in 0...memberArgc)
+								stack[localsBase + i] = stack[src + i];
+
+							for (i in memberArgc...localCount)
+								stack[localsBase + i] = VNull;
+
+							if (closure != EMPTY_MAP) {
+								var localSlots = funcChunk.localSlots;
+								if (localSlots != null) {
+									for (key in closure.keys()) {
+										var idx = localSlots.get(key);
+										if (idx != null)
+											stack[localsBase + idx] = closure.get(key);
+									}
+								}
+							}
+
+							var frameUpvalues = buildUpvalueArray(funcChunk, closure);
+							var localVars:Map<String, Value>;
+							if (closure == EMPTY_MAP) {
+								localVars = EMPTY_MAP;
+							} else {
+								localVars = new Map();
+								for (key in closure.keys())
+									localVars.set(key, closure.get(key));
+							}
+
+							sp = localsBase + localCount;
+
+							var newFrame = new CallFrame(funcChunk.chunk, 0, localsBase, localVars, frameUpvalues, funcChunk.name);
+
+							if (maxCallDepth > 0 && frames.length + 1 > maxCallDepth)
+								throw 'Execution exceeded maximum call depth ($maxCallDepth) - possible infinite recursion';
+
+							frames.push(newFrame);
+							currentFrame = newFrame;
+							this.currentFrame = newFrame;
+							currentLocalVars = newFrame.localVars;
+							currentUpvalues = newFrame.upvalues;
+							frameBase = newFrame.stackBase;
+
+							var newChunk = newFrame.chunk;
+							chunk = newChunk;
+							code = newChunk.code;
+							constants = newChunk.constants;
+							strings = newChunk.strings;
+							ip = 0;
+
+						case VNativeFunction(name, arity, fn):
+							if (arity != -1 && memberArgc != arity)
+								throw 'Native function $name expects $arity arguments, got $memberArgc';
+
+							var start = objectIndex + 1;
+							var memberArgs = [];
+							for (i in 0...memberArgc)
+								memberArgs.push(stack[start + i]);
+
+							sp = objectIndex;
+							stack[sp++] = fn(memberArgs);
+
+						default:
+							throw 'Member is not callable: $memberField';
 					}
 
 				case Op.RETURN:
@@ -1333,13 +1423,24 @@ class VM {
 					return fields.get(field);
 				}
 
+				var cachedInstanceMethods = instanceMethodCache.get(fields);
+				if (cachedInstanceMethods != null && cachedInstanceMethods.exists(field)) {
+					return cachedInstanceMethods.get(field);
+				}
+
 				// Check methods in class hierarchy
 				var currentClass = classData;
 				while (currentClass != null) {
 					if (currentClass.methods.exists(field)) {
 						var method = currentClass.methods.get(field);
 						// Return a bound method (closure with 'this')
-						return VFunction(method, ["this" => object]);
+						var bound = VFunction(method, ["this" => object]);
+						if (cachedInstanceMethods == null) {
+							cachedInstanceMethods = new Map<String, Value>();
+							instanceMethodCache.set(fields, cachedInstanceMethods);
+						}
+						cachedInstanceMethods.set(field, bound);
+						return bound;
 					}
 					// Look in parent class
 					if (currentClass.superClass != null && classes.exists(currentClass.superClass)) {
@@ -1647,10 +1748,15 @@ class VM {
 	}
 
 	function getArrayMethod(arr:Array<Value>, method:String):Value {
-		return switch (method) {
-			// Properties
-			case "length": VNumber(arr.length);
+		if (method == "length")
+			return VNumber(arr.length);
 
+		var cachedMethods = arrayMethodCache.get(arr);
+		if (cachedMethods != null && cachedMethods.exists(method))
+			return cachedMethods.get(method);
+
+		var bound = switch (method) {
+			// Properties
 			// Add/Remove
 			case "push": VNativeFunction("push", 1, (args) -> {
 					arr.push(args[0]);
@@ -1707,6 +1813,13 @@ class VM {
 
 			default: throw 'Unknown Array method: $method';
 		}
+
+		if (cachedMethods == null) {
+			cachedMethods = new Map<String, Value>();
+			arrayMethodCache.set(arr, cachedMethods);
+		}
+		cachedMethods.set(method, bound);
+		return bound;
 	}
 
 	// Helper to compare two Values for equality

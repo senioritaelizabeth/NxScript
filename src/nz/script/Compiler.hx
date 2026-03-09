@@ -476,6 +476,11 @@ class Compiler {
 
 			case ECall(callee, args):
 				switch (callee) {
+					case EMember(object, field):
+						compileExpression(object);
+						for (arg in args)
+							compileExpression(arg);
+						emitCallMember(field, args.length);
 					case EIdentifier(name)
 						if (currentClassMethodNames != null
 							&& currentClassMethodNames.exists(name)
@@ -483,13 +488,15 @@ class Compiler {
 						// Inside class methods, allow bare method calls: foo() => this.foo()
 						emit(Op.GET_THIS);
 						emitWithString(Op.GET_MEMBER, name);
+						for (arg in args)
+							compileExpression(arg);
+						emitWithArg(Op.CALL, args.length);
 					default:
 						compileExpression(callee);
+						for (arg in args)
+							compileExpression(arg);
+						emitWithArg(Op.CALL, args.length);
 				}
-				for (arg in args) {
-					compileExpression(arg);
-				}
-				emitWithArg(Op.CALL, args.length);
 
 			case EArray(elements):
 				for (elem in elements) {
@@ -729,6 +736,15 @@ class Compiler {
 			line: currentLine,
 			col: currentCol
 		});
+	}
+
+	function emitCallMember(field:String, argc:Int) {
+		if (argc < 0 || argc > 0xFFFF)
+			throw 'Too many call arguments for CALL_MEMBER: $argc';
+		var fieldIdx = addString(field);
+		if (fieldIdx < 0 || fieldIdx > 0xFFFF)
+			throw 'String pool index out of CALL_MEMBER range: $fieldIdx';
+		emitWithArg(Op.CALL_MEMBER, (fieldIdx << 16) | argc);
 	}
 
 	function emitConstant(value:Value) {

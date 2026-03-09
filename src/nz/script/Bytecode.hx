@@ -60,6 +60,7 @@ class Op {
 	public static inline var RETURN = 0x61; // Return from function
 	public static inline var MAKE_FUNC = 0x62; // Create function object
 	public static inline var MAKE_LAMBDA = 0x63; // Create lambda function
+	public static inline var CALL_MEMBER = 0x64; // Call object member with packed field index + arg count
 
 	// Data structures (0x70 - 0x7F)
 	public static inline var MAKE_ARRAY = 0x70; // Create array from top n stack items
@@ -136,6 +137,7 @@ class Op {
 			case RETURN: "RETURN";
 			case MAKE_FUNC: "MAKE_FUNC";
 			case MAKE_LAMBDA: "MAKE_LAMBDA";
+			case CALL_MEMBER: "CALL_MEMBER";
 			case MAKE_ARRAY: "MAKE_ARRAY";
 			case MAKE_DICT: "MAKE_DICT";
 			case GET_MEMBER: "GET_MEMBER";

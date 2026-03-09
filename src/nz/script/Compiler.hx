@@ -35,6 +35,13 @@ class Compiler {
 	// Slots are integer indices into stack[stackBase..stackBase+localCount-1].
 	var localSlots:Map<String, Int> = null;
 	var nextLocalSlot:Int = 0;
+	var globalSlots:Map<String, Int>;
+	var globalNames:Array<String>;
+	var globalConstMask:Array<Bool>;
+	var upvalueSlots:Map<String, Int> = null;
+	var upvalueNames:Array<String> = null;
+	var enclosingLocalSlots:Map<String, Int> = null;
+	var enclosingUpvalueSlots:Map<String, Int> = null;
 
 	// When compiling a class method body, this holds all method names so
 	// bare calls like foo() can resolve to this.foo() if no local shadows it.
@@ -49,16 +56,59 @@ class Compiler {
 		return slot;
 	}
 
+	inline function allocGlobalSlot(name:String):Int {
+		if (globalSlots.exists(name))
+			return globalSlots.get(name);
+		var slot = globalNames.length;
+		globalSlots.set(name, slot);
+		globalNames.push(name);
+		globalConstMask.push(false);
+		return slot;
+	}
+
+	inline function markGlobalConst(name:String):Int {
+		var slot = allocGlobalSlot(name);
+		globalConstMask[slot] = true;
+		return slot;
+	}
+
+	inline function resolveUpvalueSlot(name:String):Int {
+		if (upvalueSlots == null)
+			return -1;
+		if (upvalueSlots.exists(name))
+			return upvalueSlots.get(name);
+
+		var foundInEnclosing = false;
+		if (enclosingLocalSlots != null && enclosingLocalSlots.exists(name)) {
+			foundInEnclosing = true;
+		} else if (enclosingUpvalueSlots != null && enclosingUpvalueSlots.exists(name)) {
+			foundInEnclosing = true;
+		}
+
+		if (!foundInEnclosing)
+			return -1;
+
+		var slot = upvalueNames.length;
+		upvalueSlots.set(name, slot);
+		upvalueNames.push(name);
+		return slot;
+	}
+
 	public function new() {
 		constants = [];
 		functions = [];
 		strings = [];
 		stringMap = new Map();
+		globalSlots = new Map();
+		globalNames = [];
+		globalConstMask = [];
 		chunk = {
 			instructions: [],
 			constants: constants,
 			functions: functions,
-			strings: strings
+			strings: strings,
+			globalNames: globalNames,
+			globalConstMask: globalConstMask
 		};
 	}
 
@@ -105,14 +155,18 @@ class Compiler {
 					// Inside a function, treat var as function-local slot (avoids global Map overhead)
 					emitWithArg(Op.STORE_LOCAL, allocSlot(name));
 				} else {
-					emitWithString(Op.STORE_VAR, name);
+					emitWithArg(Op.STORE_GLOBAL, allocGlobalSlot(name));
 				}
 				if (!isLast)
 					emit(Op.POP);
 
 			case SConst(name, type, init):
 				compileExpression(init);
-				emitWithString(Op.STORE_CONST, name);
+				if (localSlots != null) {
+					emitWithString(Op.STORE_CONST, name);
+				} else {
+					emitWithArg(Op.STORE_GLOBAL, markGlobalConst(name));
+				}
 				if (!isLast)
 					emit(Op.POP);
 
@@ -121,7 +175,7 @@ class Compiler {
 				var funcIndex = functions.length;
 				functions.push(funcChunk);
 				emitWithArg(Op.MAKE_FUNC, funcIndex);
-				emitWithString(Op.STORE_VAR, name);
+				emitWithArg(Op.STORE_GLOBAL, allocGlobalSlot(name));
 				if (!isLast)
 					emit(Op.POP);
 
@@ -165,7 +219,7 @@ class Compiler {
 				var counts = (methods.length << 16) | fields.length;
 				emitWithArg(Op.MAKE_CLASS, counts);
 				// Store class
-				emitWithString(Op.STORE_VAR, className);
+				emitWithArg(Op.STORE_GLOBAL, allocGlobalSlot(className));
 				if (!isLast)
 					emit(Op.POP);
 
@@ -356,7 +410,13 @@ class Compiler {
 				if (localSlots != null && localSlots.exists(name)) {
 					emitWithArg(Op.LOAD_LOCAL, localSlots.get(name));
 				} else {
-					emitWithString(Op.LOAD_VAR, name);
+					var upSlot = resolveUpvalueSlot(name);
+					if (upSlot >= 0)
+						emitWithArg(Op.LOAD_UPVALUE, upSlot);
+					else if (globalSlots.exists(name))
+						emitWithArg(Op.LOAD_GLOBAL, globalSlots.get(name));
+					else
+						emitWithString(Op.LOAD_VAR, name);
 				}
 
 			case EThis:
@@ -364,7 +424,10 @@ class Compiler {
 
 			case ENew(className, args):
 				// Load the class
-				emitWithString(Op.LOAD_VAR, className);
+				if (globalSlots.exists(className))
+					emitWithArg(Op.LOAD_GLOBAL, globalSlots.get(className));
+				else
+					emitWithString(Op.LOAD_VAR, className);
 				// Push arguments
 				for (arg in args) {
 					compileExpression(arg);
@@ -459,7 +522,13 @@ class Compiler {
 						if (localSlots != null && localSlots.exists(name)) {
 							emitWithArg(Op.STORE_LOCAL, localSlots.get(name));
 						} else {
-							emitWithString(Op.STORE_VAR, name);
+							var upSlot = resolveUpvalueSlot(name);
+							if (upSlot >= 0)
+								emitWithArg(Op.STORE_UPVALUE, upSlot);
+							else if (globalSlots.exists(name))
+								emitWithArg(Op.STORE_GLOBAL, globalSlots.get(name));
+							else
+								emitWithString(Op.STORE_VAR, name);
 						}
 
 					case EMember(object, field):
@@ -546,13 +615,21 @@ class Compiler {
 		var savedTryDepth = tryDepth;
 		var savedLocalSlots = localSlots;
 		var savedNextLocalSlot = nextLocalSlot;
+		var savedUpvalueSlots = upvalueSlots;
+		var savedUpvalueNames = upvalueNames;
+		var savedEnclosingLocalSlots = enclosingLocalSlots;
+		var savedEnclosingUpvalueSlots = enclosingUpvalueSlots;
 		var savedClassMethodNames = currentClassMethodNames;
 		tryDepth = 0;
 		currentClassMethodNames = classMethodNames;
+		enclosingLocalSlots = savedLocalSlots;
+		enclosingUpvalueSlots = savedUpvalueSlots;
 
 		// Set up fresh slot tracking for this function
 		localSlots = new Map();
 		nextLocalSlot = 0;
+		upvalueSlots = new Map();
+		upvalueNames = [];
 		// Pre-register params as slots 0..N-1
 		for (p in params) {
 			localSlots.set(p.name, nextLocalSlot++);
@@ -566,7 +643,9 @@ class Compiler {
 			instructions: [],
 			constants: constants,
 			functions: functions,
-			strings: strings
+			strings: strings,
+			globalNames: globalNames,
+			globalConstMask: globalConstMask
 		};
 
 		for (stmt in body) {
@@ -590,7 +669,8 @@ class Compiler {
 			isLambda: isLambda,
 			localCount: slotCount,
 			localNames: localNames,
-			localSlots: localSlots // preserve Map<String,Int> for O(1) slot lookup in call()
+			localSlots: localSlots, // preserve Map<String,Int> for O(1) slot lookup in call()
+			upvalueNames: upvalueNames
 		};
 		// Also store localNames on the Chunk so run() can access it for closure building
 		chunk.localNames = localNames;
@@ -603,6 +683,10 @@ class Compiler {
 		tryDepth = savedTryDepth;
 		localSlots = savedLocalSlots;
 		nextLocalSlot = savedNextLocalSlot;
+		upvalueSlots = savedUpvalueSlots;
+		upvalueNames = savedUpvalueNames;
+		enclosingLocalSlots = savedEnclosingLocalSlots;
+		enclosingUpvalueSlots = savedEnclosingUpvalueSlots;
 		currentClassMethodNames = savedClassMethodNames;
 
 		return funcChunk;

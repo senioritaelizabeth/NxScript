@@ -55,6 +55,11 @@ class VM {
 	public var maxCallDepth:Int = 10000;
 
 	var catchStack:Array<CatchHandler> = [];
+	var globalSlotValues:Array<Value>;
+	var globalSlotNames:Array<String>;
+	var globalSlotByName:Map<String, Int>;
+	var globalSlotIsConst:Array<Bool>;
+	var globalSlotConstInit:Array<Bool>;
 
 	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
@@ -76,6 +81,11 @@ class VM {
 		natives = new Map();
 		classes = new Map();
 		catchStack = [];
+		globalSlotValues = [];
+		globalSlotNames = [];
+		globalSlotByName = new Map();
+		globalSlotIsConst = [];
+		globalSlotConstInit = [];
 
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
@@ -90,11 +100,12 @@ class VM {
 		sp = 0;
 		frames = [];
 		catchStack = [];
+		bindGlobalSlots(chunk);
 
 		if (chunk.code == null)
 			buildFlatCode(chunk);
 
-		var frame = new CallFrame(chunk, 0, 0, new Map(), "<main>");
+		var frame = new CallFrame(chunk, 0, 0, new Map(), [], "<main>");
 		currentFrame = frame;
 		frames.push(frame);
 
@@ -174,6 +185,7 @@ class VM {
 		var natives = this.natives;
 		var currentFrame = this.currentFrame;
 		var currentLocalVars = currentFrame.localVars;
+		var currentUpvalues = currentFrame.upvalues;
 		var frameBase = currentFrame.stackBase;
 		var maxCallDepth = this.maxCallDepth;
 		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead*/
@@ -196,8 +208,45 @@ class VM {
 				case Op.LOAD_LOCAL:
 					stack[sp++] = stack[frameBase + arg];
 
+				case Op.LOAD_GLOBAL:
+					stack[sp++] = (arg >= 0 && arg < globalSlotValues.length) ? globalSlotValues[arg] : VNull;
+
+				case Op.LOAD_UPVALUE:
+					stack[sp++] = (arg >= 0 && arg < currentUpvalues.length) ? currentUpvalues[arg] : VNull;
+
 				case Op.STORE_LOCAL:
 					stack[frameBase + arg] = stack[sp - 1];
+
+				case Op.STORE_GLOBAL:
+					var value = stack[sp - 1];
+					if (arg >= 0 && arg < globalSlotIsConst.length && globalSlotIsConst[arg] && globalSlotConstInit[arg]) {
+						var cName = (arg >= 0 && arg < globalSlotNames.length) ? globalSlotNames[arg] : ('slot#' + arg);
+						throw 'Cannot reassign constant: $cName';
+					}
+					if (arg >= globalSlotValues.length) {
+						for (_ in globalSlotValues.length...arg + 1)
+							globalSlotValues.push(VNull);
+					}
+					globalSlotValues[arg] = value;
+					if (arg >= globalSlotConstInit.length) {
+						for (_ in globalSlotConstInit.length...arg + 1)
+							globalSlotConstInit.push(false);
+					}
+					if (arg >= 0 && arg < globalSlotIsConst.length && globalSlotIsConst[arg])
+						globalSlotConstInit[arg] = true;
+					if (arg >= 0 && arg < globalSlotNames.length) {
+						var gName = globalSlotNames[arg];
+						if (gName != null && gName != "")
+							globals.set(gName, value);
+					}
+
+				case Op.STORE_UPVALUE:
+					var upValue = stack[sp - 1];
+					if (arg >= currentUpvalues.length) {
+						for (_ in currentUpvalues.length...arg + 1)
+							currentUpvalues.push(VNull);
+					}
+					currentUpvalues[arg] = upValue;
 				//  Might want to change this nesting its somewhat expensive.
 				case Op.LOAD_VAR:
 					var name = strings[arg];
@@ -451,28 +500,19 @@ class VM {
 							for (i in argc...localCount)
 								stack[localsBase + i] = VNull;
 
-							// closure injection
+							// closure injection for named locals that are still loaded via LOAD_LOCAL paths
 							if (closure != EMPTY_MAP) {
 								var localSlots = funcChunk.localSlots;
-
 								if (localSlots != null) {
 									for (key in closure.keys()) {
 										var idx = localSlots.get(key);
 										if (idx != null)
 											stack[localsBase + idx] = closure.get(key);
 									}
-								} else {
-									var localNames = funcChunk.localNames;
-
-									if (localNames != null) {
-										for (key in closure.keys()) {
-											var idx = localNames.indexOf(key);
-											if (idx >= 0)
-												stack[localsBase + idx] = closure.get(key);
-										}
-									}
 								}
 							}
+
+							var frameUpvalues = buildUpvalueArray(funcChunk, closure);
 
 							// clone closure only if needed
 							var localVars:Map<String, Value>;
@@ -486,7 +526,7 @@ class VM {
 
 							sp = localsBase + localCount;
 
-							var newFrame = new CallFrame(funcChunk.chunk, 0, localsBase, localVars, funcChunk.name);
+							var newFrame = new CallFrame(funcChunk.chunk, 0, localsBase, localVars, frameUpvalues, funcChunk.name);
 
 							if (maxCallDepth > 0 && frames.length + 1 > maxCallDepth)
 								throw 'Execution exceeded maximum call depth ($maxCallDepth) - possible infinite recursion';
@@ -496,6 +536,7 @@ class VM {
 							currentFrame = newFrame;
 							this.currentFrame = newFrame;
 							currentLocalVars = newFrame.localVars;
+							currentUpvalues = newFrame.upvalues;
 							frameBase = newFrame.stackBase;
 
 							var newChunk = newFrame.chunk;
@@ -538,6 +579,7 @@ class VM {
 					this.currentFrame = frames[frames.length - 1];
 					currentFrame = this.currentFrame;
 					currentLocalVars = currentFrame.localVars;
+					currentUpvalues = currentFrame.upvalues;
 					frameBase = currentFrame.stackBase;
 					chunk = currentFrame.chunk;
 					code = chunk.code;
@@ -651,6 +693,7 @@ class VM {
 						this.currentFrame = this.frames[this.frames.length - 1];
 						currentFrame = this.currentFrame;
 						currentLocalVars = currentFrame.localVars;
+						currentUpvalues = currentFrame.upvalues;
 						frameBase = currentFrame.stackBase;
 						chunk = currentFrame.chunk;
 						code = chunk.code;
@@ -675,6 +718,7 @@ class VM {
 					this.currentFrame = this.frames[this.frames.length - 1];
 					currentFrame = this.currentFrame;
 					currentLocalVars = currentFrame.localVars;
+					currentUpvalues = currentFrame.upvalues;
 					frameBase = currentFrame.stackBase;
 					chunk = currentFrame.chunk;
 					code = chunk.code;
@@ -901,6 +945,7 @@ class VM {
 				ip: 0,
 				stackBase: 0,
 				localVars: ctorVars,
+				upvalues: [],
 				functionName: classData.name + ".new"
 			};
 
@@ -950,17 +995,9 @@ class VM {
 							if (idx != null)
 								stack[localsBase + idx] = closure.get(key);
 						}
-					} else {
-						var localNames = funcChunk.localNames;
-						if (localNames != null) {
-							for (key in closure.keys()) {
-								var idx = localNames.indexOf(key);
-								if (idx >= 0)
-									stack[localsBase + idx] = closure.get(key);
-							}
-						}
 					}
 				}
+				var frameUpvalues = buildUpvalueArray(funcChunk, closure);
 
 				// Avoid new Map() when closure is empty — reuse EMPTY_MAP sentinel.
 				// setVariable will lazy-alloc if a 'let' binding is ever written.
@@ -979,6 +1016,7 @@ class VM {
 					ip: 0,
 					stackBase: localsBase,
 					localVars: localVars,
+					upvalues: frameUpvalues,
 					functionName: funcChunk.name
 				};
 
@@ -1000,6 +1038,23 @@ class VM {
 			default:
 				throw 'Value is not callable: $callee';
 		}
+	}
+
+	function buildUpvalueArray(funcChunk:FunctionChunk, closure:Map<String, Value>):Array<Value> {
+		var names = funcChunk.upvalueNames;
+		if (names == null || names.length == 0)
+			return [];
+
+		var values:Array<Value> = [for (_ in 0...names.length) VNull];
+		if (closure != null && closure != EMPTY_MAP) {
+			for (i in 0...names.length) {
+				var key = names[i];
+				var v = closure.get(key);
+				if (v != null)
+					values[i] = v;
+			}
+		}
+		return values;
 	}
 
 	function getVariable(name:String):Value {
@@ -1134,12 +1189,14 @@ class VM {
 		var savedConstVars = this.constVars;
 		var savedCatchStack = this.catchStack;
 		var savedSp = this.sp;
+		var frameUpvalues = buildUpvalueArray(func, closure);
 
 		var funcFrame:CallFrame = {
 			chunk: func.chunk,
 			ip: 0,
 			stackBase: 0,
 			localVars: localVars,
+			upvalues: frameUpvalues,
 			functionName: func.name
 		};
 
@@ -1697,6 +1754,7 @@ class VM {
 	}
 
 	public function callMethod(name:String, args:Array<Value>):Value {
+		syncGlobalSlotsFromMap();
 		var func = getVariable(name);
 		if (func == null)
 			throw 'Undefined function: $name';
@@ -1705,10 +1763,55 @@ class VM {
 
 	/** Resolve a callable by name once, then reuse it with callResolved/callResolved0 in host hot loops. */
 	public function resolveCallable(name:String):Value {
+		syncGlobalSlotsFromMap();
 		var func = getVariable(name);
 		if (func == null)
 			throw 'Undefined function: $name';
 		return func;
+	}
+
+	function bindGlobalSlots(chunk:Chunk):Void {
+		if (chunk == null || chunk.globalNames == null)
+			return;
+
+		var names = chunk.globalNames;
+		if (globalSlotValues.length < names.length) {
+			for (_ in globalSlotValues.length...names.length)
+				globalSlotValues.push(VNull);
+		}
+		if (globalSlotNames.length < names.length) {
+			for (_ in globalSlotNames.length...names.length)
+				globalSlotNames.push("");
+		}
+		if (globalSlotIsConst.length < names.length) {
+			for (_ in globalSlotIsConst.length...names.length)
+				globalSlotIsConst.push(false);
+		}
+		if (globalSlotConstInit.length < names.length) {
+			for (_ in globalSlotConstInit.length...names.length)
+				globalSlotConstInit.push(false);
+		}
+
+		var constMask = chunk.globalConstMask;
+
+		for (i in 0...names.length) {
+			var name = names[i];
+			globalSlotNames[i] = name;
+			globalSlotByName.set(name, i);
+			var hasGlobal = globals.exists(name);
+			globalSlotValues[i] = hasGlobal ? globals.get(name) : VNull;
+			globalSlotIsConst[i] = constMask != null && i < constMask.length ? constMask[i] : false;
+			globalSlotConstInit[i] = globalSlotIsConst[i] && hasGlobal;
+		}
+	}
+
+	function syncGlobalSlotsFromMap():Void {
+		for (i in 0...globalSlotNames.length) {
+			var name = globalSlotNames[i];
+			if (name == null || name == "")
+				continue;
+			globalSlotValues[i] = globals.exists(name) ? globals.get(name) : VNull;
+		}
 	}
 
 	/** Call a previously resolved callable value (avoids repeated global lookup by name). */
@@ -1772,13 +1875,15 @@ class CallFrame {
 	public var ip:Int;
 	public var stackBase:Int;
 	public var localVars:Map<String, Value>;
+	public var upvalues:Array<Value>;
 	public var functionName:String;
 
-	public function new(chunk, ip, stackBase, localVars, functionName) {
+	public function new(chunk, ip, stackBase, localVars, upvalues, functionName) {
 		this.chunk = chunk;
 		this.ip = ip;
 		this.stackBase = stackBase;
 		this.localVars = localVars;
+		this.upvalues = upvalues;
 		this.functionName = functionName;
 	}
 }

@@ -14,6 +14,10 @@ class Op {
 	public static inline var STORE_CONST = 0x04; // Store top of stack to const variable
 	public static inline var LOAD_LOCAL = 0xA0; // Load indexed local variable
 	public static inline var STORE_LOCAL = 0xA1; // Store indexed local variable
+	public static inline var LOAD_UPVALUE = 0xA2; // Load indexed upvalue
+	public static inline var STORE_UPVALUE = 0xA3; // Store indexed upvalue
+	public static inline var LOAD_GLOBAL = 0x07; // Load indexed global slot
+	public static inline var STORE_GLOBAL = 0x08; // Store top of stack to indexed global slot
 	public static inline var POP = 0x05; // Pop top of stack
 	public static inline var DUP = 0x06; // Duplicate top of stack
 
@@ -98,6 +102,10 @@ class Op {
 			case STORE_CONST: "STORE_CONST";
 			case LOAD_LOCAL: "LOAD_LOCAL";
 			case STORE_LOCAL: "STORE_LOCAL";
+			case LOAD_UPVALUE: "LOAD_UPVALUE";
+			case STORE_UPVALUE: "STORE_UPVALUE";
+			case LOAD_GLOBAL: "LOAD_GLOBAL";
+			case STORE_GLOBAL: "STORE_GLOBAL";
 			case POP: "POP";
 			case DUP: "DUP";
 			case ADD: "ADD";
@@ -176,6 +184,8 @@ class Chunk {
 	public var constants:Array<Value> = [];
 	public var functions:Array<FunctionChunk> = [];
 	public var strings:Array<String> = [];
+	public var globalNames:Array<String> = [];
+	public var globalConstMask:Array<Bool> = [];
 	@:optional public var code:Array<Int> = null;
 	@:optional public var localNames:Array<String> = null;
 	@:optional public var funcCache:Array<Value> = null;
@@ -191,6 +201,7 @@ class FunctionChunk {
 	@:optional public var localCount:Int = 0;
 	@:optional public var localNames:Array<String> = null;
 	@:optional public var localSlots:Map<String, Int> = null;
+	@:optional public var upvalueNames:Array<String> = null;
 }
 
 typedef ClassData = {

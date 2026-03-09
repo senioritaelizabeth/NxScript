@@ -54,6 +54,12 @@ All notable changes to this project are documented in this file.
   - cached `natives` map in loop locals
   - removed per-instruction `codeLen` bounds branch
 - Compiler now guarantees top-level chunks end with `RETURN` to support branchless VM dispatch.
+- Compiler/VM now use dedicated closure upvalue slots (`LOAD_UPVALUE` / `STORE_UPVALUE`) for captured outer-scope identifiers.
+- Top-level `const` declarations now use indexed global slots with const-mask metadata instead of name-based const map lookups.
+- Bytecode serializer format bumped to v3:
+  - stores chunk-level global const mask
+  - stores function-level upvalue name tables
+  - remains backward compatible with v1/v2 deserialization
 
 ### Fixed
 
@@ -63,6 +69,7 @@ All notable changes to this project are documented in this file.
 - Runtime handling for script-call fallback paths used by rhythm flow logic.
 - Import alias false-positive parsing where `i = i + 1` could be misread as an import line.
 - VM frame unwind bug where host calls (e.g. `call0("update")`) could resume stale `<main>` frame and re-run top-level script code.
+- Reassignment to top-level `const` declared through global slots now throws reliably in VM `STORE_GLOBAL` path.
 
 ### Docs
 

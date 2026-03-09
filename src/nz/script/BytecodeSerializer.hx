@@ -15,7 +15,9 @@ import nz.script.Bytecode;
  */
 class BytecodeSerializer {
 	// Magic number para verificar formato de archivo (NX + version)
-	static inline var MAGIC = 0x4E580001; // "NX" + version 1
+	static inline var MAGIC_V1 = 0x4E580001; // "NX" + version 1
+	static inline var MAGIC_V2 = 0x4E580002; // "NX" + version 2 (globalNames)
+	static inline var MAGIC_V3 = 0x4E580003; // "NX" + version 3 (global const mask + upvalue names)
 
 	/**
 	 * Serializes a Chunk to raw bytes. Feed the result to deserialize() to get it back.
@@ -24,7 +26,7 @@ class BytecodeSerializer {
 		var output = new BytesOutput();
 
 		// Escribir magic number
-		output.writeInt32(MAGIC);
+		output.writeInt32(MAGIC_V3);
 
 		// Serializar chunk principal
 		writeChunk(output, chunk);
@@ -41,12 +43,16 @@ class BytecodeSerializer {
 
 		// Verificar magic number
 		var magic = input.readInt32();
-		if (magic != MAGIC) {
-			throw 'Invalid bytecode file format (expected 0x${StringTools.hex(MAGIC, 8)}, got 0x${StringTools.hex(magic, 8)})';
-		}
+		var version = switch (magic) {
+			case MAGIC_V1: 1;
+			case MAGIC_V2: 2;
+			case MAGIC_V3: 3;
+			default:
+				throw 'Invalid bytecode file format (expected 0x${StringTools.hex(MAGIC_V3, 8)}, 0x${StringTools.hex(MAGIC_V2, 8)} or 0x${StringTools.hex(MAGIC_V1, 8)}, got 0x${StringTools.hex(magic, 8)})';
+		};
 
 		// Deserializar chunk principal
-		return readChunk(input);
+		return readChunk(input, version);
 	}
 
 	/**
@@ -89,6 +95,18 @@ class BytecodeSerializer {
 		output.writeInt32(chunk.instructions.length);
 		for (inst in chunk.instructions) {
 			writeInstruction(output, inst);
+		}
+
+		// Global names (v2)
+		output.writeInt32(chunk.globalNames.length);
+		for (name in chunk.globalNames) {
+			writeString(output, name);
+		}
+
+		// Global const mask (v3)
+		output.writeInt32(chunk.globalConstMask.length);
+		for (isConst in chunk.globalConstMask) {
+			output.writeByte(isConst ? 1 : 0);
 		}
 
 		// Functions
@@ -154,6 +172,19 @@ class BytecodeSerializer {
 		}
 
 		output.writeByte(func.isLambda ? 1 : 0);
+		output.writeInt32(func.localCount);
+
+		var localNames = func.localNames != null ? func.localNames : [];
+		output.writeInt32(localNames.length);
+		for (name in localNames) {
+			writeString(output, name);
+		}
+
+		var upvalueNames = func.upvalueNames != null ? func.upvalueNames : [];
+		output.writeInt32(upvalueNames.length);
+		for (name in upvalueNames) {
+			writeString(output, name);
+		}
 
 		// Function body chunk
 		writeChunk(output, func.chunk);
@@ -167,7 +198,7 @@ class BytecodeSerializer {
 
 	// === DESERIALIZACIÓN ===
 
-	static function readChunk(input:BytesInput):Chunk {
+	static function readChunk(input:BytesInput, version:Int):Chunk {
 		// String pool
 		var stringCount = input.readInt32();
 		var strings = [];
@@ -189,18 +220,40 @@ class BytecodeSerializer {
 			instructions.push(readInstruction(input));
 		}
 
+		// Global names (v2+)
+		var globalNames:Array<String> = [];
+		if (version >= 2) {
+			var globalCount = input.readInt32();
+			for (i in 0...globalCount) {
+				globalNames.push(readString(input));
+			}
+		}
+
+		var globalConstMask:Array<Bool> = [];
+		if (version >= 3) {
+			var globalConstCount = input.readInt32();
+			for (i in 0...globalConstCount) {
+				globalConstMask.push(input.readByte() == 1);
+			}
+		} else {
+			for (_ in 0...globalNames.length)
+				globalConstMask.push(false);
+		}
+
 		// Functions
 		var functionCount = input.readInt32();
 		var functions = [];
 		for (i in 0...functionCount) {
-			functions.push(readFunctionChunk(input));
+			functions.push(readFunctionChunk(input, version));
 		}
 
 		return {
 			strings: strings,
 			constants: constants,
 			instructions: instructions,
-			functions: functions
+			functions: functions,
+			globalNames: globalNames,
+			globalConstMask: globalConstMask
 		};
 	}
 
@@ -257,7 +310,7 @@ class BytecodeSerializer {
 		}
 	}
 
-	static function readFunctionChunk(input:BytesInput):FunctionChunk {
+	static function readFunctionChunk(input:BytesInput, version:Int):FunctionChunk {
 		var name = readString(input);
 		var paramCount = input.readInt32();
 
@@ -270,15 +323,47 @@ class BytecodeSerializer {
 
 		var isLambda = input.readByte() == 1;
 
+		var localCount:Int;
+		var localNames:Array<String>;
+		if (version >= 3) {
+			localCount = input.readInt32();
+			var localNameCount = input.readInt32();
+			localNames = [];
+			for (i in 0...localNameCount)
+				localNames.push(readString(input));
+		} else {
+			localCount = paramCount;
+			localNames = [for (name in paramNames) name];
+		}
+
+		var upvalueNames:Array<String> = [];
+		if (version >= 3) {
+			var upvalueCount = input.readInt32();
+			for (i in 0...upvalueCount)
+				upvalueNames.push(readString(input));
+		}
+
 		// Function body chunk
-		var chunk = readChunk(input);
+		var chunk = readChunk(input, version);
+		chunk.localNames = localNames;
+
+		var localSlots = new Map<String, Int>();
+		for (i in 0...localNames.length) {
+			var localName = localNames[i];
+			if (localName != null && localName != "")
+				localSlots.set(localName, i);
+		}
 
 		return {
 			name: name,
 			paramCount: paramCount,
 			paramNames: paramNames,
 			isLambda: isLambda,
-			chunk: chunk
+			chunk: chunk,
+			localCount: localCount,
+			localNames: localNames,
+			localSlots: localSlots,
+			upvalueNames: upvalueNames
 		};
 	}
 

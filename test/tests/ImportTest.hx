@@ -10,13 +10,13 @@ class ImportTest {
 
 		var interp = new Interpreter();
 
-		trace("Test 1: i \"package.name\"");
-		var result = interp.runDynamic('i "haxe.ds.StringMap"\nvar m = new StringMap()\nm.set("k", 10)\nm.get("k")', "tests/import_i.nx");
-		assert(result == 10, "i import resolves Haxe class");
+		trace("Test 1: import \"package.name\"");
+		var result = interp.runDynamic('import "haxe.ds.StringMap"\nvar m = new StringMap()\nm.set("k", 10)\nm.get("k")', "tests/import_string_a.nx");
+		assert(result == 10, "quoted import resolves Haxe class");
 
-		trace("\nTest 2: import \"package.name\"");
+		trace("\nTest 2: import \"package.name\" (second case)");
 		result = interp.runDynamic('import "haxe.ds.StringMap"\nvar m = new StringMap()\nm.set("k", 21)\nm.get("k")', "tests/import_string.nx");
-		assert(result == 21, "quoted import resolves Haxe class");
+		assert(result == 21, "quoted import resolves Haxe class again");
 
 		trace("\nTest 3: import package.name");
 		result = interp.runDynamic('import haxe.ds.StringMap\nvar m = new StringMap()\nm.set("k", 42)\nm.get("k")', "tests/import_plain.nx");

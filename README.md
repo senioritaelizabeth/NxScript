@@ -1,7 +1,6 @@
 <div align="center">
 
 <img src="assets/logo.png" alt="NxScript Logo" width="200"/>
-
 # NxScript
 
 **yes, another scripting lang. for haxe. you're welcome.**
@@ -30,6 +29,10 @@ Both compile to Haxe. Both actually work. Both are MIT-licensed, meaning you can
 ## NxScript — the good stuff
 
 A general-purpose scripting language. Compiles to bytecode, runs on a stack VM, doesn't allocate a new array every time you call a function (unlike some other libs we won't name).
+
+### Speeds
+
+- Go to [speed](./speed.md) for the latest benchmark results. Spoiler: it's fast.
 
 ### features (yes it has them)
 

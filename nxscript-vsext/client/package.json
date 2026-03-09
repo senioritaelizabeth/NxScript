@@ -1,0 +1,10 @@
+{
+  "name": "nxscript-client",
+  "version": "0.1.0",
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0"
+  }
+}

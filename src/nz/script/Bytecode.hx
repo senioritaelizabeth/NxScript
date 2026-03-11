@@ -87,6 +87,16 @@ class Op {
 	public static inline var SETUP_TRY = 0xB1; // Push catch handler (arg = instruction-count offset to catch block)
 	public static inline var POP_TRY = 0xB2; // Pop catch handler (normal try exit)
 
+	// Postfix/Prefix modifications (0xC0 - 0xCF)
+	public static inline var INC_LOCAL = 0xC0; // local[arg]++ (returns old)
+	public static inline var DEC_LOCAL = 0xC1; // local[arg]-- (returns old)
+	public static inline var INC_GLOBAL = 0xC2; // global[arg]++
+	public static inline var DEC_GLOBAL = 0xC3; // global[arg]--
+	public static inline var INC_MEMBER = 0xC4; // obj.field++ (obj on stack, field in strings[arg])
+	public static inline var DEC_MEMBER = 0xC5; // obj.field--
+	public static inline var INC_INDEX = 0xC6; // obj[idx]++ (obj, idx on stack)
+	public static inline var DEC_INDEX = 0xC7; // obj[idx]--
+
 	// End of file (0xFF)
 	public static inline var EOF = 0xFF;
 
@@ -155,6 +165,14 @@ class Op {
 			case THROW: "THROW";
 			case SETUP_TRY: "SETUP_TRY";
 			case POP_TRY: "POP_TRY";
+			case INC_LOCAL: "INC_LOCAL";
+			case DEC_LOCAL: "DEC_LOCAL";
+			case INC_GLOBAL: "INC_GLOBAL";
+			case DEC_GLOBAL: "DEC_GLOBAL";
+			case INC_MEMBER: "INC_MEMBER";
+			case DEC_MEMBER: "DEC_MEMBER";
+			case INC_INDEX: "INC_INDEX";
+			case DEC_INDEX: "DEC_INDEX";
 			case EOF: "EOF";
 			default: "UNKNOWN(0x" + StringTools.hex(opcode, 2) + ")";
 		}

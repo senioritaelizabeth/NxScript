@@ -56,6 +56,55 @@ class BugFixTest {
 		var finalR = interp2.runDynamic('42');
 		assert(finalR == 42, "instructionCount resets between runs");
 
+		// Test: for-from-to with continue (was infinite loop)
+		trace("\nTest: for-from-to with continue");
+		r = interp.runDynamic('
+			var sum = 0
+			for (i from 0 to 5) {
+				if (i == 2) { continue }
+				sum = sum + i
+			}
+			sum
+		');
+		assert(r == 8, "for-from-to with continue (0+1+3+4 = 8)");
+
+		// Test: elseif keyword (was parse error)
+		trace("\nTest: elseif keyword");
+		r = interp.runDynamic('
+			var x = 10
+			if (x == 5) {
+				return 1
+			} elseif (x == 10) {
+				return 2
+			} else {
+				return 3
+			}
+		');
+		assert(r == 2, "elseif keyword works");
+
+		// Test: postfix increment side effects (evaluated target twice)
+		trace("\nTest: postfix increment side effects");
+		var calls = 0;
+		interp.register("getVal", 0, function(_) {
+			calls++;
+			return VNumber(10);
+		});
+		// Note: We can't easily test setting a value back to a native call result 
+		// unless it returns an object/array.
+		r = interp.runDynamic('
+			var obj = { "x": 10 }
+			func getObj() {
+				getVal() // track call
+				return obj
+			}
+			var old = getObj().x++
+			[old, obj.x]
+		');
+		var res:Array<Dynamic> = cast r;
+		assert(calls == 1, "getObj() called only once for postfix increment");
+		assert(res[0] == 10, "Postfix returns old value 10");
+		assert(res[1] == 11, "Target incremented to 11");
+
 		trace("\n========================================");
 		trace("ALL BUG FIX TESTS PASSED!");
 		trace("========================================");

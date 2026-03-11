@@ -88,6 +88,10 @@ class Tokenizer {
 			skipLineComment();
 			return null;
 		}
+		if (c == '/' && peekNext() == '/') {
+			skipLineComment();
+			return null;
+		}
 		if (c == '/' && peekNext() == '*') {
 			skipBlockComment();
 			return null;
@@ -121,7 +125,10 @@ class Tokenizer {
 	}
 
 	function skipLineComment():Void {
-		advance(); // #
+		var c = advance(); // # or /
+		if (c == '/')
+			advance(); // the second /
+
 		while (!isEOF() && peek() != '\n') {
 			advance();
 		}

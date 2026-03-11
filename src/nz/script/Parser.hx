@@ -282,7 +282,10 @@ class Parser {
 
 	function parseIf():Stmt {
 		advance(); // consume 'if'
+		return parseIfRest();
+	}
 
+	function parseIfRest():Stmt {
 		expect(TLeftParen, "Expected '(' after 'if'");
 		var condition = parseExpression();
 		expect(TRightParen, "Expected ')' after condition");
@@ -304,6 +307,9 @@ class Parser {
 				elseBody = parseBlockBody();
 				expect(TRightBrace, "Expected '}' after else body");
 			}
+		} else if (check(TKeyword(KElseIf))) {
+			advance();
+			elseBody = [parseIfRest()];
 		}
 
 		return SIf(condition, thenBody, elseBody);
@@ -350,21 +356,7 @@ class Parser {
 				expect(TLeftBrace, "Expected '{' after for header");
 				var body = parseBlockBody();
 				expect(TRightBrace, "Expected '}' after for body");
-
-				// Lower: for (i from a to b) { body }
-				// into: {
-				//   var i = a;
-				//   const __for_end_n = b;
-				//   while (i < __for_end_n) { body; i = i + 1; }
-				// }
-				var endName = '__for_end_${syntheticCounter++}';
-				var loweredBody = body.copy();
-				loweredBody.push(SExpr(EAssign(EIdentifier(variable), EBinary(OAdd, EIdentifier(variable), ENumber(1)))));
-				loopStmt = SBlock([
-					SVar(variable, null, fromExpr),
-					SConst(endName, null, toExpr),
-					SWhile(EBinary(OLess, EIdentifier(variable), EIdentifier(endName)), loweredBody)
-				]);
+				loopStmt = SForRange(variable, fromExpr, toExpr, body);
 
 			default:
 				error("Expected 'in', 'of', or 'from' in for loop");
@@ -673,13 +665,11 @@ class Parser {
 
 				case TOperator(OIncrement):
 					advance();
-					running = false;
-					EAssign(expr, EBinary(OAdd, expr, ENumber(1)));
+					expr = EPostfix(OAdd, expr);
 
 				case TOperator(ODecrement):
 					advance();
-					running = false;
-					EAssign(expr, EBinary(OSub, expr, ENumber(1)));
+					expr = EPostfix(OSub, expr);
 
 				default:
 					running = false;

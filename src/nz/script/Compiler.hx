@@ -31,6 +31,9 @@ class Compiler {
 	// How deep we are in try blocks. Used to emit the right number of POP_TRY on return.
 	var tryDepth:Int = 0;
 
+	// Counter for synthetic variable names
+	var syntheticCounter:Int = 0;
+
 	// Slot allocator for function-local variables. null means we're at module level.
 	// Slots are integer indices into stack[stackBase..stackBase+localCount-1].
 	var localSlots:Map<String, Int> = null;
@@ -328,6 +331,73 @@ class Compiler {
 
 				loopStack.pop();
 
+			case SForRange(variable, from, to, body):
+				var endName = '__for_end_${syntheticCounter++}';
+				compileExpression(from);
+				if (localSlots != null) {
+					emitWithArg(Op.STORE_LOCAL, allocSlot(variable));
+				} else {
+					emitWithString(Op.STORE_LET, variable);
+				}
+				emit(Op.POP);
+
+				compileExpression(to);
+				emitWithString(Op.STORE_CONST, endName);
+				emit(Op.POP);
+
+				var loopStart = chunk.instructions.length;
+				var loop = {
+					start: loopStart,
+					breaks: [],
+					continues: [],
+					tryDepth: tryDepth
+				};
+				loopStack.push(loop);
+
+				// Condition: i < end
+				if (localSlots != null) {
+					emitWithArg(Op.LOAD_LOCAL, localSlots.get(variable));
+				} else {
+					emitWithString(Op.LOAD_VAR, variable);
+				}
+				emitWithString(Op.LOAD_VAR, endName);
+				emit(Op.LT);
+
+				var exitJump = emitJump(Op.JUMP_IF_FALSE);
+
+				for (s in body) {
+					compileStatement(s, false);
+				}
+
+				// Increment step
+				var stepStart = chunk.instructions.length;
+				if (localSlots != null) {
+					var slot = localSlots.get(variable);
+					emitWithArg(Op.LOAD_LOCAL, slot);
+					emitConstant(VNumber(1));
+					emit(Op.ADD);
+					emitWithArg(Op.STORE_LOCAL, slot);
+				} else {
+					emitWithString(Op.LOAD_VAR, variable);
+					emitConstant(VNumber(1));
+					emit(Op.ADD);
+					emitWithString(Op.STORE_VAR, variable);
+				}
+				emit(Op.POP);
+
+				emitLoop(loopStart);
+				patchJump(exitJump);
+
+				var endLoop = chunk.instructions.length;
+				for (breakPos in loop.breaks) {
+					patchJumpAt(breakPos, endLoop);
+				}
+				for (continuePos in loop.continues) {
+					patchJumpAt(continuePos, stepStart);
+				}
+
+				loopStack.pop();
+
 			case SBreak:
 				if (loopStack.length == 0) {
 					throw "Break outside of loop";
@@ -470,6 +540,34 @@ class Compiler {
 			case EUnary(op, e):
 				compileExpression(e);
 				compileUnaryOp(op);
+
+			case EPostfix(op, e):
+				var isInc = (op == OAdd);
+				switch (e) {
+					case EIdentifier(name):
+						if (localSlots != null && localSlots.exists(name)) {
+							emitWithArg(isInc ? Op.INC_LOCAL : Op.DEC_LOCAL, localSlots.get(name));
+						} else if (globalSlots.exists(name)) {
+							emitWithArg(isInc ? Op.INC_GLOBAL : Op.DEC_GLOBAL, globalSlots.get(name));
+						} else {
+							// Fallback for LOAD_VAR style if not in slots (less efficient)
+							compileExpression(e);
+							emit(Op.DUP);
+							emitConstant(VNumber(1));
+							compileBinaryOp(op);
+							emitWithString(Op.STORE_VAR, name);
+							emit(Op.POP);
+						}
+					case EMember(obj, field):
+						compileExpression(obj);
+						emitWithArg(isInc ? Op.INC_MEMBER : Op.DEC_MEMBER, addString(field));
+					case EIndex(obj, idx):
+						compileExpression(obj);
+						compileExpression(idx);
+						emit(isInc ? Op.INC_INDEX : Op.DEC_INDEX);
+					default:
+						throw "Invalid postfix operand";
+				}
 
 			case EMember(object, field):
 				compileExpression(object);

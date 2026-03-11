@@ -931,6 +931,54 @@ class VM {
 						stack[sp++] = next;
 					}
 
+				case Op.INC_LOCAL:
+					var val = stack[frameBase + arg];
+					stack[frameBase + arg] = VNumber(toNum(val) + 1);
+					stack[sp++] = val;
+
+				case Op.DEC_LOCAL:
+					var val = stack[frameBase + arg];
+					stack[frameBase + arg] = VNumber(toNum(val) - 1);
+					stack[sp++] = val;
+
+				case Op.INC_GLOBAL:
+					var val = (arg >= 0 && arg < globalSlotValues.length) ? globalSlotValues[arg] : VNull;
+					globalSlotValues[arg] = VNumber(toNum(val) + 1);
+					stack[sp++] = val;
+
+				case Op.DEC_GLOBAL:
+					var val = (arg >= 0 && arg < globalSlotValues.length) ? globalSlotValues[arg] : VNull;
+					globalSlotValues[arg] = VNumber(toNum(val) - 1);
+					stack[sp++] = val;
+
+				case Op.INC_MEMBER:
+					var field = strings[arg];
+					var obj = stack[sp - 1];
+					var val = getMember(obj, field);
+					setMember(obj, field, VNumber(toNum(val) + 1));
+					stack[sp - 1] = val;
+
+				case Op.DEC_MEMBER:
+					var field = strings[arg];
+					var obj = stack[sp - 1];
+					var val = getMember(obj, field);
+					setMember(obj, field, VNumber(toNum(val) - 1));
+					stack[sp - 1] = val;
+
+				case Op.INC_INDEX:
+					var idx = stack[--sp];
+					var obj = stack[sp - 1];
+					var val = getIndex(obj, idx);
+					setIndex(obj, idx, VNumber(toNum(val) + 1));
+					stack[sp - 1] = val;
+
+				case Op.DEC_INDEX:
+					var idx = stack[--sp];
+					var obj = stack[sp - 1];
+					var val = getIndex(obj, idx);
+					setIndex(obj, idx, VNumber(toNum(val) - 1));
+					stack[sp - 1] = val;
+
 				// Special
 				case Op.LOAD_NULL:
 					stack[sp++] = VNull;
@@ -1938,6 +1986,15 @@ class VM {
 	function toInt(value:Value):Int {
 		return switch (value) {
 			case VNumber(n): Std.int(n);
+			default: throw 'Expected number';
+		}
+	}
+
+	function toNum(value:Value):Float {
+		return switch (value) {
+			case VNumber(n): n;
+			case VBool(b): b ? 1.0 : 0.0;
+			case VNull: 0.0;
 			default: throw 'Expected number';
 		}
 	}

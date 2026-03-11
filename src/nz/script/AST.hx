@@ -24,6 +24,9 @@ enum Expr {
 	// Unary operations
 	EUnary(op:Operator, expr:Expr);
 
+	// Postfix operations: x++, x--
+	EPostfix(op:Operator, expr:Expr);
+
 	// Member access: obj.field
 	EMember(object:Expr, field:String);
 
@@ -66,6 +69,7 @@ enum Stmt {
 	SIf(condition:Expr, thenBody:Array<Stmt>, elseBody:Null<Array<Stmt>>);
 	SWhile(condition:Expr, body:Array<Stmt>);
 	SFor(variable:String, iterable:Expr, body:Array<Stmt>);
+	SForRange(variable:String, from:Expr, to:Expr, body:Array<Stmt>);
 	SBreak;
 	SContinue;
 

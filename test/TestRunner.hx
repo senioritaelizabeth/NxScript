@@ -12,7 +12,7 @@ using StringTools;
 class TestRunner {
 	static function main() {
 		trace("╔════════════════════════════════════════════════════════╗");
-		trace("║       Nz-Dialogue Test Runner                         ║");
+		trace("║       nx-Dialogue Test Runner                         ║");
 		trace("╚════════════════════════════════════════════════════════╝\n");
 
 		// Create results directory

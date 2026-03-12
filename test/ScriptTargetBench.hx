@@ -2,7 +2,7 @@ import crowplexus.iris.Iris;
 import haxe.Timer;
 import hscript.Interp;
 import hscript.Parser;
-import nz.script.Interpreter;
+import nx.script.Interpreter;
 #if sys
 import sys.FileSystem;
 import sys.io.File;

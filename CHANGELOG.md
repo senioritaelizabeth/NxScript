@@ -1,4 +1,45 @@
-# Changelog
+# Changelog 0.2.3.1 (2026-03-11)
+### Added
+- NativeReflection module (`NxReflect`, `CppReflect`, `HlReflect`, `JsReflect`) for platform-optimized native object access.
+- VM optimization: per-class method cache, no try/catch, direct native access for get/set/callMethod/isFunction.
+- `VIterator(arr, idx)` enum case in `Value` — replaces `VDict` Map allocation on every `for` loop entry. Iterator state is a single `Array<Int>[1]` box instead of a 3-entry Map.
+- `FOR_RANGE_SETUP` + `FOR_RANGE` opcodes for tight integer range loops inside functions — eliminates `constVars` Map lookup on every iteration.
+- VM: `VNativeFunction` closures for native object methods are now cached in `instanceMethodCache` per instance — eliminates closure allocation on every `getMember` call in hot loops.
+- Compatibility typedefs for `nz.script` (deprecated).
+- SpeedCheck and SpeedLoopCheck tests with timing and crash fixes.
+- Benchmark: `NxReflectionVsReflection.hx` compares NxReflect vs Reflect in get/set/callMethod/isFunction (1M iterations).
+
+### Fixed
+- C++: `isFunction` now uses `Std.isOfType(v, cpp.Function) == true` to avoid abstract-as-value error.
+- Fixed "Cannot use abstract as value" in VM cache logic.
+- `Interpreter.hx` and `VM.hx`: exhaustive switches over `Value` now cover `VIterator`.
+
+### Changed
+- All VM native object access now routed through `NxReflect` for platform speed.
+- `Compiler.hx`: `SForRange` inside functions now emits `FOR_RANGE_SETUP` + `FOR_RANGE` + `INC_LOCAL` instead of `STORE_CONST` + `LOAD_VAR` + `LT` + `JUMP_IF_FALSE` + `ADD` + `STORE_VAR`. Module-level fallback unchanged.
+- `VM.hx`: `getIterator` and `iteratorNext` rewritten to use `VIterator` — no Map alloc, no `map.get`/`map.set` per step.
+- Modular repo structure and docs updated.
+
+### Notes
+- `callMethod` performance vs `Reflect.callMethod` is within noise (~0.01ms delta at 1000 iterations) — both hit `hxcpp __Run` internally. No further optimization possible from Haxe userland.
+- `FOR_RANGE` and `VIterator` optimizations only apply to code inside functions. Module-level scripts still use the Map-based fallback. Wrapping scripts in an implicit function (`runDynamic` auto-wrap) is planned for 0.2.3.2.
+# Changelog 0.2.3 (latest)
+
+### Changed
+- Modular repo structure: dialogue and cinematic modules moved to their own repositories
+- VS Code extension (`nxscript-vsext`) moved outside the main repo
+- Deprecated `nz.script` alias, now use `nx.script` (typedefs for compatibility)
+
+### Fixed
+- Fix for-range continue bug, elseif keyword, postfix side effects, and return value ([commit](https://github.com/senioritaelizabeth/NxScript/commit/a76c3dfc6314b7b454850f43de71f62e317e394d), [PR #9](https://github.com/senioritaelizabeth/NxScript/pull/9))
+
+### Migration Notes
+- Update your imports from `nz.script` to `nx.script`
+- For dialogue and cinematic, install their new repositories
+- VS Code extension is now in `nxscript-vsext` outside the main repo
+
+
+# Changelog 0.2.1 - 0.2.0
 
 All notable changes to this project are documented in this file.
 
@@ -87,3 +128,4 @@ All notable changes to this project are documented in this file.
 
 - Existing non-strict scripts remain compatible.
 - Core test and demo commands continue to pass for current dev setup (`lime test hl` in `demos/rythm`).
+

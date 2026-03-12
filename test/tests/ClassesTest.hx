@@ -1,6 +1,6 @@
 package;
 
-import nz.script.Interpreter;
+import nx.script.Interpreter;
 
 class ClassesTest {
 	static function main() {

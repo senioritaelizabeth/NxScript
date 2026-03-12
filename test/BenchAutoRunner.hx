@@ -165,7 +165,7 @@ class BenchAutoRunner {
 	}
 
 	static function buildTargets(quick:Bool):Array<TargetSpec> {
-		var baseCommon = ["-cp", ".", "-cp", "..\\src", "-lib", "hscript-improved", "-lib", "hscript-iris"];
+		var baseCommon = ["-cp", ".", "-cp", "../src/", "-lib", "hscript-improved", "-lib", "hscript-iris"];
 		var base = ["haxe"].concat(baseCommon).concat(["-main", "ScriptTargetBench"]);
 		var quickArg = quick ? ["--quick"] : [];
 
@@ -180,40 +180,40 @@ class BenchAutoRunner {
 			},
 			{
 				name: "js",
-				compileCmd: base.concat(["-js", "bin\\ScriptTargetBench.js"]),
-				runCmd: ["node", ".\\bin\\ScriptTargetBench.js"].concat(quickArg),
+				compileCmd: base.concat(["-js", "bin/ScriptTargetBench.js"]),
+				runCmd: ["node", "./bin/ScriptTargetBench.js"].concat(quickArg),
 				requiredCommands: ["haxe", "node"],
 				slow: false,
 				csvName: ""
 			},
 			{
 				name: "hl",
-				compileCmd: base.concat(["-hl", "bin\\ScriptTargetBench.hl"]),
-				runCmd: ["hl", ".\\bin\\ScriptTargetBench.hl"].concat(quickArg),
+				compileCmd: base.concat(["-hl", "bin/ScriptTargetBench.hl"]),
+				runCmd: ["hl", "./bin/ScriptTargetBench.hl"].concat(quickArg),
 				requiredCommands: ["haxe", "hl"],
 				slow: false,
 				csvName: "script_target_bench_hashlink.csv"
 			},
 			{
 				name: "cpp",
-				compileCmd: base.concat(["-cpp", "bin\\cpp_scriptbench"]),
-				runCmd: [".\\bin\\cpp_scriptbench\\ScriptTargetBench.exe"].concat(quickArg),
+				compileCmd: base.concat(["-cpp", "bin/cpp_scriptbench"]),
+				runCmd: ["./bin/cpp_scriptbench/ScriptTargetBench"].concat(quickArg),
 				requiredCommands: ["haxe"],
 				slow: false,
 				csvName: "script_target_bench_cpp.csv"
 			},
 			{
 				name: "neko",
-				compileCmd: base.concat(["-neko", "bin\\ScriptTargetBench.n"]),
-				runCmd: ["neko", ".\\bin\\ScriptTargetBench.n"].concat(quickArg),
+				compileCmd: base.concat(["-neko", "bin/ScriptTargetBench.n"]),
+				runCmd: ["neko", "./bin/ScriptTargetBench.n"].concat(quickArg),
 				requiredCommands: ["haxe", "neko"],
 				slow: true,
 				csvName: "script_target_bench_neko.csv"
 			},
 			{
 				name: "python",
-				compileCmd: base.concat(["-python", "bin\\ScriptTargetBench.py"]),
-				runCmd: ["python", ".\\bin\\ScriptTargetBench.py"].concat(quickArg),
+				compileCmd: base.concat(["-python", "bin/ScriptTargetBench.py"]),
+				runCmd: ["python", "./bin/ScriptTargetBench.py"].concat(quickArg),
 				requiredCommands: ["haxe", "python"],
 				slow: true,
 				csvName: "script_target_bench_python.csv"

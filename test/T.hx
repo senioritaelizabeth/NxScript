@@ -1,4 +1,4 @@
-import nz.script.Interpreter;
+import nx.script.Interpreter;
 import package_test.Module;
 
 class T {

@@ -1,6 +1,6 @@
 package;
 
-import nz.script.Interpreter;
+import nx.script.Interpreter;
 
 class TestSuite {
 	static var passed:Int = 0;

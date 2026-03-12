@@ -340,6 +340,21 @@ NxScript/
 
 ---
 
+## Modular Structure (2026)
+
+NxScript is now fully modular:
+- Core engine in `src/nx/script/`
+- Optional modules (dialogue, cinematic) are in separate repositories
+- VS Code extension (`nxscript-vsext`) is now outside this repo
+- The old `nz.script` alias is deprecated; use `nx.script` instead
+
+### Migration
+- If you used `nz.script`, update your imports to `nx.script`. Temporary typedefs exist for compatibility.
+- For dialogue and cinematic, install their respective repositories.
+- See CHANGELOG for details.
+
+---
+
 ## Use Cases
 
 ### Perfect For:

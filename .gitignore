@@ -1,5 +1,6 @@
 # Build outputs
 snapshot
+test/tests/SpeedCheck/bin
 *.n
 *.js
 *.swf

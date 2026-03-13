@@ -1,4 +1,4 @@
-import nz.script.Interpreter;
+import nx.script.Interpreter;
 
 class TestExpr {
 	static function main() {

@@ -1,6 +1,6 @@
 package;
 
-import nz.script.Interpreter;
+import nx.script.Interpreter;
 
 class NewFeaturesTest {
 	static function assert(cond:Bool, msg:String) {
@@ -73,6 +73,32 @@ class NewFeaturesTest {
             out
         ');
 		assert(r == "negative", "catch exception from function call");
+
+		// strict semicolons
+		trace("\nTest 3: strict semicolons");
+		var strictInterp = new Interpreter(false, true);
+		var strictFailed = false;
+		try {
+			strictInterp.run('var a = 1\nvar b = 2\na + b');
+		} catch (e:Dynamic) {
+			strictFailed = true;
+		}
+		assert(strictFailed, "strict=true rejects missing semicolons");
+
+		r = strictInterp.runDynamic('var a = 1;\nvar b = 2;\na + b;');
+		assert(r == 3, "strict=true accepts semicolon-terminated statements");
+
+		var pragmaInterp = new Interpreter();
+		strictFailed = false;
+		try {
+			pragmaInterp.run('"use strict";\nvar x = 1\nvar y = 2\nx + y');
+		} catch (e:Dynamic) {
+			strictFailed = true;
+		}
+		assert(strictFailed, "\"use strict\" pragma enables strict semicolons");
+
+		r = pragmaInterp.runDynamic('"use strict";\nvar x = 1;\nvar y = 2;\nx + y;');
+		assert(r == 3, "\"use strict\" pragma works with semicolons");
 
 		trace("\n========================================");
 		trace("ALL NEW FEATURES TESTS PASSED!");

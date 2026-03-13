@@ -1,0 +1,14 @@
+# examples/nxscript/basic.nx
+
+func fib(n) {
+    if (n <= 1) {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+var values = range(1, 8)
+trace("values:", values)
+trace("fib(10):", fib(10))
+trace("clamp(120, 0, 100):", clamp(120, 0, 100))
+trace("lerp(10, 30, 0.25):", lerp(10, 30, 0.25))

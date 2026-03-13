@@ -1,9 +1,8 @@
 package nx.script;
 
 import nx.script.Bytecode;
-import nx.script.nativeReflection.NxReflect;
 import haxe.ds.ObjectMap;
-
+import nx.bridge.Reflection;
 using StringTools;
 
 /**
@@ -15,15 +14,21 @@ using StringTools;
  *   Allocating a fresh array per call was cute. We don't do that anymore.
  * - EMPTY_MAP is a shared sentinel for closures that capture nothing.
  *   Avoids `new Map()` on every single function call. You're welcome.
+ * - EMPTY_UPVALUES is a shared sentinel for functions with no upvalues.
+ *   Same deal — eliminates [] allocation on every non-closure call.
  * - RETURN restores `sp = savedBase`, unwinding the callee's locals without touching a GC.
  * - MAKE_FUNC caches VFunction(chunk, EMPTY_MAP) per function index.
  *   Because creating the same object 100,000 times per second is a cry for help.
  * - Trampoline architecture: RETURN with frames.length > 0 restores the outer frame
  *   and CONTINUES in the same run() invocation. Do not call run() twice. You'll know why.
+ * - callFunction/callResolved bypass save/restore entirely — push frame directly onto the
+ *   idle stack, let RETURN pop it naturally. No 12-field save/restore per host->script call.
  */
 class VM {
 	// One Map to rule them all — shared across every zero-capture function. Never write to this.
 	static var EMPTY_MAP:Map<String, Value> = new Map<String, Value>();
+	// One Array to rule them all — shared across every no-upvalue function. Never write to this.
+	static var EMPTY_UPVALUES:Array<Value> = [];
 	static inline var NATIVE_SUPER_INSTANCE_FIELD = "__native_super_instance";
 
 	// The stack. 512 slots, pre-allocated, sp is the logical top.
@@ -65,16 +70,19 @@ class VM {
 	var arrayMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 	var instanceMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 	var nativeArgBuffers:Map<Int, Array<Value>>;
-
-	// Per-class cache: className -> fieldName -> isMethod (true = method, false = plain field)
-	// Avoids repeated Reflect.isFunction checks for the same class+field pair in hot loops.
-	static var nativeFieldIsMethod:Map<String, Map<String, Bool>> = new Map();
+	// Caches Type.getClassName per object instance — one pointer lookup instead of reflection per access
+	var _typeNameCache:haxe.ds.ObjectMap<Dynamic, String>;
 
 	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
 
 	/** The instruction currently executing. Only populated when `debug = true`. Null otherwise. */
 	public var currentInstruction:Instruction = null;
+
+	// Preallocated frame + frames array for host->script calls (callFunction/callResolved).
+	// Mutated in-place every call — zero heap allocation per frame in the hot path.
+	var _hostFrame:CallFrame;
+	var _hostFrames:Array<CallFrame>;
 
 	/**
 	 * Creates a VM. Optionally pass debug=true to get a trace per instruction.
@@ -97,6 +105,7 @@ class VM {
 		globalSlotConstInit = [];
 		arrayMethodCache = new ObjectMap();
 		instanceMethodCache = new ObjectMap();
+		_typeNameCache = new haxe.ds.ObjectMap();
 		nativeArgBuffers = new Map();
 
 		initializeNativeFunctions();
@@ -202,7 +211,7 @@ class VM {
 		var currentUpvalues = currentFrame.upvalues;
 		var frameBase = currentFrame.stackBase;
 		var maxCallDepth = this.maxCallDepth;
-		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead*/
+		var sp = this.sp; // manual stack pointer — avoids Array.push/pop resize overhead
 
 		while (true) {
 			var op = code[ip++];
@@ -261,6 +270,7 @@ class VM {
 							currentUpvalues.push(VNull);
 					}
 					currentUpvalues[arg] = upValue;
+
 				//  Might want to change this nesting its somewhat expensive.
 				case Op.LOAD_VAR:
 					var name = strings[arg];
@@ -945,15 +955,14 @@ class VM {
 					// flat layout: [..., SETUP_OP, setupArg, FOR_RANGE_OP, jumpArg, ...]
 					// ip now points to the instruction AFTER FOR_RANGE (already advanced).
 					// So the SETUP arg is at code[ip - 4].
-					var setupArg = code[ip - 4];
+					var setupArg = code[ip - 3]; // ← was ip-4, should be ip-3
 					var varSlot = setupArg & 0xFFFF;
 					var endSlot = setupArg >>> 16;
 					var cur = stack[frameBase + varSlot];
 					var lend = stack[frameBase + endSlot];
 					switch [cur, lend] {
 						case [VNumber(c), VNumber(e)]:
-							if (c >= e)
-								ip += arg * 2;
+							if (c >= e) ip += arg * 2;
 						default:
 							throw 'FOR_RANGE expects numbers';
 					}
@@ -1005,7 +1014,6 @@ class VM {
 					var val = getIndex(obj, idx);
 					setIndex(obj, idx, VNumber(toNum(val) - 1));
 					stack[sp - 1] = val;
-
 				// Special
 				case Op.LOAD_NULL:
 					stack[sp++] = VNull;
@@ -1226,79 +1234,18 @@ class VM {
 		return inst;
 	}
 
-	function call(callee:Value, args:Array<Value>):Value {
-		return switch (callee) {
-			case VFunction(funcChunk, closure):
-				if (args.length != funcChunk.paramCount) {
-					throw 'Function ${funcChunk.name} expects ${funcChunk.paramCount} arguments, got ${args.length}';
-				}
-
-				// Stack-based locals: reserve stack[localsBase..localsBase+localCount-1]
-				var localCount = funcChunk.localCount;
-				var localsBase = this.sp;
-				for (i in 0...localCount)
-					stack[localsBase + i] = VNull;
-				// Params occupy slots 0..paramCount-1
-				for (i in 0...args.length)
-					stack[localsBase + i] = args[i];
-				// Closure vars → slots: O(1) with localSlots map, O(n) fallback with indexOf
-				if (closure != EMPTY_MAP) {
-					var localSlots = funcChunk.localSlots;
-					if (localSlots != null) {
-						for (key in closure.keys()) {
-							var idx = localSlots.get(key);
-							if (idx != null)
-								stack[localsBase + idx] = closure.get(key);
-						}
-					}
-				}
-				var frameUpvalues = buildUpvalueArray(funcChunk, closure);
-
-				// Avoid new Map() when closure is empty — reuse EMPTY_MAP sentinel.
-				// setVariable will lazy-alloc if a 'let' binding is ever written.
-				var localVars:Map<String, Value>;
-				if (closure == EMPTY_MAP) {
-					localVars = EMPTY_MAP;
-				} else {
-					localVars = new Map<String, Value>();
-					for (key in closure.keys())
-						localVars.set(key, closure.get(key));
-				}
-
-				this.sp = localsBase + localCount;
-				var newFrame:CallFrame = {
-					chunk: funcChunk.chunk,
-					ip: 0,
-					stackBase: localsBase,
-					localVars: localVars,
-					upvalues: frameUpvalues,
-					functionName: funcChunk.name
-				};
-
-				if (maxCallDepth > 0 && frames.length + 1 > maxCallDepth)
-					throw 'Execution exceeded maximum call depth ($maxCallDepth) - possible infinite recursion';
-
-				frames.push(newFrame);
-				currentFrame = newFrame;
-
-				return run();
-
-			case VNativeFunction(name, arity, fn):
-				// -1 arity means variadic (no argument count check)
-				if (arity != -1 && args.length != arity) {
-					throw 'Native function $name expects $arity arguments, got ${args.length}';
-				}
-				return fn(args);
-
-			default:
-				throw 'Value is not callable: $callee';
-		}
+	// Internal helper — direct dispatch, no indirection.
+	// Only used by callInstanceMethod. Hot host paths use callResolved directly.
+	inline function call(callee:Value, args:Array<Value>):Value {
+		return callResolved(callee, args);
 	}
 
+	// Returns EMPTY_UPVALUES sentinel for functions with no upvalue names — zero allocation
+	// on the vast majority of calls which have no upvalues.
 	function buildUpvalueArray(funcChunk:FunctionChunk, closure:Map<String, Value>):Array<Value> {
 		var names = funcChunk.upvalueNames;
 		if (names == null || names.length == 0)
-			return [];
+			return EMPTY_UPVALUES;
 
 		var values:Array<Value> = [for (_ in 0...names.length) VNull];
 		if (closure != null && closure != EMPTY_MAP) {
@@ -1371,57 +1318,67 @@ class VM {
 	// Conversion between Haxe and Script values
 
 	public function haxeToValue(value:Dynamic):Value {
-		if (value == null)
-			return VNull;
-		if (Std.isOfType(value, Bool))
-			return VBool(value);
-		if (Std.isOfType(value, Int) || Std.isOfType(value, Float))
-			return VNumber(value);
-		if (Std.isOfType(value, String))
-			return VString(value);
-		if (Std.isOfType(value, Array)) {
-			var arr:Array<Dynamic> = value;
-			return VArray([for (v in arr) haxeToValue(v)]);
+		return switch (Type.typeof(value)) {
+			case TNull: VNull;
+			case TBool: VBool(value);
+			case TInt: VNumber(value);
+			case TFloat: VNumber(value);
+			case TClass(String): VString(value);
+			case TClass(Array): VArray([for (v in (value : Array<Dynamic>)) haxeToValue(v)]);
+			case TFunction: VNativeFunction("", -1, (args:Array<Value>) -> {
+					var haxeArgs = [for (a in args) valueToHaxe(a)];
+					return haxeToValue(Reflection.callMethod(null, value, haxeArgs));
+
+				});
+			default: VNativeObject(value);
 		}
-		// For other objects, wrap as native object
-		return VNativeObject(value);
 	}
 
 	public function valueToHaxe(value:Value):Dynamic {
-		if (value == null) {
-			return null;
-		}
 		return switch (value) {
 			case VNumber(n): n;
 			case VString(s): s;
 			case VBool(b): b;
 			case VNull: null;
 			case VArray(arr): [for (v in arr) valueToHaxe(v)];
-			case VDict(map):
-				var obj = {};
-				for (key in map.keys()) {
-					Reflect.setField(obj, key, valueToHaxe(map.get(key)));
-				}
-				obj;
 			case VNativeObject(obj): obj;
+			// unwrap VInstance to native base if it has one
+			case VInstance(_, fields, _):
+				var nativeBase = fields.get(NATIVE_SUPER_INSTANCE_FIELD);
+				switch (nativeBase) {
+					case VNativeObject(obj): obj; // return the actual FlxSprite
+					default: null;
+				}
 			default: null;
 		}
 	}
 
 	/**
-	 * Calls a script function from Haxe. Saves and restores all VM state around the call,
-	 * so you don't spin up a fresh VM (which was the old approach, and it was bad).
-	 * Locals go directly onto stack[0..localCount-1]; expression stack starts above them.
+	 * Calls a script function from Haxe host code.
+	 *
+	 * Pushes the frame directly onto the idle stack at position 0 and lets the
+	 * trampoline RETURN handler pop it naturally. No VM state save/restore needed —
+	 * the stack is always empty between host calls, so we just place the frame,
+	 * run, and return the result. Eliminates ~12 field writes per call vs the old
+	 * save/restore approach.
+	 *
+	 * Precondition: no script is currently executing (frames must be empty).
 	 */
 	public function callFunction(func:FunctionChunk, closure:Map<String, Value>, args:Array<Value>):Value {
-		// Stack-based locals: reserve stack[0..localCount-1] for func frame
+		if (func.chunk.code == null)
+			buildFlatCode(func.chunk);
+
 		var localCount = func.localCount;
-		for (i in 0...localCount)
-			stack[i] = VNull;
-		for (i in 0...args.length)
-			stack[i] = args[i];
-		// O(1) closure-to-slot mapping with localSlots, O(n) fallback
-		if (closure != EMPTY_MAP) {
+		var paramCount = func.paramCount;
+
+		// Init locals then fill params — stack is idle so we always start at 0
+		var i = 0;
+		while (i < localCount) { stack[i] = VNull; i++; }
+		i = 0;
+		while (i < args.length && i < paramCount) { stack[i] = args[i]; i++; }
+
+		// Closure → local slots (O(1) with localSlots, O(n) fallback)
+		if (closure != EMPTY_MAP && closure != null) {
 			var localSlots = func.localSlots;
 			if (localSlots != null) {
 				for (key in closure.keys()) {
@@ -1441,51 +1398,50 @@ class VM {
 			}
 		}
 
-		// Avoid closure.copy() when closure is empty
+		// localVars: reuse EMPTY_MAP when no closure, copy otherwise
 		var localVars:Map<String, Value>;
-		if (closure == EMPTY_MAP) {
+		if (closure == EMPTY_MAP || closure == null) {
 			localVars = EMPTY_MAP;
 		} else {
 			localVars = closure.copy();
+			// Write param names into localVars for LOAD_VAR fallback (rare path)
+			var pnames = func.paramNames;
+			i = 0;
+			while (i < args.length && i < pnames.length) {
+				localVars.set(pnames[i], args[i]);
+				i++;
+			}
 		}
-		for (i in 0...args.length)
-			if (i < func.paramNames.length)
-				localVars.set(func.paramNames[i], args[i]);
 
-		var savedFrames = this.frames;
-		var savedCurrentFrame = this.currentFrame;
-		var savedScopeVars = this.scopeVars;
-		var savedConstVars = this.constVars;
-		var savedCatchStack = this.catchStack;
-		var savedSp = this.sp;
-		var frameUpvalues = buildUpvalueArray(func, closure);
+		var upvalues = buildUpvalueArray(func, closure);
 
-		var funcFrame:CallFrame = {
-			chunk: func.chunk,
-			ip: 0,
-			stackBase: 0,
-			localVars: localVars,
-			upvalues: frameUpvalues,
-			functionName: func.name
-		};
-
-		this.frames = [funcFrame];
+		// Push frame directly — no save/restore of VM state
+		var funcFrame = new CallFrame(func.chunk, 0, 0, localVars, upvalues, func.name);
+		frames = [funcFrame];
+		currentFrame = funcFrame;
 		this.currentFrame = funcFrame;
-		this.scopeVars = new Map();
-		this.constVars = new Map();
-		this.catchStack = [];
 		this.sp = localCount;
 
-		var result = run();
+		// run() exits when RETURN pops the last frame (frames.length == 0)
+		return run();
+	}
 
-		this.frames = savedFrames;
-		this.currentFrame = savedCurrentFrame;
-		this.scopeVars = savedScopeVars;
-		this.constVars = savedConstVars;
-		this.catchStack = savedCatchStack;
-		this.sp = savedSp;
-
-		return result;
+	/**
+	 * Call a previously resolved callable value.
+	 * VFunction: routes through the zero-save/restore callFunction path.
+	 * VNativeFunction: direct dispatch, no frame overhead at all.
+	 */
+	public function callResolved(callee:Value, args:Array<Value>):Value {
+		return switch (callee) {
+			case VFunction(funcChunk, closure):
+				callFunction(funcChunk, closure, args);
+			case VNativeFunction(name, arity, fn):
+				if (arity != -1 && args.length != arity)
+					throw 'Native function $name expects $arity arguments, got ${args.length}';
+				fn(args);
+			default:
+				throw 'Value is not callable: $callee';
+		}
 	}
 
 	// Arithmetic operations
@@ -1561,7 +1517,7 @@ class VM {
 	}
 
 	// Comparison
-	function equals(a:Value, b:Value):Bool {
+	inline function equals(a:Value, b:Value):Bool {
 		return switch [a, b] {
 			case [VNumber(x), VNumber(y)]: x == y;
 			case [VString(x), VString(y)]: x == y;
@@ -1571,7 +1527,7 @@ class VM {
 		}
 	}
 
-	function compare(a:Value, b:Value):Int {
+	inline function compare(a:Value, b:Value):Int {
 		return switch [a, b] {
 			case [VNumber(x), VNumber(y)]: if (x < y) -1 else if (x > y) 1 else 0;
 			case [VString(x), VString(y)]: if (x < y) -1 else if (x > y) 1 else 0;
@@ -1579,7 +1535,7 @@ class VM {
 		}
 	}
 
-	function isTruthy(value:Value):Bool {
+	inline function isTruthy(value:Value):Bool {
 		return switch (value) {
 			case VNull: false;
 			case VBool(b): b;
@@ -1592,27 +1548,33 @@ class VM {
 	// Member access
 	public function getMember(object:Value, field:String):Value {
 		return switch (object) {
-			case VNumber(n): getNumberMethod(n, field);
-			case VString(s): getStringMethod(s, field);
-			case VArray(arr): getArrayMethod(arr, field);
-			case VDict(map): map.exists(field) ? map.get(field) : VNull;
+			case VNumber(n):
+				getNumberMethod(n, field);
+
+			case VString(s):
+				getStringMethod(s, field);
+
+			case VArray(arr):
+				getArrayMethod(arr, field);
+
+			case VDict(map):
+				map.exists(field) ? map.get(field) : VNull;
+
 			case VInstance(className, fields, classData):
-				// Check instance fields first
-				if (fields.exists(field)) {
+				// instance fields first
+				if (fields.exists(field))
 					return fields.get(field);
-				}
 
+				// method cache
 				var cachedInstanceMethods = instanceMethodCache.get(fields);
-				if (cachedInstanceMethods != null && cachedInstanceMethods.exists(field)) {
+				if (cachedInstanceMethods != null && cachedInstanceMethods.exists(field))
 					return cachedInstanceMethods.get(field);
-				}
 
-				// Check methods in class hierarchy
+				// walk class hierarchy for methods
 				var currentClass = classData;
 				while (currentClass != null) {
 					if (currentClass.methods.exists(field)) {
 						var method = currentClass.methods.get(field);
-						// Return a bound method (closure with 'this')
 						var bound = VFunction(method, ["this" => object]);
 						if (cachedInstanceMethods == null) {
 							cachedInstanceMethods = new Map<String, Value>();
@@ -1621,90 +1583,40 @@ class VM {
 						cachedInstanceMethods.set(field, bound);
 						return bound;
 					}
-					// Look in parent class
-					if (currentClass.superClass != null && classes.exists(currentClass.superClass)) {
+					if (currentClass.superClass != null && classes.exists(currentClass.superClass))
 						currentClass = classes.get(currentClass.superClass);
-					} else {
+					else
 						currentClass = null;
-					}
 				}
 
-				// Fallback to native base object when this script class extends a native class.
+				// fallback to native base (script class extending native class)
 				var nativeBase = fields.get(NATIVE_SUPER_INSTANCE_FIELD);
 				switch (nativeBase) {
-					case VNativeObject(_):
-						return getMember(nativeBase, field);
+					case VNativeObject(_): return getMember(nativeBase, field);
 					default:
+						return VNull;
 				}
 
-				throw 'Field $field not found in class $className';
+			case VClass(classData):
+				var method = classData.methods.get(field);
+				if (method != null)
+					return VFunction(method, EMPTY_MAP);
+				var fieldVal = classData.fields.get(field);
+				if (fieldVal != null)
+					return fieldVal;
+				return VNull;
 			case VNativeObject(obj):
-				// Per-class cache: first access probes + caches whether field is method or value.
-				// Hot path (already cached): one Map.get + one NxReflect.get, no try/catch, no
-				// isFunction check.
-				var cls = Type.getClass(obj);
-				if (cls != null) {
-					var className = Type.getClassName(cls);
-					var classDescs = nativeFieldIsMethod.get(className);
-					if (classDescs == null) {
-						classDescs = new Map();
-						nativeFieldIsMethod.set(className, classDescs);
-					}
-					var isMethod = classDescs.get(field);
-					if (isMethod == null) {
-						// Cold path — probe field once, cache result.
-						var raw:Any = NxReflect.probe(obj, field);
-						isMethod = !!(raw != null && NxReflect.isFunction(raw));
-						classDescs.set(field, isMethod);
-						if (isMethod) {
-							// Also cache the VNativeFunction so we don't alloc a closure next time
-							var cachedMethods = instanceMethodCache.get(obj);
-							if (cachedMethods == null) {
-								cachedMethods = new Map();
-								instanceMethodCache.set(obj, cachedMethods);
-							}
-							final capturedFn = raw;
-							var bound = VNativeFunction(field, -1, (args:Array<Value>) -> {
-								return haxeToValue(NxReflect.callMethod(obj, capturedFn, [for (a in args) valueToHaxe(a)]));
-							});
-							cachedMethods.set(field, bound);
-							return bound;
-						}
-						return raw == null ? VNull : haxeToValue(raw);
-					}
-					if (isMethod) {
-						// Hot method path — return cached VNativeFunction, no closure alloc.
-						var cachedMethods = instanceMethodCache.get(obj);
-						if (cachedMethods != null) {
-							var cached = cachedMethods.get(field);
-							if (cached != null)
-								return cached;
-						}
-						// Miss (e.g. first call after cache cleared): build and cache
-						if (cachedMethods == null) {
-							cachedMethods = new Map();
-							instanceMethodCache.set(obj, cachedMethods);
-						}
-						var fn:Dynamic = NxReflect.get(obj, field);
-						var bound = VNativeFunction(field, -1, (args:Array<Value>) -> {
-							return haxeToValue(NxReflect.callMethod(obj, fn, [for (a in args) valueToHaxe(a)]));
-						});
-						cachedMethods.set(field, bound);
-						return bound;
-					}
-					// Hot plain-field path — single NxReflect.get, no overhead.
-					return haxeToValue(NxReflect.get(obj, field));
-				} else {
-					// Anonymous object (no class) — skip class cache.
-					var raw:Dynamic = NxReflect.probe(obj, field);
-					if (raw != null && NxReflect.isFunction(raw)) {
-						return VNativeFunction(field, -1, (args:Array<Value>) -> {
-							return haxeToValue(NxReflect.callMethod(obj, raw, [for (a in args) valueToHaxe(a)]));
-						});
-					}
-					return raw == null ? VNull : haxeToValue(raw);
+				var value:Dynamic = Reflection.getField(obj, field);
+				if (Reflection.isFunction(value)) {
+					return VNativeFunction(field, -1, (args:Array<Value>) -> {
+						var haxeArgs = [for (a in args) valueToHaxe(a)];
+						return haxeToValue(Reflection.callMethod(obj, value, haxeArgs));
+					});
 				}
-			default: throw 'Cannot access member $field';
+				return haxeToValue(value);
+
+			default:
+				throw 'Cannot access member $field on $object';
 		}
 	}
 
@@ -1725,18 +1637,22 @@ class VM {
 							fields.set(field, value);
 					}
 				}
+			case VClass(classData):
+				classData.fields.set(field, value);
 			case VNativeObject(obj):
-				// Inline unbox common types to avoid full valueToHaxe() call,
-				// then use NxReflect.set for the fastest platform write path.
-				var raw:Dynamic = switch (value) {
-					case VNumber(n): n;
-					case VString(s): s;
-					case VBool(b): b;
-					case VNull: null;
-					case VNativeObject(o): o;
-					default: valueToHaxe(value);
-				};
-				NxReflect.set(obj, field, raw);
+				// Set Haxe object field/property
+				try {
+					// Try setProperty first (works with getters/setters like set_angle)
+					try {
+						final val = valueToHaxe(value);
+						Reflection.setField(obj, field, val);
+					} catch (e:Dynamic) {
+						// Fallback to setField
+						Reflect.setField(obj, field, valueToHaxe(value));
+					}
+				} catch (e:Dynamic) {
+					throw 'Cannot set field $field on native object: $e';
+				}
 			default:
 				throw 'Cannot set member $field';
 		}
@@ -1775,8 +1691,8 @@ class VM {
 					try {
 						Type.createInstance(cast clsOrObj, []);
 					} catch (_:Dynamic) {
-						if (Reflect.isFunction(clsOrObj))
-							Reflect.callMethod(null, clsOrObj, haxeArgs);
+						if(Reflection.isFunction(clsOrObj))
+							Reflection.callMethod(null, clsOrObj, haxeArgs);
 						else
 							clsOrObj;
 					}
@@ -1808,22 +1724,17 @@ class VM {
 	function getIterator(iterable:Value):Value {
 		return switch (iterable) {
 			case VArray(arr):
-				// VIterator holds a direct ref to the array and a single-element
-				// Array<Int> as a mutable index box — no Map allocation, no VDict overhead.
-				VIterator(arr, [0]);
+				VDict([
+					"_iter_type" => VString("array"),
+					"_iter_data" => VArray(arr),
+					"_iter_index" => VNumber(0)
+				]);
 			default: throw 'Value is not iterable';
 		}
 	}
 
 	function iteratorNext(iterator:Value):Value {
 		return switch (iterator) {
-			case VIterator(arr, idx):
-				var i = idx[0];
-				if (i >= arr.length)
-					return null;
-				idx[0] = i + 1;
-				return arr[i];
-			// Legacy VDict iterator kept for backwards compat if any external code creates one
 			case VDict(map):
 				var type = map.get("_iter_type");
 				if (type == null)
@@ -1976,7 +1887,6 @@ class VM {
 			return cachedMethods.get(method);
 
 		var bound = switch (method) {
-			// Properties
 			// Add/Remove
 			case "push": VNativeFunction("push", 1, (args) -> {
 					arr.push(args[0]);
@@ -1993,7 +1903,7 @@ class VM {
 			case "first": VNativeFunction("first", 0, (_) -> arr.length > 0 ? arr[0] : VNull);
 			case "last": VNativeFunction("last", 0, (_) -> arr.length > 0 ? arr[arr.length - 1] : VNull);
 
-			// Search - need to compare values properly
+			// Search
 			case "contains": VNativeFunction("contains", 1, (args) -> {
 					var searchValue = args[0];
 					var found = false;
@@ -2042,6 +1952,15 @@ class VM {
 		return bound;
 	}
 
+	inline function toNum(value:Value):Float {
+		return switch (value) {
+			case VNumber(n): n;
+			case VBool(b): b ? 1.0 : 0.0;
+			case VNull: 0.0;
+			default: throw 'Expected number';
+		}
+	}
+
 	// Helper to compare two Values for equality
 	function valuesEqual(a:Value, b:Value):Bool {
 		return switch [a, b] {
@@ -2049,23 +1968,14 @@ class VM {
 			case [VString(x), VString(y)]: x == y;
 			case [VBool(x), VBool(y)]: x == y;
 			case [VNull, VNull]: true;
-			default: false; // Arrays, objects, etc need deep comparison
+			default: false;
 		}
 	}
 
 	// Helper functions
-	function toInt(value:Value):Int {
+	inline function toInt(value:Value):Int {
 		return switch (value) {
 			case VNumber(n): Std.int(n);
-			default: throw 'Expected number';
-		}
-	}
-
-	function toNum(value:Value):Float {
-		return switch (value) {
-			case VNumber(n): n;
-			case VBool(b): b ? 1.0 : 0.0;
-			case VNull: 0.0;
 			default: throw 'Expected number';
 		}
 	}
@@ -2080,8 +1990,7 @@ class VM {
 	}
 
 	public function callInstanceMethod(instance:Value, methodName:String, args:Array<Value>):Value {
-		var callable = getMember(instance, methodName);
-		return call(callable, args);
+		return callResolved(getMember(instance, methodName), args);
 	}
 
 	public function getNativeBaseInstance(instance:Value):Dynamic {
@@ -2096,14 +2005,13 @@ class VM {
 	}
 
 	public function callMethod(name:String, args:Array<Value>):Value {
-		syncGlobalSlotsFromMap();
 		var func = getVariable(name);
 		if (func == null)
 			throw 'Undefined function: $name';
-		return call(func, args);
+		return callResolved(func, args);
 	}
 
-	/** Resolve a callable by name once, then reuse it with callResolved/callResolved0 in host hot loops. */
+	/** Resolve a callable by name once, then reuse it with callResolved in host hot loops. */
 	public function resolveCallable(name:String):Value {
 		syncGlobalSlotsFromMap();
 		var func = getVariable(name);
@@ -2154,11 +2062,6 @@ class VM {
 				continue;
 			globalSlotValues[i] = globals.exists(name) ? globals.get(name) : VNull;
 		}
-	}
-
-	/** Call a previously resolved callable value (avoids repeated global lookup by name). */
-	public inline function callResolved(callee:Value, args:Array<Value>):Value {
-		return call(callee, args);
 	}
 
 	public function valueToString(value:Value):String {

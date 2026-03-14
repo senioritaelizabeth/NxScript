@@ -1,31 +1,39 @@
-# Build outputs
-snapshot
-# test/tests/SpeedCheck/bin
-*.n
-*.js
-*.swf
-*.cpp/
-*.cs/
-test/bin
-test/test_flixel
-# nxscript-vsext/
-*.nxb
-out/
-docs/
-doc.xml
-*.ignore/
-# IDE
-.vscode/
-.idea/
-export/
-node_modules/
-*vsix
-# Haxe
-.haxelib/
-
-# Test results
-test_results/
-
-# Temporary files
+# Logs
 *.log
 log.log
+test_results/
+
+# Compiled files and binaries
+snapshot
+*.n
+*.nxb
+*.js
+*.swf
+
+# Source and build directories
+out/
+export/
+test/bin
+test/test_flixel
+
+# Documentation
+docs/
+doc.xml
+
+# IDE and editor folders
+.vscode/
+.idea/
+
+# Node modules
+node_modules/
+
+# Haxe libraries
+.haxelib/
+
+# Miscellaneous
+*.ignore/
+*vsix
+
+# Unusual patterns 
+*.cpp/
+*.cs/

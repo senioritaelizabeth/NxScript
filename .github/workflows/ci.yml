@@ -20,6 +20,8 @@ jobs:
           haxe-version: 4.3.7
       - name: Set dev to current lib
         run: haxelib dev nxscript $GITHUB_WORKSPACE
+      - name: install prismcli
+        run: haxelib install prismcli
 
 
       - name: Run all Tests

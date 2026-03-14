@@ -19,7 +19,7 @@ jobs:
         with:
           haxe-version: 4.3.7
       - name: Set dev to current lib
-        run: haxe dev nxscript /home/runner/work/nxscript/nxscript/
+        run: haxe dev nxscript "/home/runner/work/nxscript/nxscript/"
 
       - name: Run all Tests
         working-directory: test/tests

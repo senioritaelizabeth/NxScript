@@ -50,6 +50,9 @@ enum Expr {
 
 	// Assignment
 	EAssign(target:Expr, value:Expr);
+
+	// Type check: expr is TypeName  — returns Bool
+	EIs(expr:Expr, typeName:String);
 }
 
 enum Stmt {
@@ -77,11 +80,53 @@ enum Stmt {
 	STryCatch(body:Array<Stmt>, catchVar:String, catchBody:Array<Stmt>);
 	SThrow(expr:Expr);
 
+	// Destructuring declarations
+	// var [a, b, c] = expr   — array destructure
+	SDestructureArray(names:Array<Null<String>>, init:Expr);
+	// var {x, y} = expr      — dict/object destructure
+	SDestructureDict(names:Array<String>, init:Expr);
+
 	// Expression statement
 	SExpr(expr:Expr);
 
 	// Block
 	SBlock(stmts:Array<Stmt>);
+
+	// Pattern matching
+	// match expr { case pattern => body ... default => body }
+	SMatch(subject:Expr, cases:Array<MatchCase>, defaultBody:Null<Array<Stmt>>);
+
+	// Using declaration — imports a class as extension methods
+	// using MyClass  => methods of MyClass become callable on the first arg type
+	SUsing(className:String);
+
+	// Enum declaration
+	// enum Color { Red, Green, Blue }
+	// enum Status { Ok(msg:String), Error(code:Int) }
+	SEnum(name:String, variants:Array<EnumVariant>);
+
+	// Abstract type declaration
+	// abstract Meters(Float) { ... }
+	SAbstract(name:String, baseType:Null<TypeHint>, methods:Array<ClassMethod>);
+}
+
+typedef EnumVariant = {
+	name: String,
+	fields: Array<Param>   // empty for plain variants like Red, non-empty for Ok(msg)
+}
+
+typedef MatchCase = {
+	pattern: MatchPattern,
+	body: Array<Stmt>
+}
+
+enum MatchPattern {
+	MPValue(expr:Expr);              // case 42, case "hello", case true
+	MPRange(from:Expr, to:Expr);     // case 1...5
+	MPType(typeName:String);         // case String, case Number, case Bool, case Null
+	MPArray(elements:Array<Expr>);   // case [x, y]  (destructure)
+	MPBind(name:String);             // case x  (bind to variable)
+	MPEnum(variantName:String, binds:Array<Null<String>>); // case Ok(msg) or case Red
 }
 
 typedef StmtWithPos = {

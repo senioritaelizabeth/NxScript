@@ -33,6 +33,13 @@ enum Keyword {
 	KTry; // try
 	KCatch; // catch
 	KThrow; // throw
+	KMatch; // match
+	KCase; // case (in match)
+	KDefault; // default (in match)
+	KUsing; // using — extension methods
+	KEnum; // enum
+	KAbstract; // abstract type
+	KIs; // type check: x is SomeType
 }
 
 /**

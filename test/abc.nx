@@ -1,0 +1,12 @@
+import "other.nx";
+var abc = "im gay";
+func change_abc() {
+    abc = "im not gay";
+    abc += "\n im lesbian";
+}
+change_abc();
+hellO();
+trace(`Hey ABC Is ${abc}`);
+
+
+

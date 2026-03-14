@@ -1,4 +1,5 @@
 -cp src
 -main nx.script.Main
 -lib nxscript
+-lib prismcli
 --interp

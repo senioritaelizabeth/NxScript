@@ -17,6 +17,8 @@
   "contributors": [
     "senioritaelizabeth"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "prismcli": ""
+  },
   "main": "nx.script.Main"
 }

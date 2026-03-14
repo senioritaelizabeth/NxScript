@@ -1,5 +1,7 @@
 package nx.script;
 
+import prismcli.CLI;
+
 /**
  * NxScript CLI — entry point for `haxelib run nxscript`
  *
@@ -17,7 +19,6 @@ class Main {
 	static function main() {
 		var args = Sys.args();
 
-		// haxelib passes the CWD as the last argument
 		var cwd = args.length > 0 ? args[args.length - 1] : null;
 		if (cwd != null && sys.FileSystem.exists(cwd) && sys.FileSystem.isDirectory(cwd)) {
 			args = args.slice(0, args.length - 1);
@@ -26,38 +27,28 @@ class Main {
 
 		if (args.length == 0) {
 			startRepl();
-			return;
-		}
+		} else if (sys.FileSystem.exists(args[0])) {
+			runFile(args[0], false);
+		} else {
+			var cli = new CLI("NxScript", "NxScript CLI", "1.0.0");
+			cli.addDefaults();
 
-		switch (args[0]) {
-			case "run":
-				if (args.length < 2) {
-					err("Usage: haxelib run nxscript run <file.nx>");
-					Sys.exit(1);
-				}
-				var file  = args[1];
-				var watch = args.indexOf("-w") >= 0 || args.indexOf("--watch") >= 0;
+			var runCmd = cli.addCommand("run", "Run a script file", (cli, args, flags) -> {
+				var file = args["file"];
+				var watch = flags.exists("w") || flags.exists("watch");
 				runFile(file, watch);
+			});
+			runCmd.addArgument("file", "The script file to run", String);
+			runCmd.addFlag("w", "Watch mode", ["-w", "--watch"]);
 
-			case "repl":
+			cli.addCommand("repl", "Start interactive REPL", (cli, args, flags) -> {
 				startRepl();
+			});
 
-			case "help", "--help", "-h":
-				printHelp();
-
-			default:
-				// Treat bare argument as a file path — quality of life
-				if (sys.FileSystem.exists(args[0])) {
-					runFile(args[0], false);
-				} else {
-					err('Unknown command: ${args[0]}');
-					printHelp();
-					Sys.exit(1);
-				}
+			cli.run();
 		}
 	}
 
-	// ─── run file ────────────────────────────────────────────────────────────
 
 	static function runFile(path:String, watch:Bool) {
 		if (!sys.FileSystem.exists(path)) {
@@ -71,7 +62,7 @@ class Main {
 			var code = sys.io.File.getContent(path);
 			var interp = makeInterpreter(path);
 			try {
-				interp.runString(code, path);
+				interp.runDynamic(code, path);
 			} catch (e:Dynamic) {
 				Sys.exit(1);
 			}
@@ -100,11 +91,10 @@ class Main {
 		var code   = sys.io.File.getContent(path);
 		var interp = makeInterpreter(path);
 		try {
-			interp.runString(code, path);
+			interp.runDynamic(code, path);
 		} catch (_:Dynamic) {}
 	}
 
-	// ─── REPL ────────────────────────────────────────────────────────────────
 
 	static function startRepl() {
 		Sys.println("NxScript REPL  (type 'exit' or Ctrl+C to quit, 'help' for commands)");
@@ -177,7 +167,7 @@ class Main {
 				continue;
 
 			try {
-				var result = interp.runString(src, "<repl>");
+				var result = interp.runDynamic(src, "<repl>");
 				// Print non-null results
 				if (result != null) {
 					var str = interp.vm.valueToString(interp.vm.haxeToValue(result));
@@ -217,8 +207,6 @@ class Main {
 		}
 		return braces > 0 || parens > 0;
 	}
-
-	// ─── helpers ─────────────────────────────────────────────────────────────
 
 	static function makeInterpreter(name:String):Interpreter {
 		var interp = new Interpreter();

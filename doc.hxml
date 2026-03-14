@@ -1,6 +1,7 @@
 -cp src/
 -xml doc.xml
 -neko doc.n
+--library prismcli
 --no-output
 
 --macro include('nx')

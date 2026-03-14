@@ -125,20 +125,7 @@ class TestSuite {
 		ok(pt.sum() == 7.0,"method call sum()");
 		pt.x = 10.0;
 		ok(pt.sum() == 14.0,"field modify + method");
-		// TODO: supers
-		// ok(i.runDynamic('
-		// 	class Animal {
-		// 		var name
-		// 		func new(n){this.name=n}
-		// 		func speak(){return this.name+" speaks"}
-		// 	}
-		// 	class Dog extends Animal {
-		// 		func new(n){super.new(n)}
-		// 		func fetch(){return this.name+" fetches!"}
-		// 	}
-		// 	var d=new Dog("Rex")
-		// 	d.speak()+" / "+d.fetch()
-		// ') == "Rex speaks / Rex fetches!", "inheritance + super");
+	
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
@@ -312,7 +299,7 @@ class TestSuite {
 		ok(i.runDynamic("var x=42\n'value is ${x}'") == "value is 42",           "single-quote ${} ");
 		ok(i.runDynamic("var a=10\nvar b=20\n'sum: ${a+b}'") == "sum: 30",       "single-quote expr");
 		ok(i.runDynamic("var n='world'\n\"hello ${n}\"") == "hello world",          "double-quote ${}");
-		// ok(i.runDynamic("var x=5\nx^2=${x*x}") == "x^2=25",                   "double-quote computed"); // i forget abouyt thi, shit
+		ok(i.runDynamic("var x=5\n\"x^2=${x*x}\"") == "x^2=25",                   "double-quote computed"); // i forget abouyt thi, shit
 	}
 
 	// ══════════════════════════════════════════════════════════════════════

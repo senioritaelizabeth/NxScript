@@ -59,6 +59,9 @@ class Parser {
 			case TKeyword(KTry): parseTryCatch();
 			case TKeyword(KThrow): parseThrow();
 			case TKeyword(KMatch): parseMatch();
+			case TKeyword(KUsing): parseUsing();
+			case TKeyword(KEnum): parseEnum();
+			case TKeyword(KAbstract): parseAbstract();
 			case TLeftBrace: parseBlock();
 			default: SExpr(parseExpression());
 		}
@@ -312,6 +315,33 @@ class Parser {
 		return SReturn(parseExpression());
 	}
 
+	/**
+	 * Parses either a braced block { ... } or a single statement.
+	 * Allows braceless if/while/for bodies:
+	 *   if (x) return 1
+	 *   while (x > 0) x--
+	 */
+	function parseBody():Array<Stmt> {
+		if (check(TLeftBrace)) {
+			advance();
+			var body = parseBlockBody();
+			expect(TRightBrace, "Expected '}' after body");
+			return body;
+		} else {
+			// Single statement (no braces) — newlines allowed before it
+			skipNewlines();
+			var stmt = parseStatement();
+			consumeSingleStmtTerminator(stmt);
+			return [stmt];
+		}
+	}
+
+	/** Consume terminator for a single-stmt braceless body — softer than consumeStatementTerminator */
+	function consumeSingleStmtTerminator(stmt:Stmt):Void {
+		if (statementNeedsTerminator(stmt))
+			skipSeparators();
+	}
+
 	function parseIf():Stmt {
 		advance(); // consume 'if'
 		return parseIfRest();
@@ -322,9 +352,7 @@ class Parser {
 		var condition = parseExpression();
 		expect(TRightParen, "Expected ')' after condition");
 
-		expect(TLeftBrace, "Expected '{' after if condition");
-		var thenBody = parseBlockBody();
-		expect(TRightBrace, "Expected '}' after if body");
+		var thenBody = parseBody();
 
 		var elseBody = null;
 		skipSeparators();
@@ -332,12 +360,9 @@ class Parser {
 		if (match(TKeyword(KElse))) {
 			skipSeparators();
 			if (check(TKeyword(KIf))) {
-				// elseif
 				elseBody = [parseIf()];
 			} else {
-				expect(TLeftBrace, "Expected '{' after 'else'");
-				elseBody = parseBlockBody();
-				expect(TRightBrace, "Expected '}' after else body");
+				elseBody = parseBody();
 			}
 		} else if (check(TKeyword(KElseIf))) {
 			advance();
@@ -354,9 +379,7 @@ class Parser {
 		var condition = parseExpression();
 		expect(TRightParen, "Expected ')' after condition");
 
-		expect(TLeftBrace, "Expected '{' after while condition");
-		var body = parseBlockBody();
-		expect(TRightBrace, "Expected '}' after while body");
+		var body = parseBody();
 
 		return SWhile(condition, body);
 	}
@@ -374,10 +397,7 @@ class Parser {
 				advance();
 				var iterable = parseExpression();
 				expect(TRightParen, "Expected ')' after for header");
-				expect(TLeftBrace, "Expected '{' after for header");
-				var body = parseBlockBody();
-				expect(TRightBrace, "Expected '}' after for body");
-				loopStmt = SFor(variable, iterable, body);
+				loopStmt = SFor(variable, iterable, parseBody());
 
 			case TKeyword(KFrom):
 				advance();
@@ -385,10 +405,7 @@ class Parser {
 				expect(TKeyword(KTo), "Expected 'to' in for-from-to loop");
 				var toExpr = parseExpression();
 				expect(TRightParen, "Expected ')' after for header");
-				expect(TLeftBrace, "Expected '{' after for header");
-				var body = parseBlockBody();
-				expect(TRightBrace, "Expected '}' after for body");
-				loopStmt = SForRange(variable, fromExpr, toExpr, body);
+				loopStmt = SForRange(variable, fromExpr, toExpr, parseBody());
 
 			default:
 				error("Expected 'in', 'of', or 'from' in for loop");
@@ -443,7 +460,14 @@ class Parser {
 
 	// Expression parsing with operator precedence
 	function parseExpression():Expr {
-		return parseAssignment();
+		var expr = parseAssignment();
+		// `is` type check: expr is TypeName
+		if (check(TKeyword(KIs))) {
+			advance();
+			var typeName = expectIdentifier();
+			return EIs(expr, typeName);
+		}
+		return expr;
 	}
 
 	function parseRange():Expr {
@@ -680,7 +704,7 @@ class Parser {
 			expr = switch (token) {
 				case TDot:
 					advance();
-					var field = expectIdentifier();
+					var field = expectMemberName(); // allows keywords as field names (d.enum, x.new)
 					EMember(expr, field);
 
 				case TLeftBracket:
@@ -946,15 +970,36 @@ class Parser {
 			// Negative number: -5
 			case TOperator(OSub):
 				MPValue(parseUnary());
-			// Type name or bind variable
+			// Type name, enum variant, or bind variable
 			case TIdentifier(name):
 				advance();
-				// Type patterns: String, Number, Bool, Null, Array, Dict
-				switch (name) {
-					case "String" | "Number" | "Bool" | "Null" | "Array" | "Dict" | "Function":
-						MPType(name);
-					default:
-						MPBind(name);
+				// Enum variant with payload binds: case Ok(msg) or case Error(code, _)
+				if (check(TLeftParen)) {
+					advance();
+					var binds:Array<Null<String>> = [];
+					if (!check(TRightParen)) {
+						do {
+							skipNewlines();
+							if (check(TRightParen)) break;
+							if (check(TIdentifier("_"))) { advance(); binds.push(null); }
+							else binds.push(expectIdentifier());
+							skipNewlines();
+						} while (match(TComma));
+					}
+					expect(TRightParen, "Expected ')' after enum pattern");
+					MPEnum(name, binds);
+				} else {
+					switch (name) {
+						case "String" | "Number" | "Bool" | "Null" | "Array" | "Dict" | "Function" | "Int" | "Float":
+							MPType(name);
+						default:
+							// Convention: UpperCase = enum variant, lowerCase = bind variable
+							var firstChar = name.charAt(0);
+							if (firstChar >= "A" && firstChar <= "Z")
+								MPEnum(name, []); // e.g. Red, Green, Ok
+							else
+								MPBind(name);    // e.g. n, x, value
+					}
 				}
 			// Array destructure: [x, y]
 			case TLeftBracket:
@@ -986,6 +1031,82 @@ class Parser {
 			var expr = parseExpression();
 			return [SExpr(expr)];
 		}
+	}
+
+	function parseEnum():Stmt {
+		advance(); // consume 'enum'
+		var name = expectIdentifier();
+		expect(TLeftBrace, "Expected '{' after enum name");
+		skipSeparators();
+
+		var variants:Array<EnumVariant> = [];
+		while (!check(TRightBrace) && !isEOF()) {
+			skipSeparators();
+			if (check(TRightBrace)) break;
+			var vname = expectIdentifier();
+			var fields:Array<Param> = [];
+			if (match(TLeftParen)) {
+				// Variant with fields: Ok(msg:String, code:Int)
+				fields = parseParameters();
+				expect(TRightParen, "Expected ')' after enum variant fields");
+			}
+			variants.push({ name: vname, fields: fields });
+			skipSeparators();
+			match(TComma); // optional comma between variants
+			skipSeparators();
+		}
+		expect(TRightBrace, "Expected '}' after enum body");
+		return SEnum(name, variants);
+	}
+
+	function parseAbstract():Stmt {
+		advance(); // consume 'abstract'
+		var name = expectIdentifier();
+
+		// Optional base type: abstract Meters(Float) { ... }
+		var baseType:Null<TypeHint> = null;
+		if (match(TLeftParen)) {
+			baseType = parseTypeHint();
+			expect(TRightParen, "Expected ')' after abstract base type");
+		}
+
+		expect(TLeftBrace, "Expected '{' before abstract body");
+		skipSeparators();
+
+		var methods:Array<ClassMethod> = [];
+		while (!check(TRightBrace) && !isEOF()) {
+			skipSeparators();
+			if (check(TRightBrace)) break;
+			// Parse method like class methods
+			var tok = peek();
+			if (!check(TKeyword(KFunc)) && !check(TKeyword(KFn)) && !check(TKeyword(KFun)) && !check(TKeyword(KFunction)))
+				throw 'Expected method in abstract body at line ${tok.line}';
+			advance(); // consume func
+			var mname = expectMemberName(); // allows keywords like 'new'
+			expect(TLeftParen, "Expected '(' after method name");
+			var params = parseParameters();
+			expect(TRightParen, "Expected ')' after method params");
+			var retType = null;
+			if (match(TArrow) || match(TColon)) retType = parseTypeHint();
+			expect(TLeftBrace, "Expected '{' before method body");
+			var body = parseBlockBody();
+			expect(TRightBrace, "Expected '}' after method body");
+			methods.push({ name: mname, params: params, returnType: retType, body: body, isConstructor: mname == "new" });
+			skipSeparators();
+		}
+		expect(TRightBrace, "Expected '}' after abstract body");
+		return SAbstract(name, baseType, methods);
+	}
+
+	function parseUsing():Stmt {
+		advance(); // consume 'using'
+		// Accept dotted class name: using MyClass or using my.package.MyClass
+		var name = expectIdentifier();
+		while (check(TDot)) {
+			advance(); // consume .
+			name += "." + expectIdentifier();
+		}
+		return SUsing(name);
 	}
 
 	// Helper functions
@@ -1028,6 +1149,27 @@ class Parser {
 
 		var token = peek();
 		throw '$message at line ${token.line}, col ${token.col}. Got ${token.token}';
+	}
+
+	/**
+	 * Like expectIdentifier but also accepts keywords as field names.
+	 * Needed for member access like `d.enum`, `obj.new`, `x.type`, etc.
+	 * In JavaScript/Haxe, any word can be a field name even if it's reserved.
+	 */
+	function expectMemberName():String {
+		var token = peek();
+		switch (token.token) {
+			case TIdentifier(name):
+				advance();
+				return name;
+			case TKeyword(kw):
+				advance();
+				// Strip leading 'K' from constructor name and lowercase — e.g. KEnum -> "enum"
+				var raw = Type.enumConstructor(kw); // "KEnum", "KVar", etc.
+				return raw.length > 1 ? raw.substr(1).toLowerCase() : raw.toLowerCase();
+			default:
+				throw 'Expected identifier at line ${token.line}, col ${token.col}';
+		}
 	}
 
 	function expectIdentifier():String {

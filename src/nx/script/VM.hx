@@ -43,7 +43,10 @@ class VM {
 	var scopeVars:Map<String, Value>;
 	var constVars:Map<String, Value>;
 	// Stack of scope frames for nested block-level `let` vars (module-level only)
-	var scopeStack:Array<Map<String, Value>> = [];
+	// Each entry is the list of scopeVar keys that existed BEFORE this scope.
+	// On EXIT_SCOPE, any key not in that list was introduced by the scope and gets removed.
+	// Array<String> instead of Map snapshot — much cheaper alloc.
+	var scopeStack:Array<Array<String>> = [];
 
 	// The call stack. frames[last] is currentFrame. Don't touch frames directly in hot code.
 	var frames:Array<CallFrame> = [];
@@ -79,6 +82,13 @@ class VM {
 	 *   vm.sandboxBlocklist.set("sys", true);
 	 */
 	public var sandboxed:Bool = false;
+
+	/**
+	 * Extension method registry populated by `using ClassName` declarations.
+	 * Maps className -> list of static method containers (VClass or VNativeObject).
+	 * When getMember fails to find a method, these are searched with obj as first arg.
+	 */
+	public var usingExtensions:Array<Value> = [];
 
 	/** Set of native/global names blocked in sandboxed mode. */
 	public var sandboxBlocklist:Map<String, Bool> = new Map();
@@ -168,7 +178,7 @@ class VM {
 		globals = new Map();
 		scopeVars = new Map();
 		constVars = new Map();
-		scopeStack = [];
+		scopeStack = []; // Array<Array<String>>
 		natives = new Map();
 		classes = new Map();
 		catchStack = [];
@@ -183,6 +193,7 @@ class VM {
 		nativeArgBuffers = new Map();
 		_nativeFieldCache = new Map();
 
+		usingExtensions = [];
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
 	}
@@ -196,6 +207,7 @@ class VM {
 		sp = 0;
 		frames = [];
 		catchStack = [];
+		usingExtensions = []; // reset per-run so extensions don't bleed between scripts
 		applyGcPolicy();
 		bindGlobalSlots(chunk);
 
@@ -459,8 +471,7 @@ class VM {
 						case VNumber(x):
 							switch (b) {
 								case VNumber(y):
-									if (y == 0)
-										throw 'Division by zero';
+									// IEEE 754: n/0 = Inf, 0/0 = NaN (match JS/Haxe float behaviour)
 									stack[sp++] = VNumber(x / y);
 								default:
 									throw 'Cannot divide';
@@ -1008,23 +1019,16 @@ class VM {
 					catchStack.pop();
 
 				case Op.ENTER_SCOPE:
-					// Push a snapshot of current scopeVars names so EXIT_SCOPE
-					// knows which keys to remove. We store only the key set,
-					// not values — the values live in scopeVars itself.
-					scopeStack.push([ for (k in scopeVars.keys()) k => VNull ]);
+					// Snapshot just the key names (no Map alloc, no value copies).
+					scopeStack.push([ for (k in scopeVars.keys()) k ]);
 
 				case Op.EXIT_SCOPE:
-					// Remove all let vars that were introduced in this scope frame.
+					// Remove keys introduced inside this scope frame.
 					if (scopeStack.length > 0) {
-						var frame = scopeStack.pop();
-						var keysBeforeScope = frame;
-						// Remove any key in scopeVars that was NOT present before this scope
-						var toRemove:Array<String> = [];
+						var keysBefore = scopeStack.pop();
 						for (k in scopeVars.keys())
-							if (!keysBeforeScope.exists(k))
-								toRemove.push(k);
-						for (k in toRemove)
-							scopeVars.remove(k);
+							if (keysBefore.indexOf(k) < 0)
+								scopeVars.remove(k);
 					}
 
 				// Iteration
@@ -1442,6 +1446,7 @@ class VM {
 			case VNull: null;
 			case VArray(arr): [for (v in arr) valueToHaxe(v)];
 			case VNativeObject(obj): obj;
+			case VEnumValue(_, _, _): valueToString(value); // "Color.Red" or "Result.Ok(hello)"
 			// unwrap VInstance to native base if it has one
 			case VInstance(_, fields, _):
 				var nativeBase = fields.get(NATIVE_SUPER_INSTANCE_FIELD);
@@ -1592,8 +1597,7 @@ class VM {
 	function divide(a:Value, b:Value):Value {
 		return switch [a, b] {
 			case [VNumber(x), VNumber(y)]:
-				if (y == 0)
-					throw 'Division by zero';
+				// IEEE 754: n/0 = Inf, 0/0 = NaN
 				VNumber(x / y);
 			default: throw 'Cannot divide';
 		}
@@ -1623,6 +1627,7 @@ class VM {
 			case [VString(x), VString(y)]: x == y;
 			case [VBool(x), VBool(y)]: x == y;
 			case [VNull, VNull]: true;
+			case [VEnumValue(e1,v1,_), VEnumValue(e2,v2,_)]: e1 == e2 && v1 == v2;
 			default: false;
 		}
 	}
@@ -1649,13 +1654,13 @@ class VM {
 	public function getMember(object:Value, field:String):Value {
 		return switch (object) {
 			case VNumber(n):
-				getNumberMethod(n, field);
+				tryGetOrUsing(object, field, () -> getNumberMethod(n, field));
 
 			case VString(s):
-				getStringMethod(s, field);
+				tryGetOrUsing(object, field, () -> getStringMethod(s, field));
 
 			case VArray(arr):
-				getArrayMethod(arr, field);
+				tryGetOrUsing(object, field, () -> getArrayMethod(arr, field));
 
 			case VDict(map):
 				// Dict methods
@@ -1727,9 +1732,84 @@ class VM {
 			case VNativeObject(obj):
 				return nativeGet(obj, field);
 
+			case VEnumValue(eName, variant, vals):
+				switch (field) {
+					case "variant": return VString(variant);
+					case "name":    return VString(variant); // alias
+					case "enum":    return VString(eName);
+					case "values":  return VArray(vals.copy());
+					default:
+						// Indexed access: .value0, .value1, etc.
+						var idxStr = field;
+						if (StringTools.startsWith(idxStr, "value")) {
+							var i = Std.parseInt(idxStr.substr(5));
+							if (i != null && i >= 0 && i < vals.length) return vals[i];
+						}
+						return VNull;
+				}
+
 			default:
+				// Try extension methods registered via `using`
+				if (usingExtensions.length > 0) {
+					var ext = findUsingMethod(object, field);
+					if (ext != null) return ext;
+				}
 				throw 'Cannot access member $field on $object';
 		}
+	}
+
+	/**
+	 * Searches usingExtensions for a static method named `field`.
+	 * If found, returns a VNativeFunction that calls it with obj as the first argument.
+	 * This implements the `using` extension method pattern.
+	 */
+	/**
+	 * Try the built-in method getter first; if it throws "Unknown X method",
+	 * fall through to usingExtensions before re-throwing.
+	 * This lets `using` add extension methods to Number, String, Array, etc.
+	 */
+	inline function tryGetOrUsing(obj:Value, field:String, getter:()->Value):Value {
+		if (usingExtensions.length == 0)
+			return getter();
+		try {
+			return getter();
+		} catch (e:Dynamic) {
+			var ext = findUsingMethod(obj, field);
+			if (ext != null) return ext;
+			throw e; // re-throw original error
+		}
+	}
+
+	function findUsingMethod(obj:Value, field:String):Null<Value> {
+		for (ext in usingExtensions) {
+			switch (ext) {
+				case VClass(classData):
+					var method = classData.methods.get(field);
+					if (method != null) {
+						// Extension method: obj becomes the first parameter (not `this`).
+						// Wrap in a native that prepends obj then delegates to callFunction.
+						var capturedObj = obj;
+						var capturedMethod = method;
+						return VNativeFunction(field, -1, (args:Array<Value>) -> {
+							var all = [capturedObj].concat(args);
+							return callFunction(capturedMethod, EMPTY_MAP, all);
+						});
+					}
+				case VNativeObject(clsObj):
+					// Native Haxe class — look for a static method via reflection
+					var fn:Dynamic = Reflect.field(clsObj, field);
+					if (fn != null && Reflection.isFunction(fn)) {
+						var capturedObj = obj;
+						return VNativeFunction(field, -1, (args:Array<Value>) -> {
+							var all = [capturedObj].concat(args);
+							var haxeArgs = [for (a in all) valueToHaxe(a)];
+							return haxeToValue(Reflection.callMethod(null, fn, haxeArgs));
+						});
+					}
+				default:
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -2192,6 +2272,17 @@ class VM {
 					arr.reverse();
 					VArray(arr);
 				});
+			case "includes": VNativeFunction("includes", 1, (args) -> {
+					var searchValue = args[0];
+					var found = false;
+					for (item in arr) {
+						if (valuesEqual(item, searchValue)) {
+							found = true;
+							break;
+						}
+					}
+					VBool(found);
+				});
 			case "join": VNativeFunction("join", 1, (args) -> {
 					var delim = switch (args[0]) {
 						case VString(s): s;
@@ -2551,6 +2642,8 @@ class VM {
 			case VClass(classData): '<class ${classData.name}>';
 			case VInstance(className, _, _): '<instance of $className>';
 			case VIterator(_, idx): '<iterator @${idx[0]}>';
+			case VEnumValue(eName, variant, vals):
+				vals.length == 0 ? '$eName.$variant' : '$eName.$variant(${[for(v in vals) valueToString(v)].join(", ")})';
 		}
 	}
 
@@ -2579,6 +2672,7 @@ class VM {
 				case VClass(classData): "Class<" + classData.name + ">";
 				case VInstance(className, _, _): className;
 				case VIterator(_, _): "Iterator";
+				case VEnumValue(eName, variant, _): eName;
 			}
 			return VString(typeName);
 		}));
@@ -2635,6 +2729,67 @@ class VM {
 			case VString(s): VNumber(Std.parseFloat(s));
 			case VBool(b): VNumber(b ? 1.0 : 0.0);
 			default: VNumber(0.0);
+		}));
+
+		// Enum construction — called by SEnum compilation
+		natives.set("__make_enum__", VNativeFunction("__make_enum__", 2, (args) -> {
+			var enumName = switch (args[0]) { case VString(s): s; default: throw "enum name must be string"; };
+			var variantArr = switch (args[1]) { case VArray(a): a; default: throw "enum variants must be array"; };
+			// Build a dict: Color -> { Red: VEnumValue, Green: VEnumValue, Ok: VNativeFunction(...) }
+			var enumDict = new Map<String, Value>();
+			var i = 0;
+			while (i < variantArr.length) {
+				var vname = switch (variantArr[i]) { case VString(s): s; default: throw "variant name must be string"; };
+				var arity = switch (variantArr[i+1]) { case VNumber(n): Std.int(n); default: 0; };
+				i += 2;
+				if (arity == 0) {
+					enumDict.set(vname, VEnumValue(enumName, vname, []));
+				} else {
+					var capturedEName = enumName;
+					var capturedVName = vname;
+					var capturedArity  = arity;
+					enumDict.set(vname, VNativeFunction(vname, capturedArity, (fargs) -> {
+						return VEnumValue(capturedEName, capturedVName, fargs.copy());
+					}));
+				}
+			}
+			return VDict(enumDict);
+		}));
+
+		// `is` type check — called by EIs compilation: __is__(value, "TypeName")
+		natives.set("__is__", VNativeFunction("__is__", 2, (args) -> {
+			var val = args[0];
+			var typeName = switch (args[1]) { case VString(s): s; default: throw "__is__: type name must be string"; };
+			return VBool(switch (val) {
+				case VNumber(_):       typeName == "Number" || typeName == "Int" || typeName == "Float";
+				case VString(_):       typeName == "String";
+				case VBool(_):         typeName == "Bool";
+				case VNull:            typeName == "Null";
+				case VArray(_):        typeName == "Array";
+				case VDict(_):         typeName == "Dict";
+				case VFunction(_, _) | VNativeFunction(_, _, _): typeName == "Function";
+				case VInstance(cls, _, _): cls == typeName;
+				case VEnumValue(eName, variant, _): typeName == eName || typeName == variant || typeName == (eName + "." + variant);
+				default: false;
+			});
+		}));
+
+		// Enum variant matching — called by MPEnum in compileMatch
+		// __enum_variant_match__(subject, variantName) -> Bool
+		// Returns true if subject is VEnumValue with matching variant name.
+		// Used to distinguish enum case vs variable bind in match.
+		natives.set("__enum_variant_match__", VNativeFunction("__enum_variant_match__", 2, (args) -> {
+			return switch (args[0]) {
+				case VEnumValue(_, variant, _):
+					VBool(variant == switch (args[1]) { case VString(s): s; default: ""; });
+				default: VBool(false); // not an enum value — fall through to bind
+			};
+		}));
+
+		// `using` registration — called internally by SUsing compilation
+		natives.set("__using_register__", VNativeFunction("__using_register__", 1, (args) -> {
+			usingExtensions.push(args[0]);
+			return VNull;
 		}));
 
 		// math constants

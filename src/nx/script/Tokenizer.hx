@@ -53,7 +53,11 @@ class Tokenizer {
 		"throw" => KThrow,
 		"match" => KMatch,
 		"case" => KCase,
-		"default" => KDefault
+		"default" => KDefault,
+		"using" => KUsing,
+		"enum" => KEnum,
+		"abstract" => KAbstract,
+		"is" => KIs
 	];
 
 	public function new(input:String) {
@@ -176,8 +180,14 @@ class Tokenizer {
 	function readString():Token {
 		var quote = advance();
 		var value = '';
+		var hasInterp = false;
 
 		while (!isEOF() && peek() != quote) {
+			// Check for ${ interpolation — works in both ' and " strings
+			if (peek() == '$' && peekNext() == '{') {
+				hasInterp = true;
+				break; // defer to interpolation handler
+			}
 			if (peek() == '\\') {
 				advance();
 				if (isEOF())
@@ -208,11 +218,97 @@ class Tokenizer {
 			}
 		}
 
-		if (isEOF())
-			throw 'Unterminated string at line $line, col $col';
+		if (!hasInterp) {
+			if (isEOF())
+				throw 'Unterminated string at line $line, col $col';
+			advance(); // closing quote
+			return TString(value);
+		}
 
-		advance(); // closing quote
-		return TString(value);
+		// Has ${ — hand off to interpolation logic (same as template strings)
+		// We already read `value` as the prefix before the first ${
+		readStringInterpolation(quote, value);
+		return null; // pendingTokens populated
+	}
+
+	/**
+	 * Handles ${ ... } interpolation inside regular strings (' or ").
+	 * Called from readString when ${ is detected.
+	 * prefix: text already accumulated before the first ${
+	 * quote: the opening quote char (' or ")
+	 */
+	function readStringInterpolation(quote:String, prefix:String):Void {
+		var startLine = line;
+		var startCol  = col;
+		var parts:Array<TokenPos> = [];
+		var hasContent = false;
+
+		inline function pushStr(s:String, l:Int, c:Int) {
+			if (s.length > 0) {
+				if (hasContent) parts.push({token: TOperator(OAdd), line: l, col: c});
+				parts.push({token: TString(s), line: l, col: c});
+				hasContent = true;
+			}
+		}
+
+		// Flush the prefix already read
+		pushStr(prefix, startLine, startCol);
+
+		var literal = new StringBuf();
+		var litLine = line; var litCol = col;
+
+		while (!isEOF() && peek() != quote) {
+			if (peek() == '$' && peekNext() == '{') {
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // $
+				advance(); // {
+				var exprBuf = new StringBuf();
+				var depth = 1;
+				while (!isEOF() && depth > 0) {
+					var c = peek();
+					if (c == '{') depth++;
+					else if (c == '}') { depth--; if (depth == 0) { advance(); break; } }
+					if (c == '\n') { line++; col = 0; }
+					exprBuf.add(advance());
+				}
+				var exprStr = exprBuf.toString();
+				var subTok = new Tokenizer(exprStr);
+				var subTokens = subTok.tokenize();
+				if (subTokens.length > 1) {
+					var exprToks = subTokens.slice(0, subTokens.length - 1);
+					if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+					parts.push({token: TLeftParen, line: line, col: col});
+					for (t in exprToks) parts.push(t);
+					parts.push({token: TRightParen, line: line, col: col});
+					hasContent = true;
+				}
+				litLine = line; litCol = col;
+			} else if (peek() == '\\') {
+				advance();
+				if (!isEOF()) {
+					switch (advance()) {
+						case 'n': literal.add('\n');
+						case 't': literal.add('\t');
+						case 'r': literal.add('\r');
+						case '\\': literal.add('\\');
+						case c: literal.add(c);
+					}
+				}
+			} else {
+				if (peek() == '\n') { line++; col = 0; }
+				literal.add(advance());
+			}
+		}
+
+		if (!isEOF()) advance(); // closing quote
+		pushStr(literal.toString(), litLine, litCol);
+
+		if (parts.length == 0) {
+			pendingTokens.push({token: TString(""), line: startLine, col: startCol});
+		} else {
+			for (p in parts) pendingTokens.push(p);
+		}
 	}
 
 	/**
@@ -313,8 +409,12 @@ class Tokenizer {
 
 		while (!isEOF() && (isDigit(peek()) || peek() == '.')) {
 			if (peek() == '.') {
-				// Range operator support: stop number token before `...`
+				// Stop at range operator `..` or `...`
 				if (peekNext() == '.')
+					break;
+				// Only consume the dot if what follows is a digit (4.5)
+				// NOT if it's a letter/underscore (4.squared => TNumber(4) TDot TIdent)
+				if (!isDigit(peekNext()))
 					break;
 				if (hasDot)
 					break;

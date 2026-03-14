@@ -489,14 +489,45 @@ class Compiler {
 				}
 				if (!isLast) emit(Op.LOAD_NULL);
 
+			case SEnum(name, variants):
+				// Build an enum object via __make_enum__(enumName, [variantName, fieldCount, ...])
+				// Results in a VDict: { "Red": VEnumValue, "Ok": VNativeFunction(...) }
+				emitWithString(Op.LOAD_VAR, "__make_enum__");
+				emitConstant(VString(name));
+				for (v in variants) {
+					emitConstant(VString(v.name));
+					emitConstant(VNumber(v.fields.length));
+				}
+				emitWithArg(Op.MAKE_ARRAY, variants.length * 2);
+				emitWithArg(Op.CALL, 2); // __make_enum__(enumName, variantsArray)
+				if (localSlots != null)
+					emitWithArg(Op.STORE_LOCAL, allocSlot(name))
+				else
+					emitWithArg(Op.STORE_GLOBAL, allocGlobalSlot(name));
+				if (!isLast) emit(Op.POP);
+
+			case SAbstract(name, baseType, methods):
+				// Abstract compiles as a class with a special marker.
+				// The constructor wraps the base value.
+				// We compile it exactly like SClass but register it as abstract.
+				compileStatement(SClass(name, null, methods, []), isLast);
+
+			case SUsing(className):
+				// `using MyClass` — load the class value and register it as an extension provider.
+				// At runtime this calls vm.usingExtensions.push(MyClass).
+				// We emit: LOAD_VAR "className", CALL native "__using_register__" 1
+				emitWithString(Op.LOAD_VAR, "__using_register__");
+				emitWithString(Op.LOAD_VAR, className);
+				emitWithArg(Op.CALL, 1);
+				if (!isLast) emit(Op.POP);
+
 			case SMatch(subject, cases, defaultBody):
 				compileMatch(subject, cases, defaultBody, isLast);
 
 			case SBlock(stmts):
-				// Emit scope guards so block-level `let` vars are cleaned up on exit.
-				// Only needed at module level — inside functions, locals live on the stack
-				// and are already scoped to the function frame.
-				var needsScope = (localSlots == null);
+				// Only emit ENTER/EXIT_SCOPE when at module level AND the block
+				// actually declares let/const — avoids a Map alloc on every if/while/for body.
+				var needsScope = (localSlots == null) && blockHasLetDecl(stmts);
 				if (needsScope) emit(Op.ENTER_SCOPE);
 				for (i in 0...stmts.length) {
 					var stmtIsLast = isLast && (i == stmts.length - 1);
@@ -700,6 +731,12 @@ class Compiler {
 				functions.push(funcChunk);
 				emitWithArg(Op.MAKE_LAMBDA, funcIndex);
 
+			case EIs(expr, typeName):
+				emitWithString(Op.LOAD_VAR, "__is__");
+				compileExpression(expr);
+				emitConstant(VString(typeName));
+				emitWithArg(Op.CALL, 2);
+
 			case EAssign(target, value):
 				switch (target) {
 					case EIdentifier(name):
@@ -874,6 +911,8 @@ class Compiler {
 					}
 				}
 
+			case EIs(_, _):
+				null; // runtime check, cannot fold
 			default:
 				null;
 		};
@@ -1050,6 +1089,47 @@ class Compiler {
 						emit(Op.POP);
 					}
 
+				case MPEnum(variantName, binds):
+					// Runtime check: __enum_variant_match__(subject, "variantName")
+					// Returns true only if subject is VEnumValue with matching variant.
+					// Falls through to false (skip body) if subject is not an enum at all.
+					emitWithString(Op.LOAD_VAR, "__enum_variant_match__");
+					// subject is on stack — swap: we need [fn, subject, variantStr] for CALL 2
+					// reload subject from stored name (it was already popped by the load above)
+					// Actually subject is still on stack — LOAD_VAR doesn't pop it
+					// Stack: [subject, __enum_variant_match__fn]
+					// We need: [__enum_variant_match__fn, subject, variantStr]
+					// So: pop subject, load fn first, reload subject, push variant
+					// Cleanest: emit POP first (drop the subject from loop-top load),
+					// then LOAD_VAR fn, LOAD_VAR subjectName, CONST variantName, CALL 2
+					emit(Op.POP); // drop the subject loaded at loop top
+					emitWithString(Op.LOAD_VAR, "__enum_variant_match__");
+					if (localSlots != null)
+						emitWithArg(Op.LOAD_LOCAL, localSlots.get(subjectName))
+					else
+						emitWithString(Op.LOAD_VAR, subjectName);
+					emitConstant(VString(variantName));
+					emitWithArg(Op.CALL, 2);
+					jumpOverBody = emitJump(Op.JUMP_IF_FALSE);
+					// Bind payload fields if any
+					for (i in 0...binds.length) {
+						var bname = binds[i];
+						if (bname == null) continue;
+						// Load subject.values[i]
+						if (localSlots != null)
+							emitWithArg(Op.LOAD_LOCAL, localSlots.get(subjectName))
+						else
+							emitWithString(Op.LOAD_VAR, subjectName);
+						emitWithString(Op.GET_MEMBER, "values");
+						emitConstant(VNumber(i));
+						emit(Op.GET_INDEX);
+						if (localSlots != null)
+							emitWithArg(Op.STORE_LOCAL, allocSlot(bname))
+						else
+							emitWithString(Op.STORE_LET, bname);
+						emit(Op.POP);
+					}
+
 				case MPArray(elements):
 					// Match if subject is array of right length, bind elements
 					// type(subject) == "Array" && subject.length == elements.length
@@ -1082,28 +1162,31 @@ class Compiler {
 					}
 			}
 
-			// Compile body
-			for (s in matchCase.body)
-				compileStatement(s, false);
-			// Jump to end of match
+			// Compile body — last statement leaves its value on the stack (match as expression)
+			for (i in 0...matchCase.body.length) {
+				var bodyIsLast = (i == matchCase.body.length - 1);
+				compileStatement(matchCase.body[i], bodyIsLast);
+			}
+			// Jump to end of match (skipping other cases)
 			jumpToEnds.push(emitJump(Op.JUMP));
-			// Patch the "pattern didn't match" jump to here
+			// Patch the "pattern didn't match" jump to here (next case)
 			patchJump(jumpOverBody);
 		}
 
 		// Default body
 		if (defaultBody != null) {
-			for (s in defaultBody)
-				compileStatement(s, false);
+			for (i in 0...defaultBody.length) {
+				var bodyIsLast = (i == defaultBody.length - 1);
+				compileStatement(defaultBody[i], bodyIsLast);
+			}
+		} else {
+			// No default — push null as the match result when nothing matched
+			emit(Op.LOAD_NULL);
 		}
 
-		// Patch all "jump to end" targets
+		// Patch all "jump to end" targets — everyone lands here with a value on stack
 		for (j in jumpToEnds)
 			patchJump(j);
-
-		// Push null if match is used as expression and no value was produced
-		if (!isLast)
-			emit(Op.LOAD_NULL);
 	}
 
 	function compileFunction(name:String, params:Array<Param>, body:Array<Stmt>, isLambda:Bool, classMethodNames:Map<String, Bool>):FunctionChunk {
@@ -1190,6 +1273,16 @@ class Compiler {
 		currentClassMethodNames = savedClassMethodNames;
 
 		return funcChunk;
+	}
+
+	// Returns true if any direct child statement is SLet or SConst (shallow check).
+	// Used to avoid emitting ENTER/EXIT_SCOPE on blocks that don't need it.
+	static function blockHasLetDecl(stmts:Array<Stmt>):Bool {
+		for (s in stmts) switch (s) {
+			case SLet(_, _, _) | SConst(_, _, _): return true;
+			default:
+		}
+		return false;
 	}
 
 	// String pool management

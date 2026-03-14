@@ -173,6 +173,7 @@ class Interpreter {
 				case VNativeFunction(_, _, _): "function";
 				case VNativeObject(_): "object";
 				case VIterator(_, _): "iterator";
+				case VEnumValue(eName, _, _): eName;
 			});
 		});
 
@@ -583,7 +584,10 @@ class Interpreter {
 							}
 						}
 					} else if (!resolveImportedModule(module)) {
-						__print_ln('Warning: Cant find module that package name: ' + module);
+						// Check if it's already registered as a global native (e.g. Sys, Math)
+						if (!vm.globals.exists(module) && !vm.natives.exists(module)) {
+							__print_ln('Warning: Cant find module that package name: ' + module);
+						}
 					}
 				}
 				// Keep line count stable for diagnostics.
@@ -811,12 +815,22 @@ class Interpreter {
 			throw 'Unable to load script file: ' + normalized;
 		return run(content, normalized);
 	}
-
+	/**
+	 * Reset the VM context — clears globals, reloads built-ins, etc.
+	 * Useful if you want to run multiple scripts in the same process without
+	 * them interfering with each other via globals.
+	 * Note: doesn't reset registered natives since those are meant to be shared.
+	**/
+	public function reset_context() {
+		this.vm = new VM(debug);
+		registerBuiltins();
+	}
 	/**
 	 * Run source code and return result as Haxe Dynamic (auto-converted)
 	 * Makes testing easier: `runDynamic("1 + 2") == 3`
 	 */
 	public function runDynamic(source:String, ?scriptName:String = "script"):Dynamic {
+
 		var result = run(source, scriptName);
 		return vm.valueToHaxe(result);
 	}

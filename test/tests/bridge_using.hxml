@@ -1,4 +1,4 @@
 -cp ../../src
 -cp .
--main NewFeaturesTest2
+-main BridgeAndUsingTest
 --interp

@@ -274,4 +274,10 @@ enum Value {
 	 *         without boxing into a new VIterator each step.
 	 */
 	VIterator(arr:Array<Value>, idx:Array<Int>);
+	/**
+	 * Enum instance: EnumName.VariantName with optional payload values.
+	 *   VEnumValue("Color", "Red", [])
+	 *   VEnumValue("Result", "Ok", [VString("hello")])
+	 */
+	VEnumValue(enumName:String, variant:String, values:Array<Value>);
 }

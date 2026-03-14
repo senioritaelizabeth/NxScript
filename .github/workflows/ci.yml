@@ -19,7 +19,8 @@ jobs:
         with:
           haxe-version: 4.3.7
       - name: Set dev to current lib
-        run: haxe dev nxscript "/home/runner/work/nxscript/nxscript/"
+        run: haxelib dev nxscript $GITHUB_WORKSPACE
+
 
       - name: Run all Tests
         working-directory: test/tests

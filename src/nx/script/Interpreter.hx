@@ -50,6 +50,50 @@ class Interpreter {
 	/** Manually flush all VM internal caches, regardless of gc_kind. */
 	public function gc():Void vm.gc();
 
+	/**
+	 * Run a script function once per native Haxe object — loop executes in Haxe, not in script.
+	 *
+	 * This is the fix for the "10k sprites = 24fps" problem. The script loop:
+	 *
+	 *   while (j < sprites.length) { spr.angle += 120*dt ... j++ }
+	 *
+	 * pays full VM overhead (bytecode fetch, stack ops, LT, JUMP) per iteration.
+	 * With 10k sprites that is ~50k extra VM instructions per frame just for looping.
+	 *
+	 * Migration — instead of the script loop, write a script function:
+	 *
+	 *   func updateSprite(spr, i, dt) {
+	 *       spr.angle += 120 * dt
+	 *       var phase = counter + i
+	 *       spr.x += 60 * dt * sin(phase)
+	 *       spr.y += 30 * dt * cos(phase)
+	 *       spr.color = color
+	 *   }
+	 *
+	 * And call from Haxe each frame:
+	 *
+	 *   var fn = interp.resolveCallable("updateSprite");
+	 *   interp.nativeForEach(sprites, fn, [interp.vm.haxeToValue(dt)]);
+	 *
+	 * The function body still runs in the VM (so reflection overhead remains for
+	 * native field access), but loop overhead is gone — pure Haxe iteration.
+	 */
+	public function nativeForEach(items:Array<Dynamic>, fn:Value, ?extraArgs:Array<Value>):Void
+		vm.nativeForEach(items, fn, extraArgs);
+
+	/** Resolve a script callable by name for repeated host calls. Cache the result. */
+	public function resolveCallable(name:String):Value
+		return vm.resolveCallable(name);
+
+	/** Call a script function by name, returning null on any error instead of throwing. */
+	public function safeCall(name:String, ?args:Array<Value>):Null<Value>
+		return vm.safeCall(name, args);
+
+	/** Enable sandbox mode — blocks filesystem/network natives, limits instructions. */
+	public function enableSandbox(?extraBlocklist:Array<String>):Void
+		vm.enableSandbox(extraBlocklist);
+
+	/** Kept for API compat. Use -D NXDEBUG compile flag for actual debug output. */
 	var debug:Bool = false;
 	var strictByDefault:Bool = false;
 
@@ -467,40 +511,36 @@ class Interpreter {
 			var tokenizer = new Tokenizer(scriptSource);
 			var tokens = tokenizer.tokenize();
 
-			if (debug) {
-				trace("=== TOKENS ===");
-				for (t in tokens) {
-					trace('${t.line}:${t.col} -> ${t.token}');
-				}
-			}
+			#if NXDEBUG
+			trace("=== TOKENS ===");
+			for (t in tokens) trace('${t.line}:${t.col} -> ${t.token}');
+			#end
 
 			// Parse
 			var parser = new Parser(tokens, strictMode);
 			var ast = parser.parse();
 
-			if (debug) {
-				trace("=== AST ===");
-				for (stmt in ast) {
-					trace(stmt);
-				}
-			}
+			#if NXDEBUG
+			trace("=== AST ===");
+			for (stmt in ast) trace(stmt);
+			#end
 
 			// Compile to bytecode
 			var compiler = new Compiler();
 			var chunk = compiler.compile(ast);
 
-			if (debug) {
-				trace("=== BYTECODE ===");
-				disassemble(chunk);
-			}
+			#if NXDEBUG
+			trace("=== BYTECODE ===");
+			disassemble(chunk);
+			#end
 
 			// Execute
 			var result = vm.execute(chunk);
 
-			if (debug) {
-				trace("=== RESULT ===");
-				trace(result);
-			}
+			#if NXDEBUG
+			trace("=== RESULT ===");
+			trace(result);
+			#end
 
 			return result;
 		} catch (e:Dynamic) {
@@ -917,10 +957,6 @@ class Interpreter {
 		return vm.callMethod(name, EMPTY_ARGS);
 	}
 
-	/** Resolve a function once for repeated host->script calls in performance-sensitive loops. */
-	public inline function resolveCallable(name:String):Value {
-		return vm.resolveCallable(name);
-	}
 
 	/** Call a resolved callable with custom arguments. */
 	public inline function callResolved(callee:Value, args:Array<Value>):Value {

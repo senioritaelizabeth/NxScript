@@ -33,6 +33,9 @@ enum Keyword {
 	KTry; // try
 	KCatch; // catch
 	KThrow; // throw
+	KMatch; // match
+	KCase; // case (in match)
+	KDefault; // default (in match)
 }
 
 /**

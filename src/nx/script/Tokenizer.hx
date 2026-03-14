@@ -50,7 +50,10 @@ class Tokenizer {
 		"null" => KNull,
 		"try" => KTry,
 		"catch" => KCatch,
-		"throw" => KThrow
+		"throw" => KThrow,
+		"match" => KMatch,
+		"case" => KCase,
+		"default" => KDefault
 	];
 
 	public function new(input:String) {

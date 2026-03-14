@@ -58,6 +58,7 @@ class Parser {
 			case TKeyword(KContinue): {advance(); SContinue;}
 			case TKeyword(KTry): parseTryCatch();
 			case TKeyword(KThrow): parseThrow();
+			case TKeyword(KMatch): parseMatch();
 			case TLeftBrace: parseBlock();
 			default: SExpr(parseExpression());
 		}
@@ -65,36 +66,64 @@ class Parser {
 
 	function parseLet():Stmt {
 		advance(); // consume 'let'
+		// Destructure: let [a, b] = expr  or  let {x, y} = expr
+		if (check(TLeftBracket)) return parseDestructureArray(false);
+		if (check(TLeftBrace))   return parseDestructureDict(false);
 		var name = expectIdentifier();
 		var type = null;
-
-		if (match(TColon)) {
-			type = parseTypeHint();
-		}
-
+		if (match(TColon)) type = parseTypeHint();
 		var init = null;
-		if (match(TOperator(OAssign))) {
-			init = parseExpression();
-		}
-
+		if (match(TOperator(OAssign))) init = parseExpression();
 		return SLet(name, type, init);
 	}
 
 	function parseVar():Stmt {
 		advance(); // consume 'var'
+		// Destructure: var [a, b] = expr  or  var {x, y} = expr
+		if (check(TLeftBracket)) return parseDestructureArray(true);
+		if (check(TLeftBrace))   return parseDestructureDict(true);
 		var name = expectIdentifier();
 		var type = null;
-
-		if (match(TColon)) {
-			type = parseTypeHint();
-		}
-
+		if (match(TColon)) type = parseTypeHint();
 		var init = null;
-		if (match(TOperator(OAssign))) {
-			init = parseExpression();
-		}
-
+		if (match(TOperator(OAssign))) init = parseExpression();
 		return SVar(name, type, init);
+	}
+
+	function parseDestructureArray(isVar:Bool):Stmt {
+		advance(); // consume [
+		var names:Array<Null<String>> = [];
+		skipNewlines();
+		while (!check(TRightBracket) && !isEOF()) {
+			skipNewlines();
+			if (check(TRightBracket)) break;
+			// _ means skip this element
+			if (check(TIdentifier("_"))) { advance(); names.push(null); }
+			else names.push(expectIdentifier());
+			skipNewlines();
+			if (!match(TComma)) break;
+		}
+		expect(TRightBracket, "Expected ']' in array destructure");
+		expect(TOperator(OAssign), "Expected '=' in destructure declaration");
+		var init = parseExpression();
+		return SDestructureArray(names, init);
+	}
+
+	function parseDestructureDict(isVar:Bool):Stmt {
+		advance(); // consume {
+		var names:Array<String> = [];
+		skipNewlines();
+		while (!check(TRightBrace) && !isEOF()) {
+			skipNewlines();
+			if (check(TRightBrace)) break;
+			names.push(expectIdentifier());
+			skipNewlines();
+			if (!match(TComma)) break;
+		}
+		expect(TRightBrace, "Expected '}' in dict destructure");
+		expect(TOperator(OAssign), "Expected '=' in destructure declaration");
+		var init = parseExpression();
+		return SDestructureDict(names, init);
 	}
 
 	function parseConst():Stmt {
@@ -863,6 +892,100 @@ class Parser {
 
 		expect(TRightBrace, "Expected '}' after dictionary pairs");
 		return EDict(pairs);
+	}
+
+	function parseMatch():Stmt {
+		advance(); // consume 'match'
+		var subject = parseExpression();
+		expect(TLeftBrace, "Expected '{' after match expression");
+		skipSeparators();
+
+		var cases:Array<MatchCase> = [];
+		var defaultBody:Null<Array<Stmt>> = null;
+
+		while (!check(TRightBrace) && !isEOF()) {
+			skipSeparators();
+			if (check(TRightBrace)) break;
+
+			if (match(TKeyword(KDefault))) {
+				// default => body
+				if (!match(TArrow) && !match(TFatArrow))
+					throw 'Expected "=>" after "default" at line ${peek().line}';
+				defaultBody = parseMatchBody();
+			} else {
+				expect(TKeyword(KCase), "Expected 'case' in match block");
+				var pattern = parseMatchPattern();
+				if (!match(TArrow) && !match(TFatArrow))
+					throw 'Expected "=>" after case pattern at line ${peek().line}';
+				var body = parseMatchBody();
+				cases.push({ pattern: pattern, body: body });
+			}
+			skipSeparators();
+		}
+
+		expect(TRightBrace, "Expected '}' after match block");
+		return SMatch(subject, cases, defaultBody);
+	}
+
+	function parseMatchPattern():MatchPattern {
+		var tok = peek();
+		return switch (tok.token) {
+			// Range: 1...5
+			case TNumber(_):
+				var expr = parsePrimary();
+				if (check(TRange)) {
+					advance(); // consume ...
+					var toExpr = parsePrimary();
+					MPRange(expr, toExpr);
+				} else {
+					MPValue(expr);
+				}
+			// String/Bool/Null literals
+			case TString(_) | TBool(_) | TNull:
+				MPValue(parsePrimary());
+			// Negative number: -5
+			case TOperator(OSub):
+				MPValue(parseUnary());
+			// Type name or bind variable
+			case TIdentifier(name):
+				advance();
+				// Type patterns: String, Number, Bool, Null, Array, Dict
+				switch (name) {
+					case "String" | "Number" | "Bool" | "Null" | "Array" | "Dict" | "Function":
+						MPType(name);
+					default:
+						MPBind(name);
+				}
+			// Array destructure: [x, y]
+			case TLeftBracket:
+				advance();
+				var elements:Array<Expr> = [];
+				if (!check(TRightBracket)) {
+					do {
+						skipNewlines();
+						if (check(TRightBracket)) break;
+						elements.push(parseExpression());
+						skipNewlines();
+					} while (match(TComma));
+				}
+				expect(TRightBracket, "Expected ']' after array pattern");
+				MPArray(elements);
+			default:
+				throw 'Unexpected pattern token ${tok.token} at line ${tok.line}';
+		}
+	}
+
+	function parseMatchBody():Array<Stmt> {
+		// Body is either a single-line expression or a { block }
+		if (check(TLeftBrace)) {
+			advance();
+			var stmts = parseBlockBody();
+			expect(TRightBrace, "Expected '}' after match case body");
+			return stmts;
+		} else {
+			var expr = parseExpression();
+			return [SExpr(expr)];
+		}
 	}
 
 	// Helper functions

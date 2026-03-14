@@ -77,11 +77,34 @@ enum Stmt {
 	STryCatch(body:Array<Stmt>, catchVar:String, catchBody:Array<Stmt>);
 	SThrow(expr:Expr);
 
+	// Destructuring declarations
+	// var [a, b, c] = expr   — array destructure
+	SDestructureArray(names:Array<Null<String>>, init:Expr);
+	// var {x, y} = expr      — dict/object destructure
+	SDestructureDict(names:Array<String>, init:Expr);
+
 	// Expression statement
 	SExpr(expr:Expr);
 
 	// Block
 	SBlock(stmts:Array<Stmt>);
+
+	// Pattern matching
+	// match expr { case pattern => body ... default => body }
+	SMatch(subject:Expr, cases:Array<MatchCase>, defaultBody:Null<Array<Stmt>>);
+}
+
+typedef MatchCase = {
+	pattern: MatchPattern,
+	body: Array<Stmt>
+}
+
+enum MatchPattern {
+	MPValue(expr:Expr);              // case 42, case "hello", case true
+	MPRange(from:Expr, to:Expr);     // case 1...5
+	MPType(typeName:String);         // case String, case Number, case Bool, case Null
+	MPArray(elements:Array<Expr>);   // case [x, y]  (destructure)
+	MPBind(name:String);             // case x  (bind to variable)
 }
 
 typedef StmtWithPos = {

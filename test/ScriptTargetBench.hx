@@ -37,7 +37,11 @@ class ScriptTargetBench {
 	static var EMPTY_DYNAMIC_ARGS:Array<Dynamic> = [];
 
 	static function main() {
+		#if sys
 		configureFromArgs(Sys.args());
+		#else
+		configureFromArgs([]);
+		#end
 
 		#if !sys
 		trace("no tenemo sys");

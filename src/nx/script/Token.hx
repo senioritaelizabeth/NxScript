@@ -110,6 +110,7 @@ enum Token {
 	TDot; // .
 	TRange; // ...
 	TArrow; // ->
+	TFatArrow; // =>
 
 	// Special
 	TNewLine;

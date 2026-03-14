@@ -234,6 +234,9 @@ class Parser {
 
 		do {
 			skipNewlines();
+			// Allow trailing comma: if next is ) after comma, stop
+			if (check(TRightParen))
+				break;
 			var name = expectIdentifier();
 			var type = null;
 
@@ -688,6 +691,9 @@ class Parser {
 
 		do {
 			skipNewlines();
+			// Allow trailing comma before )
+			if (check(TRightParen))
+				break;
 			args.push(parseExpression());
 			skipNewlines();
 		} while (match(TComma));
@@ -729,19 +735,32 @@ class Parser {
 
 			case TIdentifier(name):
 				advance();
+				// Shorthand lambda: x => expr  or  x => { stmts }
+				if (check(TFatArrow)) {
+					advance(); // consume =>
+					if (check(TLeftBrace)) {
+						advance();
+						var body = parseBlockBody();
+						expect(TRightBrace, "Expected '}' after lambda body");
+						return ELambda([{name: name, type: null}], Right(body));
+					} else {
+						var expr = parseExpression();
+						return ELambda([{name: name, type: null}], Left(expr));
+					}
+				}
 				EIdentifier(name);
 
 			case TLeftParen:
 				advance();
 				// Could be grouped expression or lambda
-				// Look ahead to detect lambda: () -> or (id) -> or (id, id) ->
+				// Look ahead to detect lambda: () -> or (id) -> or (id, id) ->  (also =>)
 				var savedPos = pos;
 				var isLambda = false;
 
 				if (check(TRightParen)) {
 					// Could be () -> ...
 					advance(); // skip )
-					if (check(TArrow)) {
+					if (check(TArrow) || check(TFatArrow)) {
 						isLambda = true;
 					}
 				} else if (isIdentifier()) {
@@ -756,7 +775,7 @@ class Parser {
 					}
 					if (check(TRightParen)) {
 						advance();
-						if (check(TArrow)) {
+						if (check(TArrow) || check(TFatArrow)) {
 							isLambda = true;
 						}
 					}
@@ -788,7 +807,9 @@ class Parser {
 		expect(TLeftParen, "Expected '(' for lambda");
 		var params = parseParameters();
 		expect(TRightParen, "Expected ')' after lambda parameters");
-		expect(TArrow, "Expected '->' for lambda");
+		// Support both -> and => as lambda arrow
+		if (!match(TArrow) && !match(TFatArrow))
+			throw 'Expected "->" or "=>" for lambda at line ${peek().line}, col ${peek().col}';
 
 		if (check(TLeftBrace)) {
 			advance();
@@ -809,6 +830,9 @@ class Parser {
 		if (!check(TRightBracket)) {
 			do {
 				skipNewlines();
+				// Allow trailing comma before ]
+				if (check(TRightBracket))
+					break;
 				elements.push(parseExpression());
 				skipNewlines();
 			} while (match(TComma));
@@ -826,6 +850,9 @@ class Parser {
 		if (!check(TRightBrace)) {
 			do {
 				skipNewlines();
+				// Allow trailing comma before }
+				if (check(TRightBrace))
+					break;
 				var key = parseExpression();
 				expect(TColon, "Expected ':' after dictionary key");
 				var value = parseExpression();

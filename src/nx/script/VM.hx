@@ -61,6 +61,26 @@ class VM {
 	/** Maximum call depth before the VM throws. Default 10,000. Set <= 0 to disable this guard. */
 	public var maxCallDepth:Int = 10000;
 
+	/**
+	 * Controls how aggressively the VM reclaims internal caches between script executions.
+	 *
+	 *   AGGRESSIVE  — Clears all caches (arrayMethodCache, instanceMethodCache, nativeArgBuffers,
+	 *                 _typeNameCache) on every execute() call. Minimises memory at the cost of
+	 *                 re-warming caches on each run. Best for short-lived scripts or tight memory.
+	 *
+	 *   SOFT        — Clears caches only when the number of tracked objects exceeds a threshold
+	 *                 (default 512). Good balance for long-running hosts that re-run scripts often.
+	 *
+	 *   VERY_SOFT   — Never proactively clears caches; relies entirely on the host GC. Maximum
+	 *                 throughput for hot re-execution loops where the same objects are reused.
+	 *
+	 * Default: SOFT.
+	 */
+	public var gc_kind:GcKind = SOFT;
+
+	/** Object count threshold used by SOFT mode before flushing caches. Default: 512. */
+	public var gc_softThreshold:Int = 512;
+
 	var catchStack:Array<CatchHandler> = [];
 	var globalSlotValues:Array<Value>;
 	var globalSlotNames:Array<String>;
@@ -121,8 +141,7 @@ class VM {
 		sp = 0;
 		frames = [];
 		catchStack = [];
-		arrayMethodCache = new ObjectMap();
-		instanceMethodCache = new ObjectMap();
+		applyGcPolicy();
 		bindGlobalSlots(chunk);
 
 		if (chunk.code == null)
@@ -1558,7 +1577,26 @@ class VM {
 				getArrayMethod(arr, field);
 
 			case VDict(map):
-				map.exists(field) ? map.get(field) : VNull;
+				// Dict methods
+				switch (field) {
+					case "keys":   return VNativeFunction("keys",   0, (_) -> VArray([for (k in map.keys()) VString(k)]));
+					case "values": return VNativeFunction("values", 0, (_) -> VArray([for (k in map.keys()) map.get(k)]));
+					case "has":    return VNativeFunction("has",    1, (args) -> switch (args[0]) {
+						case VString(k): VBool(map.exists(k));
+						default: throw 'has expects a string key';
+					});
+					case "remove": return VNativeFunction("remove", 1, (args) -> switch (args[0]) {
+						case VString(k): VBool(map.remove(k));
+						default: throw 'remove expects a string key';
+					});
+					case "size":   return VNativeFunction("size",   0, (_) -> VNumber(Lambda.count(map)));
+					case "set":    return VNativeFunction("set",    2, (args) -> {
+						var k = switch (args[0]) { case VString(s): s; default: throw 'set expects string key'; };
+						map.set(k, args[1]);
+						VNull;
+					});
+					default: map.exists(field) ? map.get(field) : VNull;
+				};
 
 			case VInstance(className, fields, classData):
 				// instance fields first
@@ -1874,6 +1912,48 @@ class VM {
 					default: throw 'Expected string';
 				});
 
+			// Search extras
+			case "startsWith": VNativeFunction("startsWith", 1, (args) -> switch (args[0]) {
+					case VString(prefix): VBool(s.length >= prefix.length && s.substr(0, prefix.length) == prefix);
+					default: throw 'Expected string';
+				});
+			case "endsWith": VNativeFunction("endsWith", 1, (args) -> switch (args[0]) {
+					case VString(suffix): VBool(s.length >= suffix.length && s.substr(s.length - suffix.length) == suffix);
+					default: throw 'Expected string';
+				});
+
+			// Modification
+			case "replace": VNativeFunction("replace", 2, (args) -> {
+					var from = switch (args[0]) { case VString(x): x; default: throw 'Expected string'; };
+					var to   = switch (args[1]) { case VString(x): x; default: throw 'Expected string'; };
+					VString(StringTools.replace(s, from, to));
+				});
+			case "repeat": VNativeFunction("repeat", 1, (args) -> switch (args[0]) {
+					case VNumber(n):
+						var count = Std.int(n);
+						if (count < 0) throw 'repeat count must be >= 0';
+						var sb = new StringBuf();
+						for (_ in 0...count) sb.add(s);
+						VString(sb.toString());
+					default: throw 'Expected number';
+				});
+			case "padStart": VNativeFunction("padStart", 2, (args) -> {
+					var len = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'Expected number'; };
+					var pad = switch (args[1]) { case VString(x): x; default: " "; };
+					if (pad.length == 0) pad = " ";
+					var result = s;
+					while (result.length < len) result = pad + result;
+					VString(result.substr(result.length - Std.int(Math.max(len, s.length))));
+				});
+			case "padEnd": VNativeFunction("padEnd", 2, (args) -> {
+					var len = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'Expected number'; };
+					var pad = switch (args[1]) { case VString(x): x; default: " "; };
+					if (pad.length == 0) pad = " ";
+					var result = s;
+					while (result.length < len) result = result + pad;
+					VString(result.substr(0, Std.int(Math.max(len, s.length))));
+				});
+
 			default: throw 'Unknown String method: $method';
 		}
 	}
@@ -1941,7 +2021,93 @@ class VM {
 					VString(parts.join(delim));
 				});
 
-			default: throw 'Unknown Array method: $method';
+			// Higher-order
+		case "map": VNativeFunction("map", 1, (args) -> {
+				var fn = args[0];
+				VArray([for (item in arr) callResolved(fn, [item])]);
+			});
+		case "filter": VNativeFunction("filter", 1, (args) -> {
+				var fn = args[0];
+				VArray([for (item in arr) if (isTruthy(callResolved(fn, [item]))) item]);
+			});
+		case "reduce": VNativeFunction("reduce", 2, (args) -> {
+				var fn = args[0];
+				var acc = args[1];
+				for (item in arr) acc = callResolved(fn, [acc, item]);
+				acc;
+			});
+		case "forEach": VNativeFunction("forEach", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) callResolved(fn, [item]);
+				VNull;
+			});
+		case "find": VNativeFunction("find", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) if (isTruthy(callResolved(fn, [item]))) return item;
+				VNull;
+			});
+		case "findIndex": VNativeFunction("findIndex", 1, (args) -> {
+				var fn = args[0];
+				for (i in 0...arr.length) if (isTruthy(callResolved(fn, [arr[i]]))) return VNumber(i);
+				VNumber(-1);
+			});
+		case "every": VNativeFunction("every", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) if (!isTruthy(callResolved(fn, [item]))) return VBool(false);
+				VBool(true);
+			});
+		case "some": VNativeFunction("some", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) if (isTruthy(callResolved(fn, [item]))) return VBool(true);
+				VBool(false);
+			});
+
+		// Slicing / copying
+		case "slice": VNativeFunction("slice", 2, (args) -> {
+				var start = switch (args[0]) { case VNumber(n): Std.int(n); default: 0; };
+				var end_  = switch (args[1]) { case VNumber(n): Std.int(n); case VNull: arr.length; default: arr.length; };
+				if (start < 0) start = Std.int(Math.max(0, arr.length + start));
+				if (end_  < 0) end_  = Std.int(Math.max(0, arr.length + end_));
+				VArray(arr.slice(start, end_));
+			});
+		case "concat": VNativeFunction("concat", 1, (args) -> {
+				switch (args[0]) {
+					case VArray(other): VArray(arr.concat(other));
+					default: throw 'concat expects an array';
+				}
+			});
+		case "flat": VNativeFunction("flat", 0, (_) -> {
+				var result:Array<Value> = [];
+				for (item in arr) switch (item) {
+					case VArray(inner): for (v in inner) result.push(v);
+					default: result.push(item);
+				}
+				VArray(result);
+			});
+		case "copy": VNativeFunction("copy", 0, (_) -> VArray(arr.copy()));
+
+		// Sorting
+		case "sort": VNativeFunction("sort", 1, (args) -> {
+				var fn = args[0];
+				var sorted = arr.copy();
+				sorted.sort((a, b) -> {
+					switch (callResolved(fn, [a, b])) {
+						case VNumber(n): Std.int(n);
+						case VBool(true): 1;
+						case VBool(false): -1;
+						default: 0;
+					}
+				});
+				VArray(sorted);
+			});
+		case "sortBy": VNativeFunction("sortBy", 1, (args) -> {
+				var keyFn = args[0];
+				var sorted = arr.copy();
+				sorted.sort((a, b) -> compare(callResolved(keyFn, [a]), callResolved(keyFn, [b])));
+				VArray(sorted);
+			});
+
+		default: throw 'Unknown Array method: $method';
 		}
 
 		if (cachedMethods == null) {
@@ -2018,6 +2184,45 @@ class VM {
 		if (func == null)
 			throw 'Undefined function: $name';
 		return func;
+	}
+
+	/**
+	 * Applies the current gc_kind policy.
+	 * Called automatically at the start of every execute().
+	 * You can also call gc() manually at any time to force a flush.
+	 */
+	function applyGcPolicy():Void {
+		switch (gc_kind) {
+			case AGGRESSIVE:
+				flushCaches();
+			case SOFT:
+				// Count tracked objects across both caches
+				var count = 0;
+				for (_ in arrayMethodCache.keys()) count++;
+				for (_ in instanceMethodCache.keys()) count++;
+				if (count >= gc_softThreshold)
+					flushCaches();
+			case VERY_SOFT:
+				// Never flush — trust the host GC entirely.
+				// Still allocate fresh caches on first execute if null.
+				if (arrayMethodCache == null)    arrayMethodCache    = new ObjectMap();
+				if (instanceMethodCache == null) instanceMethodCache = new ObjectMap();
+		}
+	}
+
+	/**
+	 * Manually flushes all internal VM caches, regardless of gc_kind.
+	 * Useful after a large batch of script executions to let the GC reclaim memory.
+	 */
+	public function gc():Void {
+		flushCaches();
+	}
+
+	inline function flushCaches():Void {
+		arrayMethodCache    = new ObjectMap();
+		instanceMethodCache = new ObjectMap();
+		nativeArgBuffers    = new Map();
+		_typeNameCache      = new haxe.ds.ObjectMap();
 	}
 
 	function bindGlobalSlots(chunk:Chunk):Void {
@@ -2111,6 +2316,79 @@ class VM {
 			}
 			return VString(typeName);
 		}));
+
+		// print / println
+		natives.set("print", VNativeFunction("print", -1, (args) -> {
+			var parts = [for (a in args) valueToString(a)];
+			trace(parts.join(" "));
+			VNull;
+		}));
+		natives.set("println", VNativeFunction("println", -1, (args) -> {
+			var parts = [for (a in args) valueToString(a)];
+			trace(parts.join(" "));
+			VNull;
+		}));
+
+		// range(n) -> [0..n-1],  range(from, to) -> [from..to-1]
+		natives.set("range", VNativeFunction("range", -1, (args) -> {
+			var from = 0;
+			var to = 0;
+			if (args.length == 1) {
+				to = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'range expects numbers'; };
+			} else if (args.length == 2) {
+				from = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'range expects numbers'; };
+				to   = switch (args[1]) { case VNumber(n): Std.int(n); default: throw 'range expects numbers'; };
+			} else {
+				throw 'range expects 1 or 2 arguments';
+			}
+			VArray([for (i in from...to) VNumber(i)]);
+		}));
+
+		// keys(dict) / values(dict) — global convenience wrappers
+		natives.set("keys", VNativeFunction("keys", 1, (args) -> switch (args[0]) {
+			case VDict(map): VArray([for (k in map.keys()) VString(k)]);
+			default: throw 'keys() expects a dict';
+		}));
+		natives.set("values", VNativeFunction("values", 1, (args) -> switch (args[0]) {
+			case VDict(map): VArray([for (k in map.keys()) map.get(k)]);
+			default: throw 'values() expects a dict';
+		}));
+
+		// str(x) — explicit to-string
+		natives.set("str", VNativeFunction("str", 1, (args) -> VString(valueToString(args[0]))));
+
+		// int(x) / float(x) — explicit numeric conversions
+		natives.set("int", VNativeFunction("int", 1, (args) -> switch (args[0]) {
+			case VNumber(n): VNumber(Math.floor(n));
+			case VString(s): var n = Std.parseInt(s); VNumber(n != null ? n : 0);
+			case VBool(b): VNumber(b ? 1 : 0);
+			default: VNumber(0);
+		}));
+		natives.set("float", VNativeFunction("float", 1, (args) -> switch (args[0]) {
+			case VNumber(n): VNumber(n);
+			case VString(s): VNumber(Std.parseFloat(s));
+			case VBool(b): VNumber(b ? 1.0 : 0.0);
+			default: VNumber(0.0);
+		}));
+
+		// math constants
+		natives.set("PI",  VNumber(Math.PI));
+		natives.set("INF", VNumber(Math.POSITIVE_INFINITY));
+		natives.set("NAN", VNumber(Math.NaN));
+
+		// math functions
+		natives.set("abs",   VNativeFunction("abs",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.abs(n));   default: throw 'Expected number'; }));
+		natives.set("floor", VNativeFunction("floor", 1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.floor(n)); default: throw 'Expected number'; }));
+		natives.set("ceil",  VNativeFunction("ceil",  1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.ceil(n));  default: throw 'Expected number'; }));
+		natives.set("round", VNativeFunction("round", 1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.round(n)); default: throw 'Expected number'; }));
+		natives.set("sqrt",  VNativeFunction("sqrt",  1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.sqrt(n));  default: throw 'Expected number'; }));
+		natives.set("pow",   VNativeFunction("pow",   2, (args) -> switch [args[0], args[1]] { case [VNumber(a), VNumber(b)]: VNumber(Math.pow(a, b)); default: throw 'Expected numbers'; }));
+		natives.set("min",   VNativeFunction("min",   2, (args) -> switch [args[0], args[1]] { case [VNumber(a), VNumber(b)]: VNumber(Math.min(a, b)); default: throw 'Expected numbers'; }));
+		natives.set("max",   VNativeFunction("max",   2, (args) -> switch [args[0], args[1]] { case [VNumber(a), VNumber(b)]: VNumber(Math.max(a, b)); default: throw 'Expected numbers'; }));
+		natives.set("random", VNativeFunction("random", 0, (_) -> VNumber(Math.random())));
+		natives.set("sin",   VNativeFunction("sin",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.sin(n));   default: throw 'Expected number'; }));
+		natives.set("cos",   VNativeFunction("cos",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.cos(n));   default: throw 'Expected number'; }));
+		natives.set("tan",   VNativeFunction("tan",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.tan(n));   default: throw 'Expected number'; }));
 	}
 }
 
@@ -2148,4 +2426,17 @@ class ScriptException {
 	public function new(v:Value) {
 		value = v;
 	}
+}
+
+/**
+ * Controls how aggressively the VM flushes its internal object caches.
+ * See VM.gc_kind for full documentation.
+ */
+enum GcKind {
+	/** Flush all caches on every execute() call. Lowest memory, highest re-warm cost. */
+	AGGRESSIVE;
+	/** Flush caches when tracked object count exceeds the soft threshold (default 512). */
+	SOFT;
+	/** Never flush caches proactively. Maximum throughput for hot re-execution. */
+	VERY_SOFT;
 }

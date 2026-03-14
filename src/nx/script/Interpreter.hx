@@ -37,6 +37,19 @@ class Interpreter {
 	@:deprecated("Use 'natives' instead")
 	public var methods(get, never):Map<String, Value>;
 
+	/** Controls VM cache flushing strategy. See GcKind for options. Default: SOFT. */
+	public var gc_kind(get, set):GcKind;
+	inline function get_gc_kind():GcKind return vm.gc_kind;
+	inline function set_gc_kind(v:GcKind):GcKind { vm.gc_kind = v; return v; }
+
+	/** Object count threshold used in SOFT gc mode before flushing caches. Default: 512. */
+	public var gc_softThreshold(get, set):Int;
+	inline function get_gc_softThreshold():Int return vm.gc_softThreshold;
+	inline function set_gc_softThreshold(v:Int):Int { vm.gc_softThreshold = v; return v; }
+
+	/** Manually flush all VM internal caches, regardless of gc_kind. */
+	public function gc():Void vm.gc();
+
 	var debug:Bool = false;
 	var strictByDefault:Bool = false;
 
@@ -310,28 +323,20 @@ class Interpreter {
 			}
 		});
 
-		register("range", 2, function(args:Array<Value>):Value {
-			var start = switch (args[0]) {
-				case VNumber(n): Std.int(n);
-				default: throw "range(start, end) expects numbers";
-			}
-			var end = switch (args[1]) {
-				case VNumber(n): Std.int(n);
-				default: throw "range(start, end) expects numbers";
-			}
-			var out:Array<Value> = [];
-			if (start <= end) {
-				for (i in start...end)
-					out.push(VNumber(i));
+		// range: variadic — range(n) -> [0..n-1], range(from, to) -> [from..to-1]
+		vm.natives.set("range", VNativeFunction("range", -1, function(args:Array<Value>):Value {
+			var from = 0;
+			var to = 0;
+			if (args.length == 1) {
+				to = switch (args[0]) { case VNumber(n): Std.int(n); default: throw "range expects a number"; };
+			} else if (args.length == 2) {
+				from = switch (args[0]) { case VNumber(n): Std.int(n); default: throw "range expects numbers"; };
+				to   = switch (args[1]) { case VNumber(n): Std.int(n); default: throw "range expects numbers"; };
 			} else {
-				var i = start;
-				while (i > end) {
-					out.push(VNumber(i));
-					i--;
-				}
+				throw "range expects 1 or 2 arguments";
 			}
-			return VArray(out);
-		});
+			return VArray([for (i in from...to) VNumber(i)]);
+		}));
 
 		register("contains", 2, function(args:Array<Value>):Value {
 			return switch (args[0]) {
@@ -500,11 +505,17 @@ class Interpreter {
 			return result;
 		} catch (e:Dynamic) {
 			var pretty = formatPrettyError(Std.string(e), source, scriptName);
-			Sys.println(pretty);
+			__print_ln(pretty);
 			throw pretty;
 		}
 	}
-
+	static function __print_ln(s:String):Void {
+		#if sys
+		Sys.println(s);
+		#else
+		trace(s);
+		#end
+	}
 	function preprocessImports(source:String, scriptName:String, ?visited:Map<String, Bool>):{source:String} {
 		if (visited == null)
 			visited = new Map<String, Bool>();
@@ -528,11 +539,11 @@ class Interpreter {
 								out.push("");
 								out.push(nested.source);
 							} else {
-								Sys.println('Warning: Cant load script import: ' + module + ' (resolved: ' + importPath + ')');
+								__print_ln('Warning: Cant load script import: ' + module + ' (resolved: ' + importPath + ')');
 							}
 						}
 					} else if (!resolveImportedModule(module)) {
-						Sys.println('Warning: Cant find module that package name: ' + module);
+						__print_ln('Warning: Cant find module that package name: ' + module);
 					}
 				}
 				// Keep line count stable for diagnostics.

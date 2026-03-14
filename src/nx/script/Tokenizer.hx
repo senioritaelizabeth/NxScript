@@ -17,6 +17,8 @@ class Tokenizer {
 	var pos:Int = 0;
 	var line:Int = 1;
 	var col:Int = 1;
+	// Queue for multi-token emissions (template string interpolation)
+	var pendingTokens:Array<TokenPos> = [];
 
 	static var keywords = [
 		"let" => KLet,
@@ -58,7 +60,14 @@ class Tokenizer {
 	public function tokenize():Array<TokenPos> {
 		var tokens:Array<TokenPos> = [];
 
-		while (!isEOF()) {
+		while (!isEOF() || pendingTokens.length > 0) {
+			// Drain any tokens queued by template string expansion
+			if (pendingTokens.length > 0) {
+				for (t in pendingTokens) tokens.push(t);
+				pendingTokens = [];
+				continue;
+			}
+
 			skipWhitespaceExceptNewline();
 
 			if (isEOF())
@@ -68,7 +77,12 @@ class Tokenizer {
 			var startCol = col;
 			var token = nextToken();
 
-			if (token != null) {
+			if (pendingTokens.length > 0) {
+				// Template string emitted multiple tokens — first was already pushed via pending
+				var allPending = pendingTokens.copy();
+				pendingTokens = [];
+				for (t in allPending) tokens.push(t);
+			} else if (token != null) {
 				tokens.push({token: token, line: startLine, col: startCol});
 			}
 		}
@@ -108,6 +122,10 @@ class Tokenizer {
 		// Strings
 		if (c == '"' || c == "'") {
 			return readString();
+		}
+		if (c == '`') {
+			readTemplateString();
+			return null;
 		}
 
 		// Numbers
@@ -192,6 +210,98 @@ class Tokenizer {
 
 		advance(); // closing quote
 		return TString(value);
+	}
+
+	/**
+	 * Template strings: `Hello ${name}, you are ${age} years old!`
+	 * Expands into a sequence of tokens representing string concatenation.
+	 * e.g.:  TString("Hello ") TOperator(OAdd) TIdentifier("name") TOperator(OAdd) TString(", you are ") ...
+	 */
+	function readTemplateString():Void {
+		advance(); // consume opening `
+		var startLine = line;
+		var startCol  = col;
+
+		var parts:Array<TokenPos> = [];
+		var hasContent = false;
+
+		inline function pushStr(s:String, l:Int, c:Int) {
+			if (s.length > 0) {
+				if (hasContent) parts.push({token: TOperator(OAdd), line: l, col: c});
+				parts.push({token: TString(s), line: l, col: c});
+				hasContent = true;
+			}
+		}
+
+		var literal = new StringBuf();
+		var litLine = line; var litCol = col;
+
+		while (!isEOF() && peek() != '`') {
+			if (peek() == '$' && peekNext() == '{') {
+				// Flush accumulated literal
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // $
+				advance(); // {
+				// Tokenize until matching }
+				var depth = 1;
+				var exprStart = pos;
+				var exprTokens:Array<TokenPos> = [];
+				var innerizer = new Tokenizer(input.substring(exprStart));
+				// We need the raw sub-tokenizer — but since we share pos/line/col
+				// we instead walk manually and collect chars
+				var exprBuf = new StringBuf();
+				while (!isEOF() && depth > 0) {
+					var c = peek();
+					if (c == '{') depth++;
+					else if (c == '}') { depth--; if (depth == 0) { advance(); break; } }
+					if (c == '\n') { line++; col = 0; }
+					exprBuf.add(advance());
+				}
+				// Re-tokenize the expression fragment
+				var exprStr = exprBuf.toString();
+				var subTok = new Tokenizer(exprStr);
+				var subTokens = subTok.tokenize();
+				// subTokens ends with EOF — strip it
+				if (subTokens.length > 1) {
+					var exprToks = subTokens.slice(0, subTokens.length - 1);
+					// Wrap in parens: TLeftParen, ...expr..., TRightParen
+					if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+					parts.push({token: TLeftParen, line: line, col: col});
+					for (t in exprToks) parts.push(t);
+					parts.push({token: TRightParen, line: line, col: col});
+					hasContent = true;
+				}
+				litLine = line; litCol = col;
+			} else if (peek() == '\\') {
+				advance();
+				if (!isEOF()) {
+					switch (advance()) {
+						case 'n': literal.add('\n');
+						case 't': literal.add('\t');
+						case 'r': literal.add('\r');
+						case '\\': literal.add('\\');
+						case '`': literal.add('`');
+						case c: literal.add(c);
+					}
+				}
+			} else {
+				if (peek() == '\n') { line++; col = 0; }
+				literal.add(advance());
+			}
+		}
+
+		if (!isEOF()) advance(); // consume closing `
+
+		// Flush remaining literal
+		pushStr(literal.toString(), litLine, litCol);
+
+		// If empty template string
+		if (parts.length == 0) {
+			pendingTokens.push({token: TString(""), line: startLine, col: startCol});
+		} else {
+			for (p in parts) pendingTokens.push(p);
+		}
 	}
 
 	function readNumber():Token {
@@ -322,6 +432,10 @@ class Tokenizer {
 				if (peek() == '=') {
 					advance();
 					return TOperator(OEqual);
+				}
+				if (peek() == '>') {
+					advance();
+					return TFatArrow;
 				}
 				return TOperator(OAssign);
 

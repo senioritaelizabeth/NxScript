@@ -1,4 +1,44 @@
+# Changelog 0.2.4 (2026-03-13)
+
+### Added
+
+**Syntax**
+- **Trailing commas** — now allowed in function parameters, call arguments, array literals, and dict literals. `[1, 2, 3,]`, `f(a, b,)`, `{"k": v,}` all parse cleanly.
+- **Shorthand lambda `=>`** — single-arg lambdas no longer require parentheses: `x => x * 2`. Multi-arg form `(a, b) => a + b` also supported. `=>` accepted everywhere `->` was, including block bodies `x => { ... }`.
+- **Template strings** — backtick strings with `${}` interpolation: `` `Hello ${name}, result is ${a + b}` ``. Expressions inside `${}` are fully re-tokenized and evaluated at runtime. Escape sequences (`\n`, `\t`, `\\`, `` \` ``) supported.
+
+**Array methods** — `map`, `filter`, `reduce`, `forEach`, `find`, `findIndex`, `every`, `some`, `slice`, `concat`, `flat`, `copy`, `sort`, `sortBy`
+
+**String methods** — `startsWith`, `endsWith`, `replace`, `repeat`, `padStart`, `padEnd`
+
+**Dict methods** — `.keys()`, `.values()`, `.has(k)`, `.remove(k)`, `.set(k, v)`, `.size()`
+
+**Global natives**
+- `print(...) / println(...)` — variadic trace wrappers
+- `range(n)` → `[0..n-1]`,  `range(from, to)` → `[from..to-1]`
+- `str(x)`, `int(x)`, `float(x)` — explicit type conversions
+- `keys(dict)`, `values(dict)` — global convenience wrappers
+- Math: `abs`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `min`, `max`, `random`, `sin`, `cos`, `tan`
+- Constants: `PI`, `INF`, `NAN`
+
+**GC control** — `GcKind` enum with three modes configurable via `interp.gc_kind`:
+- `AGGRESSIVE` — flush all internal VM caches on every `execute()`. Lowest memory footprint.
+- `SOFT` — flush caches when tracked object count exceeds `interp.gc_softThreshold` (default 512). Balanced default.
+- `VERY_SOFT` — never flush proactively; trust the host runtime GC. Max throughput for hot re-execution.
+- `interp.gc()` — manual flush at any time regardless of mode.
+
+> Note: GC control manages VM-internal caches (`arrayMethodCache`, `instanceMethodCache`, `nativeArgBuffers`, `_typeNameCache`). Releasing these allows the host runtime GC to reclaim objects. Direct GC cycle triggering is not available from Haxe userland on most targets.
+
+### Fixed
+- `range(n)` (single-arg) now works correctly — the old `Interpreter` registration hardcoded arity 2 and overwrote the variadic VM version.
+
+### Tests
+- Added `TodoFeaturesTest.hx` covering all features above (61 assertions across 8 sections).
+
+---
+
 # Changelog 0.2.3.1 (2026-03-11)
+
 ### Added
 - NativeReflection module (`NxReflect`, `CppReflect`, `HlReflect`, `JsReflect`) for platform-optimized native object access.
 - VM optimization: per-class method cache, no try/catch, direct native access for get/set/callMethod/isFunction.

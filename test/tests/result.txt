@@ -1,0 +1,2884 @@
+johanna@fedora:~/Documents/GitHub/NxScript/test/tests$ haxe new_features2.hxml -D NXDEBUG > "r.txt"
+
+NewFeaturesTest2.hx:35: ========================================
+NewFeaturesTest2.hx:36: NEW FEATURES TEST 2
+NewFeaturesTest2.hx:37: ========================================
+
+NewFeaturesTest2.hx:45: 1. Trailing commas
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(EArray([ENumber(<...>),ENumber(<...>),ENumber(<...>)]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 3
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x70 MAKE_ARRAY 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x72 GET_MEMBER 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ trailing comma in array literal
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KFunc)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TIdentifier(f)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TKeyword(KReturn)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 1:28 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 1:30 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(f)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TNumber(10)
+../../src/nx/script/Interpreter.hx:516: 2:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TNumber(20)
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:11 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SFunc(f,[{name: a, type: null},{name: b, type: null}],null,[SReturn(EBinary(OAdd,EIdentifier(<...>),EIdentifier(<...>)))])}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EIdentifier(f),[ENumber(10),ENumber(20)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(10)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(20)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x62 MAKE_FUNC 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x60 CALL 2
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: f
+../../src/nx/script/Interpreter.hx:1079:   Params: a, b
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(30)
+NewFeaturesTest2.hx:27:   ✓ trailing comma in params and call
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(x)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TString(y)
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TString(x)
+../../src/nx/script/Interpreter.hx:516: 2:6 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:11 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 2:12 -> TString(y)
+../../src/nx/script/Interpreter.hx:516: 2:15 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 2:16 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(EBinary(OAdd,EIndex(EIdentifier(d),EString(x)),EIndex(EIdentifier(d),EString(y))))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 6
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(x)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(y)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [4] VString(x)
+../../src/nx/script/Interpreter.hx:1064:   [5] VString(y)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 15
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x71 MAKE_DICT 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [12] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [13] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [14] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ trailing comma in dict literal
+NewFeaturesTest2.hx:59: 
+2. Shorthand lambda =>
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(double)
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TOperator(OMul)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(double)
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TNumber(7)
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(double,null,ELambda([{name: x, type: null}],Left(EBinary(OMul,EIdentifier(<...>),ENumber(<...>)))))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EIdentifier(double),[ENumber(7)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(7)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 7
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x12 MUL
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(14)
+NewFeaturesTest2.hx:27:   ✓ x => expr
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(add)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(add)
+../../src/nx/script/Interpreter.hx:516: 2:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:5 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 2:6 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(add,null,ELambda([{name: a, type: null},{name: b, type: null}],Left(EBinary(OAdd,EIdentifier(<...>),EIdentifier(<...>)))))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EIdentifier(add),[ENumber(3),ENumber(4)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(4)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x60 CALL 2
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: a, b
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(7)
+NewFeaturesTest2.hx:27:   ✓ (a, b) => expr
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(greet)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(name)
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TKeyword(KReturn)
+../../src/nx/script/Interpreter.hx:516: 1:30 -> TString(Hello )
+../../src/nx/script/Interpreter.hx:516: 1:39 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 1:41 -> TIdentifier(name)
+../../src/nx/script/Interpreter.hx:516: 1:46 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:47 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(greet)
+../../src/nx/script/Interpreter.hx:516: 2:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TString(World)
+../../src/nx/script/Interpreter.hx:516: 2:14 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:15 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(greet,null,ELambda([{name: name, type: null}],Right([SReturn(<...>)])))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EIdentifier(greet),[EString(World)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(World)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 7
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: name
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(Hello )
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(Hello World)
+NewFeaturesTest2.hx:27:   ✓ x => { block }
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(filter)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TOperator(OGreater)
+../../src/nx/script/Interpreter.hx:516: 1:29 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:30 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:38 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(ECall(EMember(EArray(<...>),filter),[ELambda(<...>,<...>)]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "filter"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 5
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(5)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 10
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x70 MAKE_ARRAY 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x33 GT
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ => passed to filter
+NewFeaturesTest2.hx:76: 
+3. Template strings
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TString(no interpolation)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 2, stmt: SExpr(EString(no interpolation))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(no interpolation)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 2
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(no interpolation)
+NewFeaturesTest2.hx:27:   ✓ plain template string
+NewFeaturesTest2.hx:90: 
+4. Array methods
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TIdentifier(map)
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TOperator(OMul)
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EIndex(ECall(EMember(EArray(<...>),map),[ELambda(<...>,<...>)]),ENumber(2)))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "map"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(2)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 9
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x70 MAKE_ARRAY 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x12 MUL
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(6)
+NewFeaturesTest2.hx:27:   ✓ map
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TNumber(6)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(filter)
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:29 -> TOperator(OMod)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:33 -> TOperator(OEqual)
+../../src/nx/script/Interpreter.hx:516: 1:36 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:37 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:38 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:39 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:45 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(ECall(EMember(EArray(<...>),filter),[ELambda(<...>,<...>)]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "filter"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 6
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(5)
+../../src/nx/script/Interpreter.hx:1064:   [5] VNumber(6)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 11
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x70 MAKE_ARRAY 6
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x14 MOD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ filter
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(reduce)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TIdentifier(acc)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:29 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TIdentifier(acc)
+../../src/nx/script/Interpreter.hx:516: 1:36 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 1:38 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:39 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:41 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:42 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:43 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EArray([<...>,<...>,<...>,<...>,<...>]),reduce),[ELambda([<...>,<...>],Left(<...>)),ENumber(0)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "reduce"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 6
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(5)
+../../src/nx/script/Interpreter.hx:1064:   [5] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 10
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x70 MAKE_ARRAY 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: acc, x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(15)
+NewFeaturesTest2.hx:27:   ✓ reduce
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(s)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TNumber(10)
+../../src/nx/script/Interpreter.hx:516: 2:4 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:5 -> TNumber(20)
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TNumber(30)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 2:11 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:12 -> TIdentifier(forEach)
+../../src/nx/script/Interpreter.hx:516: 2:19 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:20 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 2:22 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 2:25 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 2:27 -> TIdentifier(s)
+../../src/nx/script/Interpreter.hx:516: 2:29 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 2:31 -> TIdentifier(s)
+../../src/nx/script/Interpreter.hx:516: 2:33 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 2:35 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 2:37 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 2:38 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:39 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 3:1 -> TIdentifier(s)
+../../src/nx/script/Interpreter.hx:516: 3:2 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(s,null,ENumber(0))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EMember(EArray([<...>,<...>,<...>]),forEach),[ELambda([<...>],Right(<...>))]))}
+../../src/nx/script/Interpreter.hx:525: {line: 3, col: 1, stmt: SExpr(EIdentifier(s))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "forEach"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(0)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(10)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(20)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(30)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 12
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x70 MAKE_ARRAY 3
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 7
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(60)
+NewFeaturesTest2.hx:27:   ✓ forEach
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(8)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(9)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(find)
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TOperator(OMod)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:29 -> TOperator(OEqual)
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:33 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:34 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EArray([<...>,<...>,<...>,<...>,<...>]),find),[ELambda([<...>],Left(<...>))]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "find"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 5
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(5)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(8)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(9)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 9
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x70 MAKE_ARRAY 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x14 MOD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(8)
+NewFeaturesTest2.hx:27:   ✓ find
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(10)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(20)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(30)
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TNumber(40)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(findIndex)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:30 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TOperator(OGreater)
+../../src/nx/script/Interpreter.hx:516: 1:34 -> TNumber(25)
+../../src/nx/script/Interpreter.hx:516: 1:36 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:37 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EArray([<...>,<...>,<...>,<...>]),findIndex),[ELambda([<...>],Left(<...>))]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "findIndex"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(10)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(20)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(30)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(40)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x70 MAKE_ARRAY 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(25)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x33 GT
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(2)
+NewFeaturesTest2.hx:27:   ✓ findIndex
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(6)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(8)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TIdentifier(every)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TOperator(OMod)
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:28 -> TOperator(OEqual)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:33 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EArray([<...>,<...>,<...>,<...>]),every),[ELambda([<...>],Left(<...>))]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "every"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(6)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(8)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x70 MAKE_ARRAY 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x14 MOD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(true)
+NewFeaturesTest2.hx:27:   ✓ every true
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(8)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TIdentifier(every)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TOperator(OMod)
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:28 -> TOperator(OEqual)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:33 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EArray([<...>,<...>,<...>,<...>]),every),[ELambda([<...>],Left(<...>))]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "every"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(5)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(8)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x70 MAKE_ARRAY 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x14 MOD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(false)
+NewFeaturesTest2.hx:27:   ✓ every false
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(7)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TIdentifier(some)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TOperator(OMod)
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TOperator(OEqual)
+../../src/nx/script/Interpreter.hx:516: 1:30 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EArray([<...>,<...>,<...>,<...>]),some),[ELambda([<...>],Left(<...>))]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "some"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(7)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x70 MAKE_ARRAY 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x14 MOD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(true)
+NewFeaturesTest2.hx:27:   ✓ some
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(slice)
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(ECall(EMember(EArray(<...>),slice),[ENumber(<...>),ENumber(<...>)]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "slice"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 7
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(0)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [5] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [6] VNumber(4)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 11
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x70 MAKE_ARRAY 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x00 LOAD_CONST 6
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ slice length
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(slice)
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EIndex(ECall(EMember(EArray(<...>),slice),[ENumber(<...>),ENumber(<...>)]),ENumber(0)))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "slice"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 8
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(0)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [5] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [6] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [7] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 12
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x70 MAKE_ARRAY 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x00 LOAD_CONST 6
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x00 LOAD_CONST 7
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(1)
+NewFeaturesTest2.hx:27:   ✓ slice first element
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TIdentifier(concat)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(ECall(EMember(EArray(<...>),concat),[EArray(<...>)]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "concat"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(4)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 9
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x70 MAKE_ARRAY 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x70 MAKE_ARRAY 2
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(4)
+NewFeaturesTest2.hx:27:   ✓ concat
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TIdentifier(flat)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(ECall(EMember(EArray(<...>),flat),[]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "flat"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 5
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(5)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 12
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x70 MAKE_ARRAY 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x70 MAKE_ARRAY 2
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x70 MAKE_ARRAY 1
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x70 MAKE_ARRAY 3
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x64 CALL_MEMBER 0
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(5)
+NewFeaturesTest2.hx:27:   ✓ flat
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 2:5 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:11 -> TIdentifier(copy)
+../../src/nx/script/Interpreter.hx:516: 2:15 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:16 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:17 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 3:1 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 3:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 3:3 -> TIdentifier(push)
+../../src/nx/script/Interpreter.hx:516: 3:7 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 3:8 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 3:9 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 3:10 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 4:1 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 4:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 4:3 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 4:9 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(a,null,EArray([ENumber(1),ENumber(2),ENumber(3)]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SVar(b,null,ECall(EMember(EIdentifier(a),copy),[]))}
+../../src/nx/script/Interpreter.hx:525: {line: 3, col: 1, stmt: SExpr(ECall(EMember(EIdentifier(b),push),[ENumber(4)]))}
+../../src/nx/script/Interpreter.hx:525: {line: 4, col: 1, stmt: SExpr(EMember(EIdentifier(a),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 3
+../../src/nx/script/Interpreter.hx:1059:   [0] "copy"
+../../src/nx/script/Interpreter.hx:1059:   [1] "push"
+../../src/nx/script/Interpreter.hx:1059:   [2] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(4)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 17
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x70 MAKE_ARRAY 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x64 CALL_MEMBER 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x08 STORE_GLOBAL 1
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x07 LOAD_GLOBAL 1
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [12] 0x64 CALL_MEMBER 65537
+../../src/nx/script/Interpreter.hx:1072:   [13] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [14] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [15] 0x72 GET_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [16] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ copy independence
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TNumber(9)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(sort)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:29 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TOperator(OSub)
+../../src/nx/script/Interpreter.hx:516: 1:33 -> TIdentifier(b)
+../../src/nx/script/Interpreter.hx:516: 1:34 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:35 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:36 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:37 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:38 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EIndex(ECall(EMember(EArray(<...>),sort),[ELambda(<...>,<...>)]),ENumber(0)))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "sort"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 7
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(5)
+../../src/nx/script/Interpreter.hx:1064:   [5] VNumber(9)
+../../src/nx/script/Interpreter.hx:1064:   [6] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 12
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x70 MAKE_ARRAY 6
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x00 LOAD_CONST 6
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: a, b
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x11 SUB
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(1)
+NewFeaturesTest2.hx:27:   ✓ sort ascending first
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TString(banana)
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TString(apple)
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TString(cherry)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:28 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:29 -> TIdentifier(sortBy)
+../../src/nx/script/Interpreter.hx:516: 1:35 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:36 -> TIdentifier(w)
+../../src/nx/script/Interpreter.hx:516: 1:38 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:41 -> TIdentifier(w)
+../../src/nx/script/Interpreter.hx:516: 1:42 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:43 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:49 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:50 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:51 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:52 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:53 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EIndex(ECall(EMember(EArray(<...>),sortBy),[ELambda(<...>,<...>)]),ENumber(0)))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "sortBy"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(banana)
+../../src/nx/script/Interpreter.hx:1064:   [1] VString(apple)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(cherry)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 9
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x70 MAKE_ARRAY 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: w
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x72 GET_MEMBER 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VString
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VString
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VString
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VString
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VString
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VString
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(apple)
+NewFeaturesTest2.hx:27:   ✓ sortBy string length
+NewFeaturesTest2.hx:143: 
+5. String methods
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(hello world)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(startsWith)
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TString(hello)
+../../src/nx/script/Interpreter.hx:516: 1:33 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:34 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(hello world),startsWith),[EString(hello)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "startsWith"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(hello world)
+../../src/nx/script/Interpreter.hx:1064:   [1] VString(hello)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(true)
+NewFeaturesTest2.hx:27:   ✓ startsWith true
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(hello world)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(startsWith)
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TString(world)
+../../src/nx/script/Interpreter.hx:516: 1:33 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:34 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(hello world),startsWith),[EString(world)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "startsWith"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(hello world)
+../../src/nx/script/Interpreter.hx:1064:   [1] VString(world)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(false)
+NewFeaturesTest2.hx:27:   ✓ startsWith false
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(hello world)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(endsWith)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TString(world)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(hello world),endsWith),[EString(world)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "endsWith"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(hello world)
+../../src/nx/script/Interpreter.hx:1064:   [1] VString(world)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(true)
+NewFeaturesTest2.hx:27:   ✓ endsWith true
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(hello world)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TIdentifier(replace)
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TString(world)
+../../src/nx/script/Interpreter.hx:516: 1:30 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TString(NxScript)
+../../src/nx/script/Interpreter.hx:516: 1:42 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:43 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(hello world),replace),[EString(world),EString(NxScript)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "replace"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 3
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(hello world)
+../../src/nx/script/Interpreter.hx:1064:   [1] VString(world)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(NxScript)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x64 CALL_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(hello NxScript)
+NewFeaturesTest2.hx:27:   ✓ replace
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(ha)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TIdentifier(repeat)
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(ha),repeat),[ENumber(3)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "repeat"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(ha)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(3)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(hahaha)
+NewFeaturesTest2.hx:27:   ✓ repeat
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(5)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(padStart)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(4)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TString(0)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(5),padStart),[ENumber(4),EString(0)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "padStart"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 3
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(5)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(4)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x64 CALL_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(0005)
+NewFeaturesTest2.hx:27:   ✓ padStart
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(hi)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TIdentifier(padEnd)
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TString(-)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(hi),padEnd),[ENumber(5),EString(-)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "padEnd"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 3
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(hi)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(5)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(-)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x64 CALL_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(hi---)
+NewFeaturesTest2.hx:27:   ✓ padEnd
+NewFeaturesTest2.hx:169: 
+6. Dict methods
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TString(b)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TString(c)
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:26 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:28 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TIdentifier(size)
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EMember(EIdentifier(d),size),[]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "size"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 6
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(a)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(b)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [4] VString(c)
+../../src/nx/script/Interpreter.hx:1064:   [5] VNumber(3)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 12
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x71 MAKE_DICT 3
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x64 CALL_MEMBER 0
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ dict.size
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TString(b)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TIdentifier(has)
+../../src/nx/script/Interpreter.hx:516: 2:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:11 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EMember(EIdentifier(d),has),[EString(a)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "has"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 5
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(a)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(b)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [4] VString(a)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 11
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x71 MAKE_DICT 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(true)
+NewFeaturesTest2.hx:27:   ✓ dict.has existing
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TString(b)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TIdentifier(has)
+../../src/nx/script/Interpreter.hx:516: 2:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TString(z)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:11 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EMember(EIdentifier(d),has),[EString(z)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "has"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 5
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(a)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(b)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [4] VString(z)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 11
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x71 MAKE_DICT 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(false)
+NewFeaturesTest2.hx:27:   ✓ dict.has missing
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TString(b)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TIdentifier(remove)
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 2:13 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:14 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 3:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 3:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 3:3 -> TIdentifier(has)
+../../src/nx/script/Interpreter.hx:516: 3:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 3:7 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 3:10 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 3:11 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EMember(EIdentifier(d),remove),[EString(a)]))}
+../../src/nx/script/Interpreter.hx:525: {line: 3, col: 1, stmt: SExpr(ECall(EMember(EIdentifier(d),has),[EString(a)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "remove"
+../../src/nx/script/Interpreter.hx:1059:   [1] "has"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 6
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(a)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(b)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [4] VString(a)
+../../src/nx/script/Interpreter.hx:1064:   [5] VString(a)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 15
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x71 MAKE_DICT 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [12] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [13] 0x64 CALL_MEMBER 65537
+../../src/nx/script/Interpreter.hx:1072:   [14] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(false)
+NewFeaturesTest2.hx:27:   ✓ dict.remove
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(a)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TIdentifier(set)
+../../src/nx/script/Interpreter.hx:516: 2:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TString(b)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:12 -> TNumber(99)
+../../src/nx/script/Interpreter.hx:516: 2:14 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:15 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 3:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 3:2 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 3:3 -> TString(b)
+../../src/nx/script/Interpreter.hx:516: 3:6 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 3:7 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EMember(EIdentifier(d),set),[EString(b),ENumber(99)]))}
+../../src/nx/script/Interpreter.hx:525: {line: 3, col: 1, stmt: SExpr(EIndex(EIdentifier(d),EString(b)))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "set"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 5
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(a)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(b)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(99)
+../../src/nx/script/Interpreter.hx:1064:   [4] VString(b)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 14
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x71 MAKE_DICT 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 2
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [12] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [13] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(99)
+NewFeaturesTest2.hx:27:   ✓ dict.set
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(x)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(10)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TString(y)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TNumber(20)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TIdentifier(keys)
+../../src/nx/script/Interpreter.hx:516: 2:7 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 2:16 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(EMember(ECall(EMember(EIdentifier(<...>),keys),[]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "keys"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 4
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(x)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(10)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(y)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(20)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 11
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x71 MAKE_DICT 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 0
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(2)
+NewFeaturesTest2.hx:27:   ✓ dict.keys length
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TString(x)
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TNumber(10)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TString(y)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TColon
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TNumber(20)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:1 -> TIdentifier(d)
+../../src/nx/script/Interpreter.hx:516: 2:2 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:3 -> TIdentifier(values)
+../../src/nx/script/Interpreter.hx:516: 2:9 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:11 -> TDot
+../../src/nx/script/Interpreter.hx:516: 2:12 -> TIdentifier(reduce)
+../../src/nx/script/Interpreter.hx:516: 2:18 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:19 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 2:20 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 2:21 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:22 -> TIdentifier(v)
+../../src/nx/script/Interpreter.hx:516: 2:23 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:25 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 2:28 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 2:29 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 2:30 -> TIdentifier(v)
+../../src/nx/script/Interpreter.hx:516: 2:31 -> TComma
+../../src/nx/script/Interpreter.hx:516: 2:33 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 2:34 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 2:35 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SVar(d,null,EDict([{key: EString(<...>), value: ENumber(<...>)},{key: EString(<...>), value: ENumber(<...>)}]))}
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 1, stmt: SExpr(ECall(EMember(ECall(EMember(<...>,<...>),[]),reduce),[ELambda([<...>,<...>],Left(<...>)),ENumber(0)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "values"
+../../src/nx/script/Interpreter.hx:1059:   [1] "reduce"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 5
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(x)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(10)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(y)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(20)
+../../src/nx/script/Interpreter.hx:1064:   [4] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 13
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x71 MAKE_DICT 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x64 CALL_MEMBER 0
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x64 CALL_MEMBER 65538
+../../src/nx/script/Interpreter.hx:1072:   [12] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: a, v
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(30)
+NewFeaturesTest2.hx:27:   ✓ dict.values sum
+NewFeaturesTest2.hx:195: 
+7. Global natives
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(range)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(ECall(EIdentifier(range),[ENumber(<...>)]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "range"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(5)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(5)
+NewFeaturesTest2.hx:27:   ✓ range(5).length
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(range)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TNumber(6)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EIndex(ECall(EIdentifier(range),[ENumber(<...>),ENumber(<...>)]),ENumber(0)))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "range"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 3
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(6)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 7
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x60 CALL 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x74 GET_INDEX
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(2)
+NewFeaturesTest2.hx:27:   ✓ range(2,6)[0]
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(str)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(42)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(str),[ENumber(42)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "str"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(42)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(42)
+NewFeaturesTest2.hx:27:   ✓ str
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(int)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(3.9)
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(int),[ENumber(3.9)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "int"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3.9)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ int
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(abs)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TOperator(OSub)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(5)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(abs),[EUnary(OSub,ENumber(<...>))]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "abs"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(-5)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(5)
+NewFeaturesTest2.hx:27:   ✓ abs
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(floor)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TNumber(3.9)
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(floor),[ENumber(3.9)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "floor"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3.9)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ floor
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(sqrt)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(16)
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(sqrt),[ENumber(16)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "sqrt"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(16)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(4)
+NewFeaturesTest2.hx:27:   ✓ sqrt
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(pow)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(10)
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(pow),[ENumber(2),ENumber(10)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "pow"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(10)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x60 CALL 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(1024)
+NewFeaturesTest2.hx:27:   ✓ pow
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(min)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(7)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(min),[ENumber(3),ENumber(7)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "min"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(7)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x60 CALL 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ min
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(max)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TNumber(7)
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(max),[ENumber(3),ENumber(7)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "max"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(7)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 5
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x60 CALL 2
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(7)
+NewFeaturesTest2.hx:27:   ✓ max
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(PI)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TOperator(OGreater)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(3.14)
+../../src/nx/script/Interpreter.hx:516: 1:11 -> TOperator(OAnd)
+../../src/nx/script/Interpreter.hx:516: 1:14 -> TIdentifier(PI)
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TOperator(OLess)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TNumber(3.15)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EBinary(OAnd,EBinary(OGreater,EIdentifier(PI),ENumber(3.14)),EBinary(OLess,EIdentifier(PI),ENumber(3.15))))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "PI"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3.14)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(3.15)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 10
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x33 GT
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x06 DUP
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x51 JUMP_IF_FALSE 4
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x32 LT
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(true)
+NewFeaturesTest2.hx:27:   ✓ PI
+NewFeaturesTest2.hx:233: 
+8. GC control
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TLeftBracket
+../../src/nx/script/Interpreter.hx:516: 1:2 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 1:3 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TRightBracket
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TIdentifier(map)
+../../src/nx/script/Interpreter.hx:516: 1:12 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:13 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:15 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TOperator(OMul)
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 1:23 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TIdentifier(length)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(EMember(ECall(EMember(EArray(<...>),map),[ELambda(<...>,<...>)]),length))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "map"
+../../src/nx/script/Interpreter.hx:1059:   [1] "length"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 3
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(3)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 8
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x70 MAKE_ARRAY 3
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x72 GET_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x12 MUL
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/VM.hx:927: GET_MEMBER: field=length, object type=VArray
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ AGGRESSIVE gc works
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TString(hello)
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TIdentifier(startsWith)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:20 -> TString(he)
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:25 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(EString(hello),startsWith),[EString(he)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "startsWith"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VString(hello)
+../../src/nx/script/Interpreter.hx:1064:   [1] VString(he)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x64 CALL_MEMBER 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VBool(true)
+NewFeaturesTest2.hx:27:   ✓ SOFT gc works after threshold
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(range)
+../../src/nx/script/Interpreter.hx:516: 1:6 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:9 -> TDot
+../../src/nx/script/Interpreter.hx:516: 1:10 -> TIdentifier(reduce)
+../../src/nx/script/Interpreter.hx:516: 1:16 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:17 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:18 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:19 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:21 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:22 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:24 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 1:27 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 1:29 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 1:31 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 1:32 -> TComma
+../../src/nx/script/Interpreter.hx:516: 1:34 -> TNumber(0)
+../../src/nx/script/Interpreter.hx:516: 1:35 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:36 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EMember(ECall(EIdentifier(<...>),[<...>]),reduce),[ELambda([<...>,<...>],Left(<...>)),ENumber(0)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 2
+../../src/nx/script/Interpreter.hx:1059:   [0] "range"
+../../src/nx/script/Interpreter.hx:1059:   [1] "reduce"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(0)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 7
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x63 MAKE_LAMBDA 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x64 CALL_MEMBER 65538
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1076: 
+Functions: 1
+../../src/nx/script/Interpreter.hx:1078: 
+  Function: <lambda>
+../../src/nx/script/Interpreter.hx:1079:   Params: a, x
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 0
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 0
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 6
+../../src/nx/script/Interpreter.hx:1072:   [0] 0xA0 LOAD_LOCAL 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0xA0 LOAD_LOCAL 1
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x90 LOAD_NULL
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(3)
+NewFeaturesTest2.hx:27:   ✓ VERY_SOFT gc works
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TIdentifier(str)
+../../src/nx/script/Interpreter.hx:516: 1:4 -> TLeftParen
+../../src/nx/script/Interpreter.hx:516: 1:5 -> TNumber(99)
+../../src/nx/script/Interpreter.hx:516: 1:7 -> TRightParen
+../../src/nx/script/Interpreter.hx:516: 1:8 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 1, col: 1, stmt: SExpr(ECall(EIdentifier(str),[ENumber(99)]))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "str"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 1
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(99)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 4
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x60 CALL 1
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VString(99)
+NewFeaturesTest2.hx:27:   ✓ manual gc() then run works
+NewFeaturesTest2.hx:257: 
+9. Nested scopes
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:4 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 2:12 -> TNumber(10)
+../../src/nx/script/Interpreter.hx:516: 2:14 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 3:4 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 3:5 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 4:5 -> TKeyword(KLet)
+../../src/nx/script/Interpreter.hx:516: 4:9 -> TIdentifier(y)
+../../src/nx/script/Interpreter.hx:516: 4:11 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 4:13 -> TNumber(99)
+../../src/nx/script/Interpreter.hx:516: 4:15 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 5:5 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 5:7 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 5:9 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 5:11 -> TOperator(OAdd)
+../../src/nx/script/Interpreter.hx:516: 5:13 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 5:14 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 6:4 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 6:5 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 7:4 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 7:5 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 8:3 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 4, stmt: SVar(x,null,ENumber(10))}
+../../src/nx/script/Interpreter.hx:525: {line: 3, col: 4, stmt: SBlock([SLet(y,null,ENumber(99)),SExpr(EAssign(EIdentifier(<...>),EBinary(<...>,<...>,<...>)))])}
+../../src/nx/script/Interpreter.hx:525: {line: 7, col: 4, stmt: SExpr(EIdentifier(x))}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "y"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 3
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(10)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(99)
+../../src/nx/script/Interpreter.hx:1064:   [2] VNumber(1)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 15
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0xD0 ENTER_SCOPE
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x03 STORE_LET 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x10 ADD
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [12] 0xD1 EXIT_SCOPE
+../../src/nx/script/Interpreter.hx:1072:   [13] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [14] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(11)
+NewFeaturesTest2.hx:27:   ✓ outer var survives block
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:4 -> TKeyword(KLet)
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 2:12 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 2:13 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 3:4 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 3:5 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 4:5 -> TKeyword(KLet)
+../../src/nx/script/Interpreter.hx:516: 4:9 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 4:11 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 4:13 -> TNumber(42)
+../../src/nx/script/Interpreter.hx:516: 4:15 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 5:5 -> TIdentifier(a)
+../../src/nx/script/Interpreter.hx:516: 5:6 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 6:4 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 6:5 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 7:3 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 4, stmt: SLet(a,null,ENumber(1))}
+../../src/nx/script/Interpreter.hx:525: {line: 3, col: 4, stmt: SBlock([SLet(a,null,ENumber(42)),SExpr(EIdentifier(a))])}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "a"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 2
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(42)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 10
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x03 STORE_LET 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0xD0 ENTER_SCOPE
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x03 STORE_LET 0
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [8] 0xD1 EXIT_SCOPE
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: VNumber(42)
+NewFeaturesTest2.hx:27:   ✓ inner let value returned from block
+NewFeaturesTest2.hx:284: 
+10. match pattern matching
+../../src/nx/script/Interpreter.hx:515: === TOKENS ===
+../../src/nx/script/Interpreter.hx:516: 1:1 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 2:4 -> TKeyword(KVar)
+../../src/nx/script/Interpreter.hx:516: 2:8 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 2:10 -> TOperator(OAssign)
+../../src/nx/script/Interpreter.hx:516: 2:12 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 2:13 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 3:4 -> TKeyword(KMatch)
+../../src/nx/script/Interpreter.hx:516: 3:10 -> TIdentifier(x)
+../../src/nx/script/Interpreter.hx:516: 3:12 -> TLeftBrace
+../../src/nx/script/Interpreter.hx:516: 3:13 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 4:5 -> TKeyword(KCase)
+../../src/nx/script/Interpreter.hx:516: 4:10 -> TNumber(1)
+../../src/nx/script/Interpreter.hx:516: 4:12 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 4:15 -> TString(one)
+../../src/nx/script/Interpreter.hx:516: 4:20 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 5:5 -> TKeyword(KCase)
+../../src/nx/script/Interpreter.hx:516: 5:10 -> TNumber(2)
+../../src/nx/script/Interpreter.hx:516: 5:12 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 5:15 -> TString(two)
+../../src/nx/script/Interpreter.hx:516: 5:20 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 6:5 -> TKeyword(KCase)
+../../src/nx/script/Interpreter.hx:516: 6:10 -> TNumber(3)
+../../src/nx/script/Interpreter.hx:516: 6:12 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 6:15 -> TString(three)
+../../src/nx/script/Interpreter.hx:516: 6:22 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 7:5 -> TKeyword(KDefault)
+../../src/nx/script/Interpreter.hx:516: 7:13 -> TFatArrow
+../../src/nx/script/Interpreter.hx:516: 7:16 -> TString(other)
+../../src/nx/script/Interpreter.hx:516: 7:23 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 8:4 -> TRightBrace
+../../src/nx/script/Interpreter.hx:516: 8:5 -> TNewLine
+../../src/nx/script/Interpreter.hx:516: 9:3 -> TEOF
+../../src/nx/script/Interpreter.hx:524: === AST ===
+../../src/nx/script/Interpreter.hx:525: {line: 2, col: 4, stmt: SVar(x,null,ENumber(2))}
+../../src/nx/script/Interpreter.hx:525: {line: 3, col: 4, stmt: SMatch(EIdentifier(x),[{pattern: MPValue(ENumber(<...>)), body: [SExpr(<...>)]},{pattern: MPValue(ENumber(<...>)), body: [SExpr(<...>)]},{pattern: MPValue(ENumber(<...>)), body: [SExpr(<...>)]}],[SExpr(EString(other))])}
+../../src/nx/script/Interpreter.hx:533: === BYTECODE ===
+../../src/nx/script/Interpreter.hx:1055: === Chunk ===
+../../src/nx/script/Interpreter.hx:1057: 
+Strings: 1
+../../src/nx/script/Interpreter.hx:1059:   [0] "__match_0"
+../../src/nx/script/Interpreter.hx:1062: 
+Constants: 8
+../../src/nx/script/Interpreter.hx:1064:   [0] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [1] VNumber(1)
+../../src/nx/script/Interpreter.hx:1064:   [2] VString(one)
+../../src/nx/script/Interpreter.hx:1064:   [3] VNumber(2)
+../../src/nx/script/Interpreter.hx:1064:   [4] VString(two)
+../../src/nx/script/Interpreter.hx:1064:   [5] VNumber(3)
+../../src/nx/script/Interpreter.hx:1064:   [6] VString(three)
+../../src/nx/script/Interpreter.hx:1064:   [7] VString(other)
+../../src/nx/script/Interpreter.hx:1067: 
+Instructions: 30
+../../src/nx/script/Interpreter.hx:1072:   [0] 0x00 LOAD_CONST 0
+../../src/nx/script/Interpreter.hx:1072:   [1] 0x08 STORE_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [2] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [3] 0x07 LOAD_GLOBAL 0
+../../src/nx/script/Interpreter.hx:1072:   [4] 0x03 STORE_LET 0
+../../src/nx/script/Interpreter.hx:1072:   [5] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [6] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [7] 0x00 LOAD_CONST 1
+../../src/nx/script/Interpreter.hx:1072:   [8] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [9] 0x51 JUMP_IF_FALSE 3
+../../src/nx/script/Interpreter.hx:1072:   [10] 0x00 LOAD_CONST 2
+../../src/nx/script/Interpreter.hx:1072:   [11] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [12] 0x50 JUMP 16
+../../src/nx/script/Interpreter.hx:1072:   [13] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [14] 0x00 LOAD_CONST 3
+../../src/nx/script/Interpreter.hx:1072:   [15] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [16] 0x51 JUMP_IF_FALSE 3
+../../src/nx/script/Interpreter.hx:1072:   [17] 0x00 LOAD_CONST 4
+../../src/nx/script/Interpreter.hx:1072:   [18] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [19] 0x50 JUMP 9
+../../src/nx/script/Interpreter.hx:1072:   [20] 0x01 LOAD_VAR 0
+../../src/nx/script/Interpreter.hx:1072:   [21] 0x00 LOAD_CONST 5
+../../src/nx/script/Interpreter.hx:1072:   [22] 0x30 EQ
+../../src/nx/script/Interpreter.hx:1072:   [23] 0x51 JUMP_IF_FALSE 3
+../../src/nx/script/Interpreter.hx:1072:   [24] 0x00 LOAD_CONST 6
+../../src/nx/script/Interpreter.hx:1072:   [25] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [26] 0x50 JUMP 2
+../../src/nx/script/Interpreter.hx:1072:   [27] 0x00 LOAD_CONST 7
+../../src/nx/script/Interpreter.hx:1072:   [28] 0x05 POP
+../../src/nx/script/Interpreter.hx:1072:   [29] 0x61 RETURN
+../../src/nx/script/Interpreter.hx:541: === RESULT ===
+../../src/nx/script/Interpreter.hx:542: null
+
+
+ERR >
+../../src/nx/script/VM.hx:1438: characters 18-23 : Uncaught exception Null Access
+../../src/nx/script/Interpreter.hx:821: characters 10-32 : Called from here
+NewFeaturesTest2.hx:287: lines 287-295 : Called from here

@@ -1415,6 +1415,9 @@ class VM {
 	// Conversion between Haxe and Script values
 
 	public function haxeToValue(value:Dynamic):Value {
+		if (value == null) {
+			return VNull;
+		}
 		return switch (Type.typeof(value)) {
 			case TNull: VNull;
 			case TBool: VBool(value);
@@ -2532,6 +2535,7 @@ class VM {
 	}
 
 	public function valueToString(value:Value):String {
+		if (value == null) return "null";
 		return switch (value) {
 			case VNumber(n): Std.string(n);
 			case VString(s): s;

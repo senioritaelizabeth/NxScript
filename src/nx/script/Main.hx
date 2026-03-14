@@ -1,7 +1,10 @@
 package nx.script;
 
+import sys.FileSystem;
+import haxe.Json;
+import sys.io.Process;
 import prismcli.CLI;
-
+using StringTools;
 /**
  * NxScript CLI — entry point for `haxelib run nxscript`
  *
@@ -15,23 +18,62 @@ import prismcli.CLI;
  *   -D NXDEBUG   — enable instruction tracing, AST/token/bytecode dumps
  */
 class Main {
+	static function lib_dir() {
+		
+		// run haxelib path nxscript to get the library directory, then add "src" to get to the sources
+		var haxelibPath = '';
+		try {
+			var process = new Process("haxelib", ["path", "nxscript"]);
+			haxelibPath = process.stdout.readAll().toString();
+			process.close();
+			if (haxelibPath == null || haxelibPath == "") {
+				err("haxelib did not return a path for nxscript");
+				Sys.exit(1);
+			}
+			haxelibPath = StringTools.trim(haxelibPath).split("\n")[0].trim(	);
 
-	static function main() {
+			var isUsingBar = haxelibPath.contains("/");
+			if (haxelibPath.endsWith("/") || haxelibPath.endsWith("\\")) 
+				haxelibPath = haxelibPath.substring(0, haxelibPath.length- 1);
+			if (haxelibPath.endsWith("/src") || haxelibPath.endsWith("\\src")) 
+				haxelibPath = haxelibPath.substring(0, haxelibPath.length - 4);
+			haxelibPath += isUsingBar ? "/" : "\\";
+		} catch (e:Dynamic) {
+			err("Failed to get haxelib path: " + Std.string(e));
+			Sys.exit(1);
+		}
+		return StringTools.trim(haxelibPath).split("\n")[0];
+	}
+	static function args() {
 		var args = Sys.args();
+		var file = FileSystem.readDirectory("./");
+		
+		return args;
+	}
+	static function main() {
+		
+		
+		var haxelib_json: HaxelibJson = Json.parse(sys.io.File.getContent(lib_dir() + "haxelib.json"));
+		var args = args();
 
 		var cwd = args.length > 0 ? args[args.length - 1] : null;
 		if (cwd != null && sys.FileSystem.exists(cwd) && sys.FileSystem.isDirectory(cwd)) {
 			args = args.slice(0, args.length - 1);
 			Sys.setCwd(cwd);
 		}
-
+		
 		if (args.length == 0) {
 			startRepl();
-		} else if (sys.FileSystem.exists(args[0])) {
+		} else if (sys.FileSystem.exists(args[0]) && !sys.FileSystem.isDirectory(args[0]) && (args[0].endsWith(".nx") )) {
 			runFile(args[0], false);
 		} else {
-			var cli = new CLI("NxScript", "NxScript CLI", "1.0.0");
+			var cli = new CLI("NxScript", "NxScript CLI", haxelib_json.version);
 			cli.addDefaults();
+			var test = cli.addCommand("test", "Run tests all tests.", (cli, args, flags) -> {
+				var path = lib_dir() + "test/tests/test_suite.hxml";
+				Sys.setCwd(lib_dir() + "test/tests/");
+				Sys.command("haxe " + path);
+			});
 
 			var runCmd = cli.addCommand("run", "Run a script file", (cli, args, flags) -> {
 				var file = args["file"];
@@ -44,7 +86,10 @@ class Main {
 			cli.addCommand("repl", "Start interactive REPL", (cli, args, flags) -> {
 				startRepl();
 			});
-
+			var h = cli.addCommand('help', 'Show this help message', (cli, args, flags) -> {
+				printHelp();
+			});
+			cli.setDefaultCommand(h);
 			cli.run();
 		}
 	}
@@ -252,3 +297,15 @@ Multi-line input:
 ");
 	}
 }
+typedef  HaxelibJson = {
+	name: String,
+	version: String,
+	url: String,
+	license: String,
+	tags: Array<String>,
+	description: String,
+	releasenote: String,
+	contributors: Array<String>,
+	dependencies: Map<String, String>,
+	main: String
+};

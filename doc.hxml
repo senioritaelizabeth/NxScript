@@ -6,3 +6,4 @@
 
 --macro include('nx')
 
+--c-arg arg

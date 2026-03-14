@@ -1,3 +1,48 @@
+# Changelog 0.5.2 (2026-03-14)
+
+### Added
+
+- **PrismCLI-powered CLI** (`src/nx/script/Main.hx`) — the CLI now uses the `prismcli` library for subcommands, flags, and help output.
+  - `haxelib run nxscript run <file.nx>` (same as before)
+  - `haxelib run nxscript run <file.nx> -w` / `--watch` (watch mode)
+  - `haxelib run nxscript repl` (interactive REPL)
+  - `haxelib run nxscript test` (runs the test suite via `haxe test/tests/test_suite.hxml`)
+
+- **`lib_dir()` helper** — resolves the current `nxscript` haxelib path (via `haxelib path nxscript`) so the CLI can locate bundled resources like test scripts.
+
+- **Native bridge types**: added `NxDate` and `NxStd` integration for improved native interoperability.
+
+### VM
+
+- **Scoped `let` variables** are now tracked without expensive map snapshots: `ENTER_SCOPE`/`EXIT_SCOPE` use an optimized `scopeStack` that stores only the introduced names.
+- **`using` extension methods** are now supported: `using X; obj.method()` can resolve to static methods in `X` when instance methods are missing.
+- **Enum/variant runtime support**: `VEnumValue` now converts to a string (`Color.Red`) and supports member access (`.variant`, `.enum`, `.values`, `.value0`, etc.).
+- **IEEE 754 division semantics**: division by zero now returns `Inf`/`NaN` (matching JS/Haxe float behavior) instead of throwing.
+- `haxeToValue` now converts `null` to `VNull` (improves native interop).
+
+### Changed
+
+- **Test suite cleanup / reorganization**
+  - Added `BridgeAndUsingTest.hx` and updated `test/tests/TestSuite.hx`.
+  - Removed `NewFeaturesTest2.hx` and the generated `test/tests/result.txt`.
+  - Renamed `new_features2.hxml` to `bridge_using.hxml`.
+
+- Internal refactors in `Compiler`, `Parser`, `Tokenizer`, `VM`, and `Interpreter` to support the new CLI workflow and testing harness.
+
+### KNOWN:
+- Sanboxing is not working very well.
+- pattern range is not worken, i.e.:
+  > ```hx
+  > var s=85
+  > match s {
+  >  case 90...100 => "A"
+  >  case 80...95 => "B"
+  >  default => "F"
+  > } # returns "A" - expected "B"
+  >```
+
+---
+
 # Changelog 0.2.4.1 (2026-03-13)
 
 ### Added

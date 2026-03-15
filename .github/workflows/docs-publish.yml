@@ -30,7 +30,10 @@ jobs:
       - name: Install dox
         run: |
           yes | haxelib install dox
-
+      # same to prismcli
+      - name: Install prismcli
+        run: |
+          yes | haxelib install prismcli
       - name: Prepare dox CommonJS compatibility
         shell: bash
         run: |
@@ -42,7 +45,7 @@ jobs:
 
       - name: Generate XML docs
         run: haxe doc.hxml
-
+ 
       - name: Build HTML docs
         run: haxelib run dox -i doc.xml -o docs/ --title "NxScript" --include "nz"
 

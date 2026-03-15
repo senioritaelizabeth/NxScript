@@ -33,6 +33,13 @@ enum Keyword {
 	KTry; // try
 	KCatch; // catch
 	KThrow; // throw
+	KMatch; // match
+	KCase; // case (in match)
+	KDefault; // default (in match)
+	KUsing; // using — extension methods
+	KEnum; // enum
+	KAbstract; // abstract type
+	KIs; // type check: x is SomeType
 }
 
 /**
@@ -57,6 +64,8 @@ enum Operator {
 	// Logical
 	OAnd; // &&
 	OOr; // ||
+	ONullCoal; // ?? null-coalescing
+	OOptChain; // ?. optional chain
 	ONot; // !
 
 	// Assignment
@@ -109,6 +118,7 @@ enum Token {
 	TColon; // :
 	TDot; // .
 	TRange; // ...
+	TQuestion; // ? (standalone, for future ternary)
 	TArrow; // ->
 	TFatArrow; // =>
 

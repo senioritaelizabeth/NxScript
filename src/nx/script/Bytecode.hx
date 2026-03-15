@@ -54,6 +54,8 @@ class Op {
 	public static inline var JUMP = 0x50; // Unconditional jump
 	public static inline var JUMP_IF_FALSE = 0x51; // Jump if top of stack is false
 	public static inline var JUMP_IF_TRUE = 0x52; // Jump if top of stack is true
+	public static inline var JUMP_IF_NULL = 0x53; // Jump if TOS is VNull (leaves TOS)
+	public static inline var JUMP_IF_NOT_NULL = 0x54; // Jump if TOS is not VNull (leaves TOS)
 
 	// Functions (0x60 - 0x6F)
 	public static inline var CALL = 0x60; // Call function with n arguments
@@ -109,6 +111,10 @@ class Op {
 	public static inline var INC_INDEX = 0xC6; // obj[idx]++ (obj, idx on stack)
 	public static inline var DEC_INDEX = 0xC7; // obj[idx]--
 
+	// Scope management for block-level let declarations
+	public static inline var ENTER_SCOPE = 0xD0; // push a new scope frame onto scopeStack
+	public static inline var EXIT_SCOPE  = 0xD1; // pop scope frame, removing its let vars
+
 	// End of file (0xFF)
 	public static inline var EOF = 0xFF;
 
@@ -155,6 +161,8 @@ class Op {
 			case JUMP: "JUMP";
 			case JUMP_IF_FALSE: "JUMP_IF_FALSE";
 			case JUMP_IF_TRUE: "JUMP_IF_TRUE";
+			case JUMP_IF_NULL: "JUMP_IF_NULL";
+			case JUMP_IF_NOT_NULL: "JUMP_IF_NOT_NULL";
 			case CALL: "CALL";
 			case RETURN: "RETURN";
 			case MAKE_FUNC: "MAKE_FUNC";
@@ -187,6 +195,8 @@ class Op {
 			case DEC_MEMBER: "DEC_MEMBER";
 			case INC_INDEX: "INC_INDEX";
 			case DEC_INDEX: "DEC_INDEX";
+			case ENTER_SCOPE: "ENTER_SCOPE";
+			case EXIT_SCOPE: "EXIT_SCOPE";
 			case EOF: "EOF";
 			default: "UNKNOWN(0x" + StringTools.hex(opcode, 2) + ")";
 		}
@@ -268,4 +278,11 @@ enum Value {
 	 *         without boxing into a new VIterator each step.
 	 */
 	VIterator(arr:Array<Value>, idx:Array<Int>);
+	/**
+	 * Enum instance: EnumName.VariantName with optional payload values.
+	 *   VEnumValue("Color", "Red", [])
+	 *   VEnumValue("Result", "Ok", [VString("hello")])
+	 */
+	VEnumValue(enumName:String, variant:String, values:Array<Value>);
+
 }

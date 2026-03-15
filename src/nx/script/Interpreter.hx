@@ -1,6 +1,9 @@
 package nx.script;
 
+import nx.script.SyntaxRules;
+
 import nx.script.Bytecode;
+import nx.script.NativeProxy;
 import nx.script.BytecodeSerializer;
 import nx.script.Compiler;
 import nx.script.NxProxy;
@@ -50,13 +53,91 @@ class Interpreter {
 	/** Manually flush all VM internal caches, regardless of gc_kind. */
 	public function gc():Void vm.gc();
 
+	/**
+	 * Run a script function once per native Haxe object — loop executes in Haxe, not in script.
+	 *
+	 * This is the fix for the "10k sprites = 24fps" problem. The script loop:
+	 *
+	 *   while (j < sprites.length) { spr.angle += 120*dt ... j++ }
+	 *
+	 * pays full VM overhead (bytecode fetch, stack ops, LT, JUMP) per iteration.
+	 * With 10k sprites that is ~50k extra VM instructions per frame just for looping.
+	 *
+	 * Migration — instead of the script loop, write a script function:
+	 *
+	 *   func updateSprite(spr, i, dt) {
+	 *       spr.angle += 120 * dt
+	 *       var phase = counter + i
+	 *       spr.x += 60 * dt * sin(phase)
+	 *       spr.y += 30 * dt * cos(phase)
+	 *       spr.color = color
+	 *   }
+	 *
+	 * And call from Haxe each frame:
+	 *
+	 *   var fn = interp.resolveCallable("updateSprite");
+	 *   interp.nativeForEach(sprites, fn, [interp.vm.haxeToValue(dt)]);
+	 *
+	 * The function body still runs in the VM (so reflection overhead remains for
+	 * native field access), but loop overhead is gone — pure Haxe iteration.
+	 */
+	public function nativeForEach(items:Array<Dynamic>, fn:Value, ?extraArgs:Array<Value>):Void
+		vm.nativeForEach(items, fn, extraArgs);
+
+	/** Resolve a script callable by name for repeated host calls. Cache the result. */
+	public function resolveCallable(name:String):Value
+		return vm.resolveCallable(name);
+
+	/** Call a script function by name, returning null on any error instead of throwing. */
+	public function safeCall(name:String, ?args:Array<Value>):Null<Value>
+		return vm.safeCall(name, args);
+
+	/** Enable sandbox mode — blocks filesystem/network natives, limits instructions. */
+	public function enableSandbox(?extraBlocklist:Array<String>):Void
+		vm.enableSandbox(extraBlocklist);
+
+	// ─── NativeProxy helpers ────────────────────────────────────────────────
+
+	/**
+	 * Wrap a single native Haxe object (e.g. FlxSprite) as a VDict proxy.
+	 * Fields are read once into a shadow Map<String,Value> — script accesses
+	 * are pure Map ops with no Reflection in the hot path.
+	 *
+	 * Call proxy.flush() after the script update to write changes back.
+	 *
+	 *   var proxy = interp.wrapNative(sprite, ["x","y","angle","color"]);
+	 *   vm.globals.set("spr", proxy.value);
+	 *   interp.run('update(spr, dt)');
+	 *   proxy.flush();
+	 */
+	public function wrapNative(obj:Dynamic, ?fields:Array<String>):NativeProxy
+		return NativeProxy.wrap(vm, obj, fields);
+
+	/**
+	 * Wrap many native objects at once (same field list for all).
+	 * Returns a WrapManyResult with a VArray of VDicts for the script
+	 * and the proxy list for calling flushAll() after the update.
+	 *
+	 *   var r = interp.wrapNativeMany(sprites, ["x","y","angle","color"]);
+	 *   vm.globals.set("sprites", r.value);  // VArray of VDicts
+	 *   interp.run('for (spr in sprites) update(spr, dt)');
+	 *   NativeProxy.flushAll(r.proxies);
+	 */
+	public function wrapNativeMany(objects:Array<Dynamic>, ?fields:Array<String>):nx.script.WrapManyResult
+		return NativeProxy.wrapMany(vm, objects, fields);
+
+	/** Kept for API compat. Use -D NXDEBUG compile flag for actual debug output. */
 	var debug:Bool = false;
 	var strictByDefault:Bool = false;
 
-	public function new(debug:Bool = false, strict:Bool = false) {
+	/** Active syntax rules for this interpreter. Change before calling run(). */
+	public var rules:SyntaxRules = null;
+
+	public function new(debug:Bool = false, strict:Bool = false, ?rules:SyntaxRules) {
 		this.debug = debug;
 		this.strictByDefault = strict;
 		this.vm = new VM(debug);
+		this.rules = rules ?? SyntaxRules.nxScript();
 
 		// Register built-in functions
 		registerBuiltins();
@@ -129,6 +210,7 @@ class Interpreter {
 				case VNativeFunction(_, _, _): "function";
 				case VNativeObject(_): "object";
 				case VIterator(_, _): "iterator";
+				case VEnumValue(eName, _, _): eName;
 			});
 		});
 
@@ -464,43 +546,39 @@ class Interpreter {
 			vm.scriptName = scriptName;
 
 			// Tokenize
-			var tokenizer = new Tokenizer(scriptSource);
+			var tokenizer = new Tokenizer(scriptSource, rules);
 			var tokens = tokenizer.tokenize();
 
-			if (debug) {
-				trace("=== TOKENS ===");
-				for (t in tokens) {
-					trace('${t.line}:${t.col} -> ${t.token}');
-				}
-			}
+			#if NXDEBUG
+			trace("=== TOKENS ===");
+			for (t in tokens) trace('${t.line}:${t.col} -> ${t.token}');
+			#end
 
 			// Parse
-			var parser = new Parser(tokens, strictMode);
+			var parser = new Parser(tokens, strictMode, rules);
 			var ast = parser.parse();
 
-			if (debug) {
-				trace("=== AST ===");
-				for (stmt in ast) {
-					trace(stmt);
-				}
-			}
+			#if NXDEBUG
+			trace("=== AST ===");
+			for (stmt in ast) trace(stmt);
+			#end
 
 			// Compile to bytecode
 			var compiler = new Compiler();
 			var chunk = compiler.compile(ast);
 
-			if (debug) {
-				trace("=== BYTECODE ===");
-				disassemble(chunk);
-			}
+			#if NXDEBUG
+			trace("=== BYTECODE ===");
+			disassemble(chunk);
+			#end
 
 			// Execute
 			var result = vm.execute(chunk);
 
-			if (debug) {
-				trace("=== RESULT ===");
-				trace(result);
-			}
+			#if NXDEBUG
+			trace("=== RESULT ===");
+			trace(result);
+			#end
 
 			return result;
 		} catch (e:Dynamic) {
@@ -543,7 +621,10 @@ class Interpreter {
 							}
 						}
 					} else if (!resolveImportedModule(module)) {
-						__print_ln('Warning: Cant find module that package name: ' + module);
+						// Check if it's already registered as a global native (e.g. Sys, Math)
+						if (!vm.globals.exists(module) && !vm.natives.exists(module)) {
+							__print_ln('Warning: Cant find module that package name: ' + module);
+						}
 					}
 				}
 				// Keep line count stable for diagnostics.
@@ -771,12 +852,22 @@ class Interpreter {
 			throw 'Unable to load script file: ' + normalized;
 		return run(content, normalized);
 	}
-
+	/**
+	 * Reset the VM context — clears globals, reloads built-ins, etc.
+	 * Useful if you want to run multiple scripts in the same process without
+	 * them interfering with each other via globals.
+	 * Note: doesn't reset registered natives since those are meant to be shared.
+	**/
+	public function reset_context() {
+		this.vm = new VM(debug);
+		registerBuiltins();
+	}
 	/**
 	 * Run source code and return result as Haxe Dynamic (auto-converted)
 	 * Makes testing easier: `runDynamic("1 + 2") == 3`
 	 */
 	public function runDynamic(source:String, ?scriptName:String = "script"):Dynamic {
+
 		var result = run(source, scriptName);
 		return vm.valueToHaxe(result);
 	}
@@ -812,11 +903,11 @@ class Interpreter {
 		var strictMode = strictByDefault || strictFromPragma;
 
 		// Tokenize
-		var tokenizer = new Tokenizer(scriptSource);
+		var tokenizer = new Tokenizer(scriptSource, rules);
 		var tokens = tokenizer.tokenize();
 
 		// Parse
-		var parser = new Parser(tokens, strictMode);
+		var parser = new Parser(tokens, strictMode, rules);
 		var ast = parser.parse();
 
 		// Compile to bytecode
@@ -917,10 +1008,6 @@ class Interpreter {
 		return vm.callMethod(name, EMPTY_ARGS);
 	}
 
-	/** Resolve a function once for repeated host->script calls in performance-sensitive loops. */
-	public inline function resolveCallable(name:String):Value {
-		return vm.resolveCallable(name);
-	}
 
 	/** Call a resolved callable with custom arguments. */
 	public inline function callResolved(callee:Value, args:Array<Value>):Value {

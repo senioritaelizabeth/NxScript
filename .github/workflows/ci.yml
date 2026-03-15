@@ -18,26 +18,31 @@ jobs:
         uses: krdlab/setup-haxe@v1
         with:
           haxe-version: 4.3.7
+      - name: Set dev to current lib
+        run: haxelib dev nxscript $GITHUB_WORKSPACE
+      - name: install prismcli
+        run: haxelib install prismcli
 
-      - name: Run Basic Tests
-        working-directory: test/tests
-        run: haxe basic.hxml
 
-      - name: Run Methods Tests
+      - name: Run all Tests
         working-directory: test/tests
-        run: haxe methods.hxml
+        run: haxe test_suite.hxml
 
-      - name: Run Classes Tests
-        working-directory: test/tests
-        run: haxe classes.hxml
+      # - name: Run Methods Tests
+      #   working-directory: test/tests
+      #   run: haxe methods.hxml
 
-      - name: Run Error Format Tests
-        working-directory: test/tests
-        run: haxe errors.hxml
+      # - name: Run Classes Tests
+      #   working-directory: test/tests
+      #   run: haxe classes.hxml
 
-      - name: Run Import Compatibility Tests
-        working-directory: test/tests
-        run: haxe imports.hxml
+      # - name: Run Error Format Tests
+      #   working-directory: test/tests
+      #   run: haxe errors.hxml
+
+      # - name: Run Import Compatibility Tests
+      #   working-directory: test/tests
+      #   run: haxe imports.hxml
 
   docs-check:
     runs-on: ubuntu-latest
@@ -54,7 +59,9 @@ jobs:
       - name: Install dox
         run: |
           yes | haxelib install dox
-
+      - name: Install prismcli
+        run: |
+          yes | haxelib install prismcli
       - name: Prepare dox CommonJS compatibility
         shell: bash
         run: |

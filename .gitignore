@@ -38,3 +38,10 @@ node_modules/
 *.cpp/
 *.cs/
 *.zip
+*.nro
+*.elf
+*.a
+
+# ! means a file should be added regardless of it it gets ignored prior.
+!test/bin/cppSwitch_scriptbench/wrawrapper_src
+!test/bin/cppSwitch_scriptbench/Makefile

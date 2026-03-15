@@ -16,6 +16,7 @@ export/
 test/bin
 test/test_flixel
 bin/
+
 # Documentation
 docs/
 doc.xml
@@ -34,7 +35,7 @@ node_modules/
 *.ignore/
 *vsix
 
-# Unusual patterns 
+# Unusual patterns
 *.cpp/
 *.cs/
 *.zip
@@ -42,6 +43,13 @@ node_modules/
 *.elf
 *.a
 
-# ! means a file should be added regardless of it it gets ignored prior.
-!test/bin/cppSwitch_scriptbench/wrawrapper_src
+# Include just "test/bin/cppSwitch_scriptbench/Makefile"
+!test/bin/
+!test/bin/cppSwitch_scriptbench/
 !test/bin/cppSwitch_scriptbench/Makefile
+
+# Include just "bin/cppSwitch_scriptbench/wrapper_src"
+!bin/
+!bin/cppSwitch_scriptbench/
+!bin/cppSwitch_scriptbench/wrapper_src
+!bin/cppSwitch_scriptbench/wrapper_src/**

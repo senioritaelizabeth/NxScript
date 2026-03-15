@@ -15,10 +15,12 @@ class Parser {
 	var pos:Int = 0;
 	var strictSemicolons:Bool;
 	var syntheticCounter:Int = 0;
+	var rules:SyntaxRules = null;
 
-	public function new(tokens:Array<TokenPos>, strictSemicolons:Bool = false) {
+	public function new(tokens:Array<TokenPos>, strictSemicolons:Bool = false, ?rules:SyntaxRules) {
 		this.tokens = tokens;
 		this.strictSemicolons = strictSemicolons;
+		this.rules = rules;
 	}
 
 	public function parse():Array<StmtWithPos> {
@@ -471,10 +473,20 @@ class Parser {
 	}
 
 	function parseRange():Expr {
-		var left = parseLogicalOr();
+		var left = parseNullCoal();
 		while (match(TRange)) {
-			var right = parseLogicalOr();
+			var right = parseNullCoal();
 			left = ECall(EIdentifier("range"), [left, right]);
+		}
+		return left;
+	}
+
+	// ?? has lower precedence than || but higher than assignment
+	function parseNullCoal():Expr {
+		var left = parseLogicalOr();
+		while (match(TOperator(ONullCoal))) {
+			var right = parseLogicalOr();
+			left = ENullCoal(left, right);
 		}
 		return left;
 	}
@@ -702,6 +714,11 @@ class Parser {
 		while (running) {
 			var token = peek().token;
 			expr = switch (token) {
+				case TOperator(OOptChain): // ?.
+					advance();
+					var field = expectMemberName();
+					EOptChain(expr, field);
+
 				case TDot:
 					advance();
 					var field = expectMemberName(); // allows keywords as field names (d.enum, x.new)

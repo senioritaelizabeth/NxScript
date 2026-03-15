@@ -20,6 +20,8 @@ enum Expr {
 
 	// Binary operations
 	EBinary(op:Operator, left:Expr, right:Expr);
+	ENullCoal(left:Expr, right:Expr);  // left ?? right
+	EOptChain(object:Expr, field:String); // obj?.field
 
 	// Unary operations
 	EUnary(op:Operator, expr:Expr);

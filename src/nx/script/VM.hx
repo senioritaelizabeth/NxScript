@@ -587,6 +587,20 @@ class VM {
 						ip += arg * 2;
 					sp--;
 
+				// JUMP_IF_NULL / JUMP_IF_NOT_NULL — used by ?? and ?.
+				// Does NOT pop TOS — leaves it for the consuming instruction.
+				case Op.JUMP_IF_NULL:
+					switch (stack[sp - 1]) {
+						case VNull: ip += arg * 2;
+						default:
+					}
+
+				case Op.JUMP_IF_NOT_NULL:
+					switch (stack[sp - 1]) {
+						case VNull:
+						default: ip += arg * 2;
+					}
+
 				// Functions
 				case Op.CALL:
 					var argc = arg;
@@ -1680,10 +1694,12 @@ class VM {
 
 	inline function isTruthy(value:Value):Bool {
 		return switch (value) {
-			case VNull: false;
-			case VBool(b): b;
-			case VNumber(n): n != 0;
-			case VString(s): s.length > 0;
+			case VNull:       false;
+			case VBool(b):    b;
+			case VNumber(n):  n != 0 && !Math.isNaN(n);
+			case VString(s):  s.length > 0;
+			case VArray(a):   a.length > 0;
+			case VDict(m):    Lambda.count(m) > 0;
 			default: true;
 		}
 	}

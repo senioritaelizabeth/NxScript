@@ -733,6 +733,25 @@ class Compiler {
 				emitConstant(VString(typeName));
 				emitWithArg(Op.CALL, 2);
 
+			// left ?? right — evaluates left, if null/VNull uses right
+			// Bytecode: eval left, DUP, JUMP_IF_NOT_NULL→skip, POP, eval right, skip:
+			case ENullCoal(left, right):
+				compileExpression(left);
+				emit(Op.DUP);
+				var jumpSkip = emitJump(Op.JUMP_IF_NOT_NULL); // if not null, skip right
+				emit(Op.POP);                                  // pop the null
+				compileExpression(right);
+				patchJump(jumpSkip);
+
+			// obj?.field — if obj is null returns null, else GET_MEMBER
+			// Bytecode: eval obj, DUP, JUMP_IF_NULL→end, GET_MEMBER, end:
+			case EOptChain(object, field):
+				compileExpression(object);
+				emit(Op.DUP);
+				var jumpNull = emitJump(Op.JUMP_IF_NULL); // if null, leave null on stack
+				emitWithString(Op.GET_MEMBER, field);
+				patchJump(jumpNull);
+
 			case EAssign(target, value):
 				switch (target) {
 					case EIdentifier(name):

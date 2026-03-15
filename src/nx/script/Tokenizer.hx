@@ -60,8 +60,11 @@ class Tokenizer {
 		"is" => KIs
 	];
 
-	public function new(input:String) {
+	public var rules:SyntaxRules = null;
+
+	public function new(input:String, ?rules:SyntaxRules) {
 		this.input = input.replace('\r\n', '\n').replace('\r', '\n');
+		this.rules = rules;
 	}
 
 	public function tokenize():Array<TokenPos> {
@@ -436,9 +439,28 @@ class Tokenizer {
 
 		var id = input.substring(start, pos);
 
+		// SyntaxRules: operator aliases (e.g. "not" → "!", "and" → "&&")
+		if (rules != null && rules.operatorAliases.exists(id)) {
+			var opStr = rules.operatorAliases.get(id);
+			return switch (opStr) {
+				case "!":  TOperator(ONot);
+				case "&&": TOperator(OAnd);
+				case "||": TOperator(OOr);
+				case "==": TOperator(OEqual);
+				case "!=": TOperator(ONotEqual);
+				case "??": TOperator(ONullCoal);
+				default:   TIdentifier(id); // unknown alias, treat as identifier
+			};
+		}
+
+		// SyntaxRules: keyword aliases (e.g. "fn" → "func", "elif" → "elseif")
+		var resolvedId = (rules != null && rules.keywordAliases.exists(id))
+			? rules.keywordAliases.get(id)
+			: id;
+
 		// Check if it's a keyword
-		if (keywords.exists(id)) {
-			var keyword = keywords.get(id);
+		if (keywords.exists(resolvedId)) {
+			var keyword = keywords.get(resolvedId);
 			// Handle boolean literals
 			if (keyword == KTrue)
 				return TBool(true);
@@ -449,7 +471,7 @@ class Tokenizer {
 			return TKeyword(keyword);
 		}
 
-		return TIdentifier(id);
+		return TIdentifier(resolvedId != id ? resolvedId : id);
 	}
 
 	function readOperatorOrDelimiter():Token {
@@ -584,6 +606,17 @@ class Tokenizer {
 					return TOperator(OOr);
 				}
 				return TOperator(OBitOr);
+
+			case '?':
+				if (peek() == '?') {
+					advance();
+					return TOperator(ONullCoal); // ??
+				}
+				if (peek() == '.') {
+					advance();
+					return TOperator(OOptChain); // ?.
+				}
+				return TQuestion; // lone ? (ternary future use)
 
 			default:
 				throw 'Unexpected character "$c" at line $line, col $col';

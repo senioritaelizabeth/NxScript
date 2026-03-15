@@ -64,6 +64,8 @@ enum Operator {
 	// Logical
 	OAnd; // &&
 	OOr; // ||
+	ONullCoal; // ?? null-coalescing
+	OOptChain; // ?. optional chain
 	ONot; // !
 
 	// Assignment
@@ -116,6 +118,7 @@ enum Token {
 	TColon; // :
 	TDot; // .
 	TRange; // ...
+	TQuestion; // ? (standalone, for future ternary)
 	TArrow; // ->
 	TFatArrow; // =>
 

@@ -1,5 +1,7 @@
 package nx.script;
 
+import nx.script.SyntaxRules;
+
 import nx.script.Bytecode;
 import nx.script.NativeProxy;
 import nx.script.BytecodeSerializer;
@@ -128,10 +130,14 @@ class Interpreter {
 	var debug:Bool = false;
 	var strictByDefault:Bool = false;
 
-	public function new(debug:Bool = false, strict:Bool = false) {
+	/** Active syntax rules for this interpreter. Change before calling run(). */
+	public var rules:SyntaxRules = null;
+
+	public function new(debug:Bool = false, strict:Bool = false, ?rules:SyntaxRules) {
 		this.debug = debug;
 		this.strictByDefault = strict;
 		this.vm = new VM(debug);
+		this.rules = rules ?? SyntaxRules.nxScript();
 
 		// Register built-in functions
 		registerBuiltins();
@@ -540,7 +546,7 @@ class Interpreter {
 			vm.scriptName = scriptName;
 
 			// Tokenize
-			var tokenizer = new Tokenizer(scriptSource);
+			var tokenizer = new Tokenizer(scriptSource, rules);
 			var tokens = tokenizer.tokenize();
 
 			#if NXDEBUG
@@ -549,7 +555,7 @@ class Interpreter {
 			#end
 
 			// Parse
-			var parser = new Parser(tokens, strictMode);
+			var parser = new Parser(tokens, strictMode, rules);
 			var ast = parser.parse();
 
 			#if NXDEBUG
@@ -897,11 +903,11 @@ class Interpreter {
 		var strictMode = strictByDefault || strictFromPragma;
 
 		// Tokenize
-		var tokenizer = new Tokenizer(scriptSource);
+		var tokenizer = new Tokenizer(scriptSource, rules);
 		var tokens = tokenizer.tokenize();
 
 		// Parse
-		var parser = new Parser(tokens, strictMode);
+		var parser = new Parser(tokens, strictMode, rules);
 		var ast = parser.parse();
 
 		// Compile to bytecode

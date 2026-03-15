@@ -1,6 +1,7 @@
 package;
 
 import nx.script.Interpreter;
+import nx.script.SyntaxRules;
 import nx.script.VM;
 import nx.script.VM.GcKind;
 import nx.script.Bytecode.Value;
@@ -78,6 +79,10 @@ class TestSuite {
 		testIsOperator();
 		testBracelessSyntax();
 		testAbstracts();
+		testNullCoalescing();
+		testOptionalChain();
+		testTruthy();
+		testSyntaxRules();
 
 		Sys.println("\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
 		Sys.println('\u2551  Results: ' + passed + ' passed, ' + failed + ' failed');
@@ -454,10 +459,8 @@ class TestSuite {
 		ok(i.vm.maxCallDepth == 256,       "maxCallDepth = 256");
 		ok(i.vm.sandboxed == true,         "sandboxed = true");
 	
-		// ok(false, "sandbox blocks Sys");
 		throws(() -> i.runDynamic('Sys.exit(3)'), "sandbox blocks Sys"); 
 	}
-	
 
 	// ══════════════════════════════════════════════════════════════════════
 	// 25. USING / EXTENSION METHODS
@@ -603,5 +606,82 @@ class TestSuite {
 			var e=new Email("user@example.com")\ne.domain()
 		') == "example.com", "abstract Email.domain()");
 	}
-}
+	// ══════════════════════════════════════════════════════════════════════
+	// ?? NULL COALESCING
+	// ══════════════════════════════════════════════════════════════════════
+	static function testNullCoalescing() {
+		sec("?? null coalescing");
+		var i = new Interpreter();
+		ok(i.runDynamic('var x = null\nx ?? "default"') == "default",    "null ?? default");
+		ok(i.runDynamic('var x = 42\nx ?? "default"') == 42,             "non-null ?? returns left");
+		ok(i.runDynamic('var x = 0\nx ?? "default"') == 0,               "0 ?? is 0 (not null)");
+		ok(i.runDynamic('var x = ""\nx ?? "default"') == "",              '"" ?? is "" (not null)');
+		ok(i.runDynamic('null ?? null ?? "found"') == "found",            "chained ??");
+		ok(i.runDynamic('var a=null\nvar b=null\nvar c=99\na??b??c') == 99, "a??b??c");
+	}
 
+	// ══════════════════════════════════════════════════════════════════════
+	// ?. OPTIONAL CHAIN
+	// ══════════════════════════════════════════════════════════════════════
+	static function testOptionalChain() {
+		sec("?. optional chain");
+		var i = new Interpreter();
+		ok(i.runDynamic('var x=null\nx?.y') == null,                       "null?.y == null");
+		ok(i.runDynamic('var d={"a":42}\nd?.a') == 42,                    "dict?.field returns value");
+		ok(i.runDynamic('var d=null\nd?.a ?? "fb"') == "fb",              "null?.field ?? fallback");
+		ok(i.runDynamic('var x=null\nx?.y?.z') == null,                   "null?.y?.z chain");
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// TRUTHY JS-STYLE
+	// ══════════════════════════════════════════════════════════════════════
+	static function testTruthy() {
+		sec("Truthy JS-style coercion");
+		var i = new Interpreter();
+		ok(i.runDynamic('if (1) "yes" else "no"') == "yes",    "1 is truthy");
+		ok(i.runDynamic('if (0) "yes" else "no"') == "no",     "0 is falsy");
+		ok(i.runDynamic('if ("hi") "yes" else "no"') == "yes", '"hi" is truthy');
+		ok(i.runDynamic('if ("") "yes" else "no"') == "no",    '"" is falsy');
+		ok(i.runDynamic('if ([1]) "yes" else "no"') == "yes",  '[1] is truthy');
+		ok(i.runDynamic('if ([]) "yes" else "no"') == "no",    '[] is falsy');
+		ok(i.runDynamic('if (null) "yes" else "no"') == "no",  "null is falsy");
+		ok(i.runDynamic('var x=5\nif (x) "y" else "n"') == "y", "x=5 truthy");
+		ok(i.runDynamic('var x=0\nif (x) "y" else "n"') == "n", "x=0 falsy");
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// SYNTAXRULES
+	// ══════════════════════════════════════════════════════════════════════
+	static function testSyntaxRules() {
+		sec("SyntaxRules — aliases");
+
+		var r1 = new SyntaxRules();
+		r1.addKeywordAlias("fn", "func");
+		var i1 = new Interpreter(false, false, r1);
+		ok(i1.runDynamic('fn add(a,b){return a+b}\nadd(3,4)') == 7, "fn alias for func");
+
+		var r2 = new SyntaxRules();
+		r2.addKeywordAlias("let", "var");
+		var i2 = new Interpreter(false, false, r2);
+		ok(i2.runDynamic('let x=10\nlet y=20\nx+y') == 30, "let alias for var");
+
+		var r3 = new SyntaxRules();
+		r3.addOperatorAlias("not", "!");
+		var i3 = new Interpreter(false, false, r3);
+		ok(i3.runDynamic('not false') == true,  "not alias for !");
+		ok(i3.runDynamic('not true') == false,  "not true == false");
+
+		var r4 = new SyntaxRules();
+		r4.addOperatorAlias("and", "&&");
+		r4.addOperatorAlias("or", "||");
+		var i4 = new Interpreter(false, false, r4);
+		ok(i4.runDynamic('true and false') == false, "and alias for &&");
+		ok(i4.runDynamic('false or true') == true,   "or alias for ||");
+
+		var i5 = new Interpreter(false, false, SyntaxRules.pythonish());
+		ok(i5.runDynamic('def add(a,b){return a+b}\nadd(10,5)') == 15, "pythonish: def");
+		ok(i5.runDynamic('not False') == true,         "pythonish: not False");
+		ok(i5.runDynamic('True and not False') == true,"pythonish: True and not False");
+	}
+
+}

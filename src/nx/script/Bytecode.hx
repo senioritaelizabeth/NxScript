@@ -54,6 +54,8 @@ class Op {
 	public static inline var JUMP = 0x50; // Unconditional jump
 	public static inline var JUMP_IF_FALSE = 0x51; // Jump if top of stack is false
 	public static inline var JUMP_IF_TRUE = 0x52; // Jump if top of stack is true
+	public static inline var JUMP_IF_NULL = 0x53; // Jump if TOS is VNull (leaves TOS)
+	public static inline var JUMP_IF_NOT_NULL = 0x54; // Jump if TOS is not VNull (leaves TOS)
 
 	// Functions (0x60 - 0x6F)
 	public static inline var CALL = 0x60; // Call function with n arguments
@@ -159,6 +161,8 @@ class Op {
 			case JUMP: "JUMP";
 			case JUMP_IF_FALSE: "JUMP_IF_FALSE";
 			case JUMP_IF_TRUE: "JUMP_IF_TRUE";
+			case JUMP_IF_NULL: "JUMP_IF_NULL";
+			case JUMP_IF_NOT_NULL: "JUMP_IF_NOT_NULL";
 			case CALL: "CALL";
 			case RETURN: "RETURN";
 			case MAKE_FUNC: "MAKE_FUNC";

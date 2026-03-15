@@ -203,6 +203,24 @@ class BenchAutoRunner {
 				csvName: "script_target_bench_cpp.csv"
 			},
 			{
+				name: "switch",
+				compileCmd: base.concat([
+					"-cpp",
+					"bin/cppSwitch_scriptbench",
+					"--library",
+					"hx_libnx",
+					"-D",
+					"nx",
+					"-D",
+					"HX_NX",
+					"-D",
+					"static_link"]),
+				runCmd: null,
+				requiredCommands: ["haxe"],
+				slow: false,
+				csvName: "script_target_bench_cpp_switch.csv"
+			},
+			{
 				name: "neko",
 				compileCmd: base.concat(["-neko", "bin/ScriptTargetBench.n"]),
 				runCmd: ["neko", "./bin/ScriptTargetBench.n"].concat(quickArg),
@@ -222,6 +240,14 @@ class BenchAutoRunner {
 	}
 
 	static function runCommand(cmd:Array<String>, cwd:String):CmdResult {
+		if (cmd == null || cmd.length == 0)
+			return {
+				ok: false,
+				exitCode: 0,
+				stdout: "",
+				stderr: ""
+			};
+
 		var previous = Sys.getCwd();
 		traceLog('runCommand -> cwd=' + cwd + ' cmd=' + formatCommand(cmd));
 		try {
@@ -316,6 +342,8 @@ class BenchAutoRunner {
 	}
 
 	static function formatCommand(cmd:Array<String>):String {
+		if (cmd == null || cmd.length == 0)
+			return "No command";
 		return cmd.join(" ");
 	}
 

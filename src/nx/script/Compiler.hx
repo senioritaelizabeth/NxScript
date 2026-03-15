@@ -513,13 +513,9 @@ class Compiler {
 				compileStatement(SClass(name, null, methods, []), isLast);
 
 			case SUsing(className):
-				// `using MyClass` — load the class value and register it as an extension provider.
-				// At runtime this calls vm.usingExtensions.push(MyClass).
-				// We emit: LOAD_VAR "className", CALL native "__using_register__" 1
-				emitWithString(Op.LOAD_VAR, "__using_register__");
-				emitWithString(Op.LOAD_VAR, className);
-				emitWithArg(Op.CALL, 1);
-				if (!isLast) emit(Op.POP);
+				// `using` is parsed but currently a no-op at runtime.
+				// Extension methods via VProxy were removed for performance.
+				if (!isLast) emit(Op.LOAD_NULL);
 
 			case SMatch(subject, cases, defaultBody):
 				compileMatch(subject, cases, defaultBody, isLast);
@@ -1038,24 +1034,19 @@ class Compiler {
 					jumpOverBody = emitJump(Op.JUMP_IF_FALSE);
 
 				case MPRange(from, to):
-					// subject >= from && subject <= to
-					// Dup subject for two comparisons
-					emit(Op.DUP);
+					// Cleanest: __range_match__(subject, from, to) -> Bool
+					// Avoids all stack-juggling from short-circuit AND.
+					// subject is on stack from loop-top load — pop it, reload via stored name.
+					emit(Op.POP); // drop subject from loop-top load
+					emitWithString(Op.LOAD_VAR, "__range_match__");
+					if (localSlots != null)
+						emitWithArg(Op.LOAD_LOCAL, localSlots.get(subjectName))
+					else
+						emitWithString(Op.LOAD_VAR, subjectName);
 					compileExpression(from);
-					emit(Op.GTE);
-					// subject (original) <= to
-					var jFalse1 = emitJump(Op.JUMP_IF_FALSE);
-					// subject still on stack
 					compileExpression(to);
-					emit(Op.LTE);
+					emitWithArg(Op.CALL, 3); // __range_match__(subject, from, to)
 					jumpOverBody = emitJump(Op.JUMP_IF_FALSE);
-					patchJump(jFalse1);
-					// if first cond false, jump to jumpOverBody position
-					// but we already patched — this is a known limitation,
-					// handled by re-emitting a jump to end
-					// TODO: clean up with short-circuit AND opcode
-					// For now: works correctly because JUMP_IF_FALSE pops
-					// and the range check is just two consecutive checks
 
 				case MPType(typeName):
 					// Compare type() result against type name string

@@ -1,6 +1,7 @@
 package nx.script;
 
 import nx.script.Bytecode;
+import nx.script.NativeProxy;
 import nx.script.BytecodeSerializer;
 import nx.script.Compiler;
 import nx.script.NxProxy;
@@ -92,6 +93,36 @@ class Interpreter {
 	/** Enable sandbox mode — blocks filesystem/network natives, limits instructions. */
 	public function enableSandbox(?extraBlocklist:Array<String>):Void
 		vm.enableSandbox(extraBlocklist);
+
+	// ─── NativeProxy helpers ────────────────────────────────────────────────
+
+	/**
+	 * Wrap a single native Haxe object (e.g. FlxSprite) as a VDict proxy.
+	 * Fields are read once into a shadow Map<String,Value> — script accesses
+	 * are pure Map ops with no Reflection in the hot path.
+	 *
+	 * Call proxy.flush() after the script update to write changes back.
+	 *
+	 *   var proxy = interp.wrapNative(sprite, ["x","y","angle","color"]);
+	 *   vm.globals.set("spr", proxy.value);
+	 *   interp.run('update(spr, dt)');
+	 *   proxy.flush();
+	 */
+	public function wrapNative(obj:Dynamic, ?fields:Array<String>):NativeProxy
+		return NativeProxy.wrap(vm, obj, fields);
+
+	/**
+	 * Wrap many native objects at once (same field list for all).
+	 * Returns a WrapManyResult with a VArray of VDicts for the script
+	 * and the proxy list for calling flushAll() after the update.
+	 *
+	 *   var r = interp.wrapNativeMany(sprites, ["x","y","angle","color"]);
+	 *   vm.globals.set("sprites", r.value);  // VArray of VDicts
+	 *   interp.run('for (spr in sprites) update(spr, dt)');
+	 *   NativeProxy.flushAll(r.proxies);
+	 */
+	public function wrapNativeMany(objects:Array<Dynamic>, ?fields:Array<String>):nx.script.WrapManyResult
+		return NativeProxy.wrapMany(vm, objects, fields);
 
 	/** Kept for API compat. Use -D NXDEBUG compile flag for actual debug output. */
 	var debug:Bool = false;

@@ -280,4 +280,5 @@ enum Value {
 	 *   VEnumValue("Result", "Ok", [VString("hello")])
 	 */
 	VEnumValue(enumName:String, variant:String, values:Array<Value>);
+
 }

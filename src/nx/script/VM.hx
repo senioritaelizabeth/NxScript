@@ -88,7 +88,7 @@ class VM {
 	 * Maps className -> list of static method containers (VClass or VNativeObject).
 	 * When getMember fails to find a method, these are searched with obj as first arg.
 	 */
-	public var usingExtensions:Array<Value> = [];
+// usingExtensions removed (using feature removed with VProxy)
 
 	/** Set of native/global names blocked in sandboxed mode. */
 	public var sandboxBlocklist:Map<String, Bool> = new Map();
@@ -113,7 +113,7 @@ class VM {
 	 * Controls how aggressively the VM reclaims internal caches between script executions.
 	 *
 	 *   AGGRESSIVE  — Clears all caches (arrayMethodCache, instanceMethodCache, nativeArgBuffers,
-	 *                 _typeNameCache) on every execute() call. Minimises memory at the cost of
+	 *                 caches) on every execute() call. Minimises memory at the cost of
 	 *                 re-warming caches on each run. Best for short-lived scripts or tight memory.
 	 *
 	 *   SOFT        — Clears caches only when the number of tracked objects exceeds a threshold
@@ -139,10 +139,10 @@ class VM {
 	var instanceMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 	var nativeArgBuffers:Map<Int, Array<Value>>;
 	// Caches Type.getClassName per object instance — one pointer lookup instead of reflection per access
-	var _typeNameCache:haxe.ds.ObjectMap<Dynamic, String>;
+	// _typeNameCache removed
 	// Per-class field descriptor cache: className -> fieldName -> NativeFieldKind
 	// Resolved once on first access, reused for every subsequent get/set on any instance of that class.
-	var _nativeFieldCache:Map<String, Map<String, NativeFieldKind>>;
+	// NativeFieldCache removed — cache overhead exceeded Reflection cost on CPP
 
 	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
@@ -189,11 +189,11 @@ class VM {
 		globalSlotConstInit = [];
 		arrayMethodCache = new ObjectMap();
 		instanceMethodCache = new ObjectMap();
-		_typeNameCache = new haxe.ds.ObjectMap();
+		// _typeNameCache removed
 		nativeArgBuffers = new Map();
-		_nativeFieldCache = new Map();
+		// _nativeFieldCache removed
 
-		usingExtensions = [];
+// usingExtensions init removed
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
 	}
@@ -207,7 +207,7 @@ class VM {
 		sp = 0;
 		frames = [];
 		catchStack = [];
-		usingExtensions = []; // reset per-run so extensions don't bleed between scripts
+// usingExtensions init removed // reset per-run so extensions don't bleed between scripts
 		applyGcPolicy();
 		bindGlobalSlots(chunk);
 
@@ -367,6 +367,9 @@ class VM {
 						if (value == null) {
 							value = constVars.get(name);
 							if (value == null) {
+								// Sandbox check before globals/natives (inlined path must respect blocklist)
+								if (sandboxed && sandboxBlocklist.exists(name))
+									throw 'Sandbox: access to "$name" is not allowed';
 								value = globals.get(name);
 								if (value == null) {
 									value = natives.get(name);
@@ -766,6 +769,30 @@ class VM {
 									var parts = [for (v in arr) valueToString(v)];
 									sp = objectIndex;
 									stack[sp++] = VString(parts.join(delim));
+									continue;
+								default:
+							}
+						case VNativeObject(nobj) if (Std.isOfType(nobj, Array)):
+							var narr:Array<Dynamic> = cast nobj;
+							var argStart = objectIndex + 1;
+							switch (memberField) {
+								case "push":
+									narr.push(valueToHaxe(stack[argStart]));
+									sp = objectIndex;
+									stack[sp++] = VNumber(narr.length);
+									continue;
+								case "pop":
+									sp = objectIndex;
+									stack[sp++] = narr.length == 0 ? VNull : haxeToValue(narr.pop());
+									continue;
+								case "shift":
+									sp = objectIndex;
+									stack[sp++] = narr.length == 0 ? VNull : haxeToValue(narr.shift());
+									continue;
+								case "unshift":
+									narr.unshift(valueToHaxe(stack[argStart]));
+									sp = objectIndex;
+									stack[sp++] = VNull;
 									continue;
 								default:
 							}
@@ -1428,7 +1455,18 @@ class VM {
 			case TInt: VNumber(value);
 			case TFloat: VNumber(value);
 			case TClass(String): VString(value);
-			case TClass(Array): VArray([for (v in (value : Array<Dynamic>)) haxeToValue(v)]);
+			case TClass(Array):
+				// Return a live VArray wrapping the SAME Array<Dynamic>.
+				// Script push/pop/[] operate on the original array — no copy.
+				// Each element is lazily converted via haxeToValue per access.
+				// We store a shared reference by aliasing Array<Dynamic> as Array<Value>
+				// using a thin adapter stored in a VNativeArray wrapper.
+				//
+				// Implementation: build a VArray backed by a proxy Array<Value>
+				// that syncs both ways with the original.
+				// Simpler approach that works: keep the original array as VNativeObject
+				// and handle push/length/[] on VNativeObject(Array) specially in getMember.
+				VNativeObject(value);
 			case TFunction: VNativeFunction("", -1, (args:Array<Value>) -> {
 					var haxeArgs = [for (a in args) valueToHaxe(a)];
 					return haxeToValue(Reflection.callMethod(null, value, haxeArgs));
@@ -1654,47 +1692,44 @@ class VM {
 	public function getMember(object:Value, field:String):Value {
 		return switch (object) {
 			case VNumber(n):
-				tryGetOrUsing(object, field, () -> getNumberMethod(n, field));
+				getNumberMethod(n, field);
 
 			case VString(s):
-				tryGetOrUsing(object, field, () -> getStringMethod(s, field));
+				getStringMethod(s, field);
 
 			case VArray(arr):
-				tryGetOrUsing(object, field, () -> getArrayMethod(arr, field));
+				getArrayMethod(arr, field);
 
 			case VDict(map):
-				// Dict methods
 				switch (field) {
 					case "keys":   return VNativeFunction("keys",   0, (_) -> VArray([for (k in map.keys()) VString(k)]));
 					case "values": return VNativeFunction("values", 0, (_) -> VArray([for (k in map.keys()) map.get(k)]));
-					case "has":    return VNativeFunction("has",    1, (args) -> switch (args[0]) {
-						case VString(k): VBool(map.exists(k));
-						default: throw 'has expects a string key';
+					case "has":    return VNativeFunction("has",    1, (args) -> VBool(switch (args[0]) {
+						case VString(k): map.exists(k);
+						default: map.exists(valueToString(args[0]));
+					}));
+					case "remove": return VNativeFunction("remove", 1, (args) -> {
+						var k = switch (args[0]) { case VString(s): s; default: valueToString(args[0]); };
+						map.remove(k); return VNull;
 					});
-					case "remove": return VNativeFunction("remove", 1, (args) -> switch (args[0]) {
-						case VString(k): VBool(map.remove(k));
-						default: throw 'remove expects a string key';
+					case "set":    return VNativeFunction("set",    2, (args) -> {
+						var k = switch (args[0]) { case VString(s): s; default: valueToString(args[0]); };
+						map.set(k, args[1]); return VNull;
 					});
 					case "size":   return VNativeFunction("size",   0, (_) -> VNumber(Lambda.count(map)));
-					case "set":    return VNativeFunction("set",    2, (args) -> {
-						var k = switch (args[0]) { case VString(s): s; default: throw 'set expects string key'; };
-						map.set(k, args[1]);
-						VNull;
-					});
-					default: map.exists(field) ? map.get(field) : VNull;
-				};
+					case "clear":  return VNativeFunction("clear",  0, (_) -> { map.clear(); return VNull; });
+					default:
+						map.exists(field) ? map.get(field) : VNull;
+				}
 
 			case VInstance(className, fields, classData):
-				// instance fields first
 				if (fields.exists(field))
 					return fields.get(field);
 
-				// method cache
 				var cachedInstanceMethods = instanceMethodCache.get(fields);
 				if (cachedInstanceMethods != null && cachedInstanceMethods.exists(field))
 					return cachedInstanceMethods.get(field);
 
-				// walk class hierarchy for methods
 				var currentClass = classData;
 				while (currentClass != null) {
 					if (currentClass.methods.exists(field)) {
@@ -1713,12 +1748,10 @@ class VM {
 						currentClass = null;
 				}
 
-				// fallback to native base (script class extending native class)
 				var nativeBase = fields.get(NATIVE_SUPER_INSTANCE_FIELD);
 				switch (nativeBase) {
 					case VNativeObject(_): return getMember(nativeBase, field);
-					default:
-						return VNull;
+					default: return VNull;
 				}
 
 			case VClass(classData):
@@ -1729,17 +1762,15 @@ class VM {
 				if (fieldVal != null)
 					return fieldVal;
 				return VNull;
-			case VNativeObject(obj):
-				return nativeGet(obj, field);
+
 
 			case VEnumValue(eName, variant, vals):
 				switch (field) {
 					case "variant": return VString(variant);
-					case "name":    return VString(variant); // alias
+					case "name":    return VString(variant);
 					case "enum":    return VString(eName);
 					case "values":  return VArray(vals.copy());
 					default:
-						// Indexed access: .value0, .value1, etc.
 						var idxStr = field;
 						if (StringTools.startsWith(idxStr, "value")) {
 							var i = Std.parseInt(idxStr.substr(5));
@@ -1748,132 +1779,41 @@ class VM {
 						return VNull;
 				}
 
-			default:
-				// Try extension methods registered via `using`
-				if (usingExtensions.length > 0) {
-					var ext = findUsingMethod(object, field);
-					if (ext != null) return ext;
+			case VNativeObject(obj):
+				// Live Array<Dynamic> — handle ops directly
+				if (Std.isOfType(obj, Array)) {
+					var arr:Array<Dynamic> = cast obj;
+					switch (field) {
+						case "length": return VNumber(arr.length);
+						case "push":   return VNativeFunction("push",   1, (args) -> { arr.push(valueToHaxe(args[0])); return VNumber(arr.length); });
+						case "pop":    return VNativeFunction("pop",    0, (_)    -> arr.length == 0 ? VNull : haxeToValue(arr.pop()));
+						case "shift":  return VNativeFunction("shift",  0, (_)    -> arr.length == 0 ? VNull : haxeToValue(arr.shift()));
+						case "unshift":return VNativeFunction("unshift",1, (args) -> { arr.unshift(valueToHaxe(args[0])); return VNull; });
+						case "first":  return arr.length > 0 ? haxeToValue(arr[0]) : VNull;
+						case "last":   return arr.length > 0 ? haxeToValue(arr[arr.length-1]) : VNull;
+						case "join":   return VNativeFunction("join", 1, (args) -> {
+								var sep = switch(args[0]) { case VString(s): s; default: ""; };
+								return VString(arr.map(v -> Std.string(v)).join(sep));
+							});
+						case "reverse":return VNativeFunction("reverse",0,(_) -> { arr.reverse(); return VNativeObject(arr); });
+						case "indexOf":return VNativeFunction("indexOf",1,(args) -> VNumber(arr.indexOf(valueToHaxe(args[0]))));
+						case "contains" | "includes": return VNativeFunction(field,1,(args)->VBool(arr.indexOf(valueToHaxe(args[0]))>=0));
+						case "copy":   return VNativeObject(arr.copy());
+						default: // fall through to Reflection
+					}
 				}
-				throw 'Cannot access member $field on $object';
-		}
-	}
-
-	/**
-	 * Searches usingExtensions for a static method named `field`.
-	 * If found, returns a VNativeFunction that calls it with obj as the first argument.
-	 * This implements the `using` extension method pattern.
-	 */
-	/**
-	 * Try the built-in method getter first; if it throws "Unknown X method",
-	 * fall through to usingExtensions before re-throwing.
-	 * This lets `using` add extension methods to Number, String, Array, etc.
-	 */
-	inline function tryGetOrUsing(obj:Value, field:String, getter:()->Value):Value {
-		if (usingExtensions.length == 0)
-			return getter();
-		try {
-			return getter();
-		} catch (e:Dynamic) {
-			var ext = findUsingMethod(obj, field);
-			if (ext != null) return ext;
-			throw e; // re-throw original error
-		}
-	}
-
-	function findUsingMethod(obj:Value, field:String):Null<Value> {
-		for (ext in usingExtensions) {
-			switch (ext) {
-				case VClass(classData):
-					var method = classData.methods.get(field);
-					if (method != null) {
-						// Extension method: obj becomes the first parameter (not `this`).
-						// Wrap in a native that prepends obj then delegates to callFunction.
-						var capturedObj = obj;
-						var capturedMethod = method;
-						return VNativeFunction(field, -1, (args:Array<Value>) -> {
-							var all = [capturedObj].concat(args);
-							return callFunction(capturedMethod, EMPTY_MAP, all);
-						});
-					}
-				case VNativeObject(clsObj):
-					// Native Haxe class — look for a static method via reflection
-					var fn:Dynamic = Reflect.field(clsObj, field);
-					if (fn != null && Reflection.isFunction(fn)) {
-						var capturedObj = obj;
-						return VNativeFunction(field, -1, (args:Array<Value>) -> {
-							var all = [capturedObj].concat(args);
-							var haxeArgs = [for (a in all) valueToHaxe(a)];
-							return haxeToValue(Reflection.callMethod(null, fn, haxeArgs));
-						});
-					}
-				default:
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Cached native field/property read.
-	 *
-	 * On first access for a given (className, fieldName) pair, probes the object
-	 * to determine the field kind (plain field, getter property, or method) and
-	 * stores a NativeFieldKind descriptor keyed by class name.
-	 * All subsequent accesses for any instance of that class hit only a two-level
-	 * Map lookup — zero Reflection calls in the hot path for fields and properties.
-	 *
-	 * Methods are not cached per-instance — a fresh VNativeFunction closure is
-	 * returned each time (same as before), but the isFunction probe is cached so
-	 * we skip it on the fast path.
-	 */
-	inline function nativeGet(obj:Dynamic, field:String):Value {
-		var className = nativeClassName(obj);
-		var classEntry = _nativeFieldCache.get(className);
-		if (classEntry == null) {
-			classEntry = new Map();
-			_nativeFieldCache.set(className, classEntry);
-		}
-		var kind = classEntry.get(field);
-		if (kind == null) {
-			// First access — classify by probing. This runs once per (class, field) pair.
-			var raw:Dynamic = Reflection.getField(obj, field);
-			if (Reflection.isFunction(raw)) {
-				kind = NFK_Method;
-			} else {
-				// Detect if the field is backed by a Haxe getter (get_<field>).
-				// Check if Type.getInstanceFields includes "get_<field>" on the class —
-				// that is the canonical way to detect properties in Haxe across all targets.
-				var cls = Type.getClass(obj);
-				var getterName = 'get_$field';
-				var fields = cls != null ? Type.getInstanceFields(cls) : [];
-				var hasGetter = fields.indexOf(getterName) >= 0;
-				kind = hasGetter ? NFK_Property : NFK_Field;
-			}
-			classEntry.set(field, kind);
-			// Return the value we already read instead of re-reading
-			return switch (kind) {
-				case NFK_Method:
-					VNativeFunction(field, -1, (args:Array<Value>) -> {
-						var haxeArgs = [for (a in args) valueToHaxe(a)];
-						return haxeToValue(Reflection.callMethod(obj, raw, haxeArgs));
-					});
-				case NFK_Property:
-					haxeToValue(Reflect.getProperty(obj, field));
-				case NFK_Field:
-					haxeToValue(raw); // reuse the already-fetched value, no second getField
-			}
-		}
-		// Hot path — kind already known, no reflection probe needed
-		return switch (kind) {
-			case NFK_Field:
-				haxeToValue(Reflection.getField(obj, field));
-			case NFK_Property:
-				haxeToValue(Reflect.getProperty(obj, field));
-			case NFK_Method:
-				var fn:Dynamic = Reflection.getField(obj, field);
-				VNativeFunction(field, -1, (args:Array<Value>) -> {
+				// Standard native object — direct Reflection, no cache
+				var raw:Dynamic = Reflection.getField(obj, field);
+				if (raw == null) return VNull;
+				if (!Reflection.isFunction(raw)) return haxeToValue(raw);
+				var capturedObj = obj; var capturedFn = raw;
+				return VNativeFunction(field, -1, (args:Array<Value>) -> {
 					var haxeArgs = [for (a in args) valueToHaxe(a)];
-					return haxeToValue(Reflection.callMethod(obj, fn, haxeArgs));
+					return haxeToValue(Reflection.callMethod(capturedObj, capturedFn, haxeArgs));
 				});
+
+			default:
+				throw 'Cannot access member $field on $object';
 		}
 	}
 
@@ -1897,64 +1837,15 @@ class VM {
 			case VClass(classData):
 				classData.fields.set(field, value);
 			case VNativeObject(obj):
-				nativeSet(obj, field, value);
+				Reflection.setField(obj, field, valueToHaxe(value));
 			default:
 				throw 'Cannot set member $field';
 		}
 	}
 
-	/**
-	 * Cached native field/property write.
-	 *
-	 * Uses the same NativeFieldKind descriptor as nativeGet — once classified
-	 * as field or property, every subsequent write takes the correct branch
-	 * with zero try/catch overhead.
-	 *
-	 * The old double try { try { setField } catch { setField } } catch pattern
-	 * was safe but paid exception-handling overhead on every write even in the
-	 * happy path. This replaces it with a single branch on the cached kind.
-	 */
-	inline function nativeSet(obj:Dynamic, field:String, value:Value):Void {
-		var className = nativeClassName(obj);
-		var classEntry = _nativeFieldCache.get(className);
-		if (classEntry == null) {
-			classEntry = new Map();
-			_nativeFieldCache.set(className, classEntry);
-		}
-		var kind = classEntry.get(field);
-		if (kind == null) {
-			// First write — probe to classify (write-first scenario, no prior read)
-			var testVal:Dynamic = Reflection.getField(obj, field);
-			var propVal:Dynamic = Reflect.getProperty(obj, field);
-			kind = (propVal != null && propVal != testVal) ? NFK_Property : NFK_Field;
-			classEntry.set(field, kind);
-		}
-		final hval = valueToHaxe(value);
-		switch (kind) {
-			case NFK_Field | NFK_Method:
-				Reflection.setField(obj, field, hval);
-			case NFK_Property:
-				Reflect.setProperty(obj, field, hval);
-		}
-	}
+	// nativeSet removed — inlined to Reflection.setField directly
 
-	/**
-	 * Returns a stable class-name string for _nativeFieldCache lookup.
-	 * Cached in _typeNameCache keyed by the CLASS object (not the instance),
-	 * so 10k FlxSprite instances produce exactly one _typeNameCache entry,
-	 * not 10k.
-	 */
-	inline function nativeClassName(obj:Dynamic):String {
-		var cls = Type.getClass(obj);
-		if (cls == null) return "<anonymous>";
-		var name = _typeNameCache.get(cls);
-		if (name == null) {
-			name = Type.getClassName(cls);
-			if (name == null) name = "<anonymous>";
-			_typeNameCache.set(cls, name);
-		}
-		return name;
-	}
+	// nativeClassName removed with NativeFieldCache
 
 	function getIndex(object:Value, index:Value):Value {
 		return switch [object, index] {
@@ -1963,6 +1854,12 @@ class VM {
 				if (idx < 0 || idx >= arr.length)
 					throw 'Index out of bounds: $idx';
 				arr[idx];
+			case [VNativeObject(obj), VNumber(i)] if (Std.isOfType(obj, Array)):
+				var arr:Array<Dynamic> = cast obj;
+				var idx = Std.int(i);
+				if (idx < 0 || idx >= arr.length)
+					throw 'Index out of bounds: $idx';
+				haxeToValue(arr[idx]);
 			case [VDict(map), _]:
 				var key = valueToString(index);
 				map.exists(key) ? map.get(key) : VNull;
@@ -2011,6 +1908,12 @@ class VM {
 				if (idx < 0 || idx >= arr.length)
 					throw 'Index out of bounds: $idx';
 				arr[idx] = value;
+			case [VNativeObject(obj), VNumber(i)] if (Std.isOfType(obj, Array)):
+				var arr:Array<Dynamic> = cast obj;
+				var idx = Std.int(i);
+				if (idx < 0 || idx >= arr.length)
+					throw 'Index out of bounds: $idx';
+				arr[idx] = valueToHaxe(value);
 			case [VDict(map), _]:
 				map.set(valueToString(index), value);
 			default:
@@ -2025,6 +1928,14 @@ class VM {
 				VDict([
 					"_iter_type" => VString("array"),
 					"_iter_data" => VArray(arr),
+					"_iter_index" => VNumber(0)
+				]);
+			case VNativeObject(obj) if (Std.isOfType(obj, Array)):
+				// Wrap the native array as a VArray for iteration (snapshot is OK for for-in)
+				var arr:Array<Dynamic> = cast obj;
+				VDict([
+					"_iter_type" => VString("array"),
+					"_iter_data" => VArray([for (v in arr) haxeToValue(v)]),
 					"_iter_index" => VNumber(0)
 				]);
 			default: throw 'Value is not iterable';
@@ -2577,8 +2488,8 @@ class VM {
 		arrayMethodCache    = new ObjectMap();
 		instanceMethodCache = new ObjectMap();
 		nativeArgBuffers    = new Map();
-		_typeNameCache      = new haxe.ds.ObjectMap();
-		_nativeFieldCache   = new Map();
+		// _typeNameCache removed
+		// _nativeFieldCache removed
 	}
 
 	function bindGlobalSlots(chunk:Chunk):Void {
@@ -2774,6 +2685,14 @@ class VM {
 			});
 		}));
 
+		// Range matching — called by MPRange: __range_match__(subject, from, to) -> Bool
+		natives.set("__range_match__", VNativeFunction("__range_match__", 3, (args) -> {
+			var subject = switch (args[0]) { case VNumber(n): n; default: return VBool(false); };
+			var from    = switch (args[1]) { case VNumber(n): n; default: return VBool(false); };
+			var to      = switch (args[2]) { case VNumber(n): n; default: return VBool(false); };
+			return VBool(subject >= from && subject <= to);
+		}));
+
 		// Enum variant matching — called by MPEnum in compileMatch
 		// __enum_variant_match__(subject, variantName) -> Bool
 		// Returns true if subject is VEnumValue with matching variant name.
@@ -2786,11 +2705,7 @@ class VM {
 			};
 		}));
 
-		// `using` registration — called internally by SUsing compilation
-		natives.set("__using_register__", VNativeFunction("__using_register__", 1, (args) -> {
-			usingExtensions.push(args[0]);
-			return VNull;
-		}));
+		// __using_register__ removed
 
 		// math constants
 		natives.set("PI",  VNumber(Math.PI));
@@ -2851,17 +2766,10 @@ class ScriptException {
 
 /**
  * Describes how a native Haxe object field is accessed.
- * Resolved once per (className, fieldName) pair and stored in _nativeFieldCache.
- *
- *   NFK_Field    — plain Haxe field, read/written with Reflection.getField/setField.
- *   NFK_Property — has a Haxe getter/setter (get_x / set_x), use Reflect.getProperty/setProperty.
- *   NFK_Method   — callable function, wrap in VNativeFunction on each read.
+ * NativeFieldCache removed — direct Reflection used instead.
  */
-enum NativeFieldKind {
-	NFK_Field;
-	NFK_Property;
-	NFK_Method;
-}
+// NativeFieldKind removed
+
 
 /**
  * Controls how aggressively the VM flushes its internal object caches.

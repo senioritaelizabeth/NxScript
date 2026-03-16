@@ -113,6 +113,7 @@ class Op {
 	public static inline var DEC_INDEX = 0xC7; // obj[idx]--
 
 	// Scope management for block-level let declarations
+	public static inline var REGISTER_USING = 0xCF; // arg = string index of class name
 	public static inline var ENTER_SCOPE = 0xD0; // push a new scope frame onto scopeStack
 	public static inline var EXIT_SCOPE  = 0xD1; // pop scope frame, removing its let vars
 
@@ -197,6 +198,7 @@ class Op {
 			case DEC_MEMBER: "DEC_MEMBER";
 			case INC_INDEX: "INC_INDEX";
 			case DEC_INDEX: "DEC_INDEX";
+				case REGISTER_USING: "REGISTER_USING";
 			case ENTER_SCOPE: "ENTER_SCOPE";
 			case EXIT_SCOPE: "EXIT_SCOPE";
 			case EOF: "EOF";

@@ -1,73 +1,70 @@
 package tools;
 
-import sys.io.File;
 import sys.FileSystem;
-
+using StringTools;
 class BuildBind {
+    static final OS_PATHS = [
+        "Windows" => "bin/windows/",
+        "Linux" => "bin/linux/",
+        "Mac" => "bin/mac/"
+    ];
+    
+    static final OS_EXTENSIONS = [
+        "Windows" => ".dll",
+        "Linux" => ".dso",
+        "Mac" => ".dylib"
+    ];
+
     public static function main() {
         trace("Building NxBinding...");
-        var result = Sys.command("haxe", ["build.hxml", "-cpp", get_os_path( )]);
-        if (result == 0) {
-            trace("Build successful!");
-        } else {
+        
+        var osPath = getOsPath();
+        var result = Sys.command("haxe", ["build.hxml", "-cpp", osPath]);
+        
+        if (result != 0) {
             trace("Build failed with exit code " + result);
-            trace("Error output: " + Sys.getEnv("HAXE_ERROR"));
             Sys.exit(result);
         }
-        // rename output file to NxBinding.dll or .so to libNxBinding for easier loading
-        var outputDir = get_os_path();
-        var outputFile = switch (Sys.systemName()) {
-            case "Windows": outputDir + "NxBinding.dll"; // Windows produces .exe for DLLs
-            case "Linux":   outputDir + "NxBinding.dso";
-            case "Mac":     outputDir + "NxBinding.dylib";
-            default:       throw "Unsupported OS: " + Sys.systemName();
-        };
-        var read_name = get_arg("name", "libNxBinding");
-        outputDir += read_name;
-        var targetFile = switch (Sys.systemName()) {
-            case "Windows": outputDir + ".dll";
-            case "Linux":   outputDir + ".dso";
-            case "Mac":     outputDir + ".dylib";
-            default:       throw "Unsupported OS: " + Sys.systemName();
-        };
-        var out = get_arg("out", "binaries/");
-        targetFile = out + targetFile;
-        if (!FileSystem.exists(out)) {
-            FileSystem.createDirectory(out);            
+        
+        trace("Build successful!");
+        
+        var outputFile = osPath + "NxBinding" + getExtension();
+        var libName = getArg("name", "libNxBinding");
+        var outDir = getArg("out", "binaries/");
+        var targetFile = outDir + libName + getExtension();
+        
+        if (!FileSystem.exists(outDir)) {
+            FileSystem.createDirectory(outDir);
         }
-        if (sys.FileSystem.exists(outputFile)) {
-            sys.FileSystem.rename(outputFile, targetFile);
+        
+        if (FileSystem.exists(outputFile)) {
+            FileSystem.rename(outputFile, targetFile);
             trace("Renamed " + outputFile + " to " + targetFile);
         } else {
-            Sys.exit(67); // SIX_SEVEN = "im autistic"
             trace("Expected output file not found: " + outputFile);
+            Sys.exit(1);
         }
+    }
 
-    }
-  static function get_arg(name:String, deft:String = ""):String {
-        // for (arg in Sys.args()) {
-        //     if (StringTools.startsWith(arg, "--" + name )) {
-                
-        //     }
-        // }
-        var i = 0;
-        while (i < Sys.args().length) {
-            var arg = Sys.args()[i];
-            if (arg == "--" + name && i + 1 < Sys.args().length) {
-                return Sys.args()[i + 1];
-            } else if (StringTools.startsWith(arg, "--" + name + "=")) {
-                return arg.substr(name.length + 3); // length of "--" + name + "="
+    static function getArg(name:String, defaultValue:String = ""):String {
+        var args = Sys.args();
+        for (i in 0...args.length) {
+            if (args[i] == "--" + name && i + 1 < args.length) {
+                return args[i + 1];
+            } else if (args[i].startsWith("--" + name + "=")) {
+                return args[i].substr(name.length + 3);
             }
-            i++;
         }
-        return deft;
+        return defaultValue;
     }
-    public static function get_os_path() {
-        return switch (Sys.systemName()) {
-            case "Windows": "bin/windows/";
-            case "Linux":   "bin/linux/";
-            case "Mac":     "bin/mac/";
-            default:       throw "Unsupported OS: " + Sys.systemName();
-        };
+
+    static function getOsPath():String {
+        var os = Sys.systemName();
+        return OS_PATHS.get(os) ?? throw "Unsupported OS: " + os;
+    }
+
+    static function getExtension():String {
+        var os = Sys.systemName();
+        return OS_EXTENSIONS.get(os) ?? throw "Unsupported OS: " + os;
     }
 }

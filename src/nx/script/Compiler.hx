@@ -552,8 +552,7 @@ class Compiler {
 				if (!isLast) emit(Op.POP);
 
 			case SUsing(className):
-				// `using` is parsed but currently a no-op at runtime.
-				// Extension methods via VProxy were removed for performance.
+				emitWithString(Op.REGISTER_USING, className);
 				if (!isLast) emit(Op.LOAD_NULL);
 
 			case SMatch(subject, cases, defaultBody):

@@ -57,6 +57,9 @@ class VM {
 	/** Externally-registered native Haxe functions. Prefer `Interpreter.register()` over writing to this directly. */
 	public var natives:Map<String, Value>;
 
+	/** Classes registered via `using ClassName` — searched for extension methods. */
+	public var usingClasses:Array<String> = [];
+
 	/** Class registry. Populated by MAKE_CLASS instructions and NativeClasses.registerAll(). Used for inheritance lookups during instantiation. */
 	public var classes:Map<String, ClassData>;
 
@@ -209,7 +212,7 @@ class VM {
 		sp = 0;
 		frames = [];
 		catchStack = [];
-// usingExtensions init removed // reset per-run so extensions don't bleed between scripts
+		usingClasses = []; // reset per-run so using declarations don't bleed between scripts
 		applyGcPolicy();
 		bindGlobalSlots(chunk);
 
@@ -1066,6 +1069,11 @@ class VM {
 				case Op.POP_TRY:
 					catchStack.pop();
 
+				case Op.REGISTER_USING:
+					var className = strings[arg];
+					if (!usingClasses.contains(className))
+						usingClasses.push(className);
+
 				case Op.ENTER_SCOPE:
 					// Snapshot just the key names (no Map alloc, no value copies).
 					scopeStack.push([ for (k in scopeVars.keys()) k ]);
@@ -1382,8 +1390,6 @@ class VM {
 
 			var ctorVars = new Map<String, Value>();
 			ctorVars.set("this", inst);
-			if (classData.superClass != null && classes.exists(classData.superClass))
-				ctorVars.set("super", VClass(classes.get(classData.superClass)));
 			var ctorFrame:CallFrame = {
 				chunk: ctor.chunk,
 				ip: 0,
@@ -1746,6 +1752,20 @@ class VM {
 	}
 
 	// Member access
+	function tryUsingMethod(object:Value, field:String):Value {
+		for (className in usingClasses) {
+			var cd = classes.get(className);
+			if (cd == null) continue;
+			var method = cd.methods.get(field);
+			if (method == null) continue;
+			return VNativeFunction(field, -1, function(args:Array<Value>):Value {
+				var fullArgs = [object].concat(args);
+				return callFunction(method, new Map(), fullArgs);
+			});
+		}
+		return null;
+	}
+
 	public function getMember(object:Value, field:String):Value {
 		return switch (object) {
 			case VNumber(n):
@@ -1791,10 +1811,7 @@ class VM {
 				while (currentClass != null) {
 					if (currentClass.methods.exists(field)) {
 						var method = currentClass.methods.get(field);
-						var superVal:Value = VNull;
-						if (classData.superClass != null && classes.exists(classData.superClass))
-							superVal = VClass(classes.get(classData.superClass));
-						var bound = VFunction(method, ["this" => object, "super" => superVal]);
+						var bound = VFunction(method, ["this" => object]);
 						if (cachedInstanceMethods == null) {
 							cachedInstanceMethods = new Map<String, Value>();
 							instanceMethodCache.set(fields, cachedInstanceMethods);
@@ -1822,19 +1839,10 @@ class VM {
 				// Static fields
 				if (classData.staticFields.exists(field))
 					return classData.staticFields.get(field);
-				// super.new() — constructor accessed on a class value.
-				// Return VFunction with __inherit_this__ marker so the caller
-				// knows to inject the current "this" into the frame.
-				if (field == "new" && classData.constructor != null) {
-					var thisVal = getVariable("this") ?? VNull;
-					return VFunction(classData.constructor, ["this" => thisVal, "__super_ctor__" => VBool(true)]);
-				}
-				// Instance method accessed on class (super.method())
+				// Instance method lookup (for e.g. passing methods as values)
 				var method = classData.methods.get(field);
-				if (method != null) {
-					var thisVal = getVariable("this") ?? VNull;
-					return VFunction(method, ["this" => thisVal]);
-				}
+				if (method != null)
+					return VFunction(method, EMPTY_MAP);
 				return VNull;
 
 
@@ -2104,7 +2112,10 @@ class VM {
 					default: throw 'Expected number';
 				});
 
-			default: throw 'Unknown Number method: $method';
+			default:
+				var ext = tryUsingMethod(VNumber(n), method);
+				if (ext != null) return ext;
+				throw 'Unknown Number method: $method';
 		}
 	}
 
@@ -2200,7 +2211,10 @@ class VM {
 					VString(result.substr(0, Std.int(Math.max(len, s.length))));
 				});
 
-			default: throw 'Unknown String method: $method';
+			default:
+				var ext = tryUsingMethod(VString(s), method);
+				if (ext != null) return ext;
+				throw 'Unknown String method: $method';
 		}
 	}
 
@@ -2364,7 +2378,10 @@ class VM {
 				VArray(sorted);
 			});
 
-		default: throw 'Unknown Array method: $method';
+		default:
+			var ext = tryUsingMethod(VArray(arr), method);
+			if (ext != null) return ext;
+			throw 'Unknown Array method: $method';
 		}
 
 		if (cachedMethods == null) {

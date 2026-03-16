@@ -25,10 +25,10 @@ jobs:
             artifact: nxscript-macos-arm64
 
     steps:
-      - name: Checkout NxScript
-        uses: actions/checkout@v4
-        with:
-          path: NxScript
+      # - name: Checkout NxScript
+      #   uses: actions/checkout@v4
+      #   with:
+         
 
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
@@ -45,6 +45,7 @@ jobs:
         run: sudo apt-get install -y gcc g++ make
 
       - name: Build NxBinding
+        working-directory: NxScript
         run: >
           haxe --run tools.BuildBindings --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/${{ matrix.platform }}.zip
 

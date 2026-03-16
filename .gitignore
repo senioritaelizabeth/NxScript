@@ -16,6 +16,7 @@ export/
 test/bin
 test/test_flixel
 bin/
+
 # Documentation
 docs/
 doc.xml
@@ -34,7 +35,21 @@ node_modules/
 *.ignore/
 *vsix
 
-# Unusual patterns 
+# Unusual patterns
 *.cpp/
 *.cs/
 *.zip
+*.nro
+*.elf
+*.a
+
+# Include just "test/bin/cppSwitch_scriptbench/Makefile"
+!test/bin/
+!test/bin/cppSwitch_scriptbench/
+!test/bin/cppSwitch_scriptbench/Makefile
+
+# Include just "bin/cppSwitch_scriptbench/wrapper_src"
+!bin/
+!bin/cppSwitch_scriptbench/
+!bin/cppSwitch_scriptbench/wrapper_src
+!bin/cppSwitch_scriptbench/wrapper_src/**

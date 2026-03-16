@@ -33,6 +33,11 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install haxe neko
+      - name: setup haxelib (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          haxelib setup ~/.haxelib
+          
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
         if: runner.os != 'macOS'

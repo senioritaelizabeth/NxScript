@@ -1,6 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────
 // Haxe host side — how to use NativeProxy with FlxSprite
-// ─────────────────────────────────────────────────────────────────────────
 //
 // Drop this into your HaxeFlixel game class or a ScriptManager class.
 
@@ -67,7 +65,6 @@ class SpriteScriptHost {
 	}
 }
 
-// ─── Drop-in FlxState usage ───────────────────────────────────────────────
 //
 // class PlayState extends FlxState {
 //     var scriptHost : SpriteScriptHost;

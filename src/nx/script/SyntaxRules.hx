@@ -20,7 +20,6 @@ package nx.script;
  */
 class SyntaxRules {
 
-	// ─── feature flags ────────────────────────────────────────────────────
 
 	/** Allow truthy coercion in if/while/for: if (x) instead of if (x != null) */
 	public var truthyCoercion:Bool = true;
@@ -46,7 +45,6 @@ class SyntaxRules {
 	/** Require semicolons (strict mode) */
 	public var strictSemicolons:Bool = false;
 
-	// ─── aliases ──────────────────────────────────────────────────────────
 
 	/**
 	 * Keyword aliases: maps an alternative spelling to the canonical keyword.
@@ -63,7 +61,6 @@ class SyntaxRules {
 	 */
 	public var operatorAliases:Map<String, String> = new Map();
 
-	// ─── construction ─────────────────────────────────────────────────────
 
 	public function new() {}
 
@@ -77,7 +74,6 @@ class SyntaxRules {
 		return this;
 	}
 
-	// ─── presets ──────────────────────────────────────────────────────────
 
 	/**
 	 * Default NxScript ruleset — all features on, NxScript keywords.

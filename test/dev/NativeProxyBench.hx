@@ -15,7 +15,6 @@ class NativeProxyBench {
 	static function main() {
 		Sys.println("Microbenchmark — N=" + N + " sprites, " + FRAMES + " frames\n");
 
-		// ── A: script con 4 field accesses por sprite (original) ─────────
 		var spritesA = makeSprites();
 		var interpA  = new Interpreter();
 		interpA.run('
@@ -38,7 +37,6 @@ class NativeProxyBench {
 		var msA = ms(t0);
 		Sys.println("A  script + VNativeObject (4 fields):     " + fmt(msA));
 
-		// ── B: script com VProxy (shadow map) ────────────────────────────
 		var spritesB = makeSprites();
 		var interpB  = new Interpreter();
 		interpB.run('
@@ -65,7 +63,6 @@ class NativeProxyBench {
 		var msB = ms(t1);
 		Sys.println("B  script + VProxy + flushAll:            " + fmt(msB));
 
-		// ── C: script con loop vacío (solo overhead del VM loop) ─────────
 		var spritesC = makeSprites();
 		var interpC  = new Interpreter();
 		interpC.run('
@@ -84,7 +81,6 @@ class NativeProxyBench {
 		var msC = ms(t2);
 		Sys.println("C  script + empty loop (VM overhead):     " + fmt(msC));
 
-		// ── D: solo flushAll, sin script ────────────────────────────────
 		var spritesD = makeSprites();
 		var interpD  = new Interpreter();
 		var resD = NativeProxy.wrapMany(interpD.vm, cast spritesD, ["x","y","angle","color"]);
@@ -93,7 +89,6 @@ class NativeProxyBench {
 		var msD = ms(t3);
 		Sys.println("D  flushAll only (no script):             " + fmt(msD));
 
-		// ── E: Haxe nativeForEach + script per-item (loop in Haxe) ───────
 		var spritesE = makeSprites();
 		var interpE  = new Interpreter();
 		interpE.run('
@@ -115,7 +110,6 @@ class NativeProxyBench {
 		var msE = ms(t4);
 		Sys.println("E  scriptForEach (Haxe loop) + flushAll:  " + fmt(msE));
 
-		// ── F: pure Haxe (ceiling) ────────────────────────────────────────
 		var spritesF = makeSprites();
 		var t5 = stamp();
 		var dummy = 0.0;

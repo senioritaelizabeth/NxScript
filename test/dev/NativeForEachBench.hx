@@ -18,7 +18,6 @@ class NativeForEachBench {
 		var timeA = 0.0; var timeB = 0.0; var timeC = 0.0;
 		var timeD = 0.0; var timeE = 0.0;
 
-		// ── A: script loop ───────────────────────────────────────────────
 		trace("[ A ] Script loop  (while j < sprites.length)");
 		{
 			var interp = new Interpreter();
@@ -48,7 +47,6 @@ class NativeForEachBench {
 		}
 		trace('    ${fmtMs(timeA)}  /  ${fmt(FRAMES/timeA)} fps\n');
 
-		// ── B: nativeForEach ─────────────────────────────────────────────
 		trace("[ B ] nativeForEach  (loop in Haxe, reflection per field)");
 		{
 			var interp = new Interpreter();
@@ -76,7 +74,6 @@ class NativeForEachBench {
 		}
 		trace('    ${fmtMs(timeB)}  /  ${fmt(FRAMES/timeB)} fps\n');
 
-		// ── C: pure Haxe ─────────────────────────────────────────────────
 		trace("[ C ] Pure Haxe  (no VM, ceiling reference)");
 		{
 			var counter = 0.0; var dt = 1.0 / FRAMES; var color = 0xFF0000;
@@ -96,7 +93,6 @@ class NativeForEachBench {
 		}
 		trace('    ${fmtMs(timeC)}  /  ${fmt(FRAMES/timeC)} fps\n');
 
-		// ── D: native wrapper — script does math, Haxe writes fields ─────
 		trace("[ D ] Native wrapper  (script does sin/cos, Haxe writes fields)");
 		{
 			var interp = new Interpreter();
@@ -133,7 +129,6 @@ class NativeForEachBench {
 		}
 		trace('    ${fmtMs(timeD)}  /  ${fmt(FRAMES/timeD)} fps\n');
 
-		// ── E: full Haxe loop — script only defines constants ─────────────
 		// Script is used only to read config values (color, counter).
 		// Haxe does ALL the math AND the writes.
 		// This shows the floor: minimum possible overhead when the script
@@ -187,7 +182,6 @@ class NativeForEachBench {
 		}
 		trace('    ${fmtMs(timeE)}  /  ${fmt(FRAMES/timeE)} fps\n');
 
-		// ── Summary ───────────────────────────────────────────────────────
 		trace("=== Summary ===");
 		trace('  A  script loop          : ${pad(fmtMs(timeA))}  ${fmt(FRAMES/timeA)} fps');
 		trace('  B  nativeForEach        : ${pad(fmtMs(timeB))}  ${fmt(FRAMES/timeB)} fps');

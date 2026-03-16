@@ -177,6 +177,7 @@ class Parser {
 			superClass = expectIdentifier();
 		}
 
+		skipNewlines();
 		expect(TLeftBrace, "Expected '{' before class body");
 
 		var fields:Array<ClassField> = [];
@@ -328,7 +329,17 @@ class Parser {
 				TArray(elementType);
 			case TIdentifier(name):
 				advance();
-				// Soporte para clases externas (FlxSound, etc)
+				// Haxe generics: Array<T>, Map<K,V>, etc — consume and discard type params
+				if (check(TOperator(OLess))) {
+					advance(); // consume <
+					var depth = 1;
+					while (!isEOF() && depth > 0) {
+						if (check(TOperator(OLess)))       { depth++; advance(); }
+						else if (check(TOperator(OGreater))){ depth--; advance(); }
+						else if (check(TNewLine) || check(TRightBrace)) break;
+						else advance();
+					}
+				}
 				TCustom(name);
 			default:
 				throw 'Expected type hint at line ${token.line}, col ${token.col}';
@@ -338,7 +349,7 @@ class Parser {
 	function parseReturn():Stmt {
 		advance(); // consume 'return'
 
-		if (check(TNewLine) || check(TRightBrace) || isEOF()) {
+		if (check(TNewLine) || check(TSemicolon) || check(TRightBrace) || isEOF()) {
 			return SReturn(null);
 		}
 
@@ -890,6 +901,19 @@ class Parser {
 				expect(TRightParen, "Expected ')' after expression");
 				expr;
 
+			case TKeyword(KFunc) | TKeyword(KFn) | TKeyword(KFun) | TKeyword(KFunction):
+				// Anonymous function as expression: function(a:T, b:T) { ... }
+				advance(); // consume func/function
+				expect(TLeftParen, "Expected '(' after function");
+				var params = parseParameters();
+				expect(TRightParen, "Expected ')' after parameters");
+				if (match(TColon) || match(TArrow)) parseTypeHint(); // optional return type
+				skipNewlines();
+				expect(TLeftBrace, "Expected '{' before function body");
+				var body = parseBlockBody();
+				expect(TRightBrace, "Expected '}' after function body");
+				ELambda(params, Right(body));
+
 			case TLeftBracket:
 				parseArrayLiteral();
 
@@ -1145,6 +1169,7 @@ class Parser {
 			expect(TRightParen, "Expected ')' after abstract base type");
 		}
 
+		skipNewlines();
 		expect(TLeftBrace, "Expected '{' before abstract body");
 		skipSeparators();
 

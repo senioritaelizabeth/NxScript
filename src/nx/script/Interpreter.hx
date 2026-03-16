@@ -96,7 +96,6 @@ class Interpreter {
 	public function enableSandbox(?extraBlocklist:Array<String>):Void
 		vm.enableSandbox(extraBlocklist);
 
-	// ─── NativeProxy helpers ────────────────────────────────────────────────
 
 	/**
 	 * Wrap a single native Haxe object (e.g. FlxSprite) as a VDict proxy.

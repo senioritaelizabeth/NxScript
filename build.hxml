@@ -1,0 +1,5 @@
+-cp src
+-lib prismcli
+-D dll_link
+--macro keep('nx.binding.NxBinding')
+--main nx.binding.NxBinding

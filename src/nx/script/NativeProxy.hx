@@ -61,7 +61,6 @@ class NativeProxy {
 
 	var vm:VM;
 
-	// ─── construction ──────────────────────────────────────────────────────
 
 	/**
 	 * Wrap a single native Haxe object as a VProxy.
@@ -116,7 +115,6 @@ class NativeProxy {
 		return { values: values, proxies: proxies };
 	}
 
-	// ─── sync ──────────────────────────────────────────────────────────────
 
 	/**
 	 * Write shadow map → native object.
@@ -155,7 +153,6 @@ class NativeProxy {
 		for (p in proxies) p.pull();
 	}
 
-	// ─── VM integration ────────────────────────────────────────────────────
 
 	/**
 	 * Run a script function over each proxy with Haxe driving the outer loop.
@@ -180,7 +177,6 @@ class NativeProxy {
 		}
 	}
 
-	// ─── private ───────────────────────────────────────────────────────────
 
 	function new() {}
 

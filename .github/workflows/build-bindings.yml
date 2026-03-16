@@ -1,0 +1,56 @@
+name: Build Bindings
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            artifact: nxscript-linux-x64
+
+          - os: windows-latest
+            platform: windows-x64
+            artifact: nxscript-windows-x64
+
+          - os: macos-latest
+            platform: macos-arm64
+            artifact: nxscript-macos-arm64
+
+    steps:
+      - name: Checkout NxScript
+        uses: actions/checkout@v4
+        with:
+          path: NxScript
+
+      - name: Setup Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: "4.3.7"
+
+      - name: Install dependencies
+        run: |
+          haxelib install hxcpp --quiet
+          haxelib install prismcli --quiet
+
+      - name: Linux build deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y gcc g++ make
+
+      - name: Build NxBinding
+        run: >
+          haxe --run tools.BuildBindings --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/${{ matrix.platform }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: binaries/${{ matrix.platform }}.zip
+          retention-days: 30

@@ -39,9 +39,7 @@ class TodoFeaturesTest {
 		var interp = new Interpreter();
 		var r:Dynamic;
 
-		// ─────────────────────────────────────────
 		// 1. TRAILING COMMAS
-		// ─────────────────────────────────────────
 		trace("1. Trailing commas");
 
 		r = interp.runDynamic('
@@ -62,9 +60,7 @@ class TodoFeaturesTest {
 		');
 		assert(r == 3, "trailing comma in dict literal");
 
-		// ─────────────────────────────────────────
 		// 2. SHORTHAND LAMBDA  (=>)
-		// ─────────────────────────────────────────
 		trace("\n2. Shorthand lambda (=>)");
 
 		r = interp.runDynamic('
@@ -93,9 +89,7 @@ class TodoFeaturesTest {
 		');
 		assert(r == 3, "shorthand lambda passed to filter");
 
-		// ─────────────────────────────────────────
 		// 3. TEMPLATE STRINGS  (`${}`)
-		// ─────────────────────────────────────────
 		trace("\n3. Template strings");
 
 		r = interp.runDynamic("
@@ -120,9 +114,7 @@ class TodoFeaturesTest {
 		r = interp.runDynamic('`no interpolation here`');
 		assert(r == "no interpolation here", "template string without interpolation");
 
-		// ─────────────────────────────────────────
 		// 4. ARRAY METHODS
-		// ─────────────────────────────────────────
 		trace("\n4. Array methods");
 
 		// map
@@ -261,9 +253,7 @@ class TodoFeaturesTest {
 		');
 		assert(r == "apple", "array.sortBy string length");
 
-		// ─────────────────────────────────────────
 		// 5. STRING METHODS
-		// ─────────────────────────────────────────
 		trace("\n5. String methods");
 
 		r = interp.runDynamic('"hello world".startsWith("hello")');
@@ -290,9 +280,7 @@ class TodoFeaturesTest {
 		r = interp.runDynamic('"hi".padEnd(5, "-")');
 		assert(r == "hi---", "padEnd");
 
-		// ─────────────────────────────────────────
 		// 6. DICT METHODS
-		// ─────────────────────────────────────────
 		trace("\n6. Dict methods");
 
 		r = interp.runDynamic('
@@ -341,9 +329,7 @@ class TodoFeaturesTest {
 		');
 		assert(r == 30, "dict.values sum");
 
-		// ─────────────────────────────────────────
 		// 7. GLOBAL NATIVES
-		// ─────────────────────────────────────────
 		trace("\n7. Global natives");
 
 		// range
@@ -421,9 +407,7 @@ class TodoFeaturesTest {
 		r = interp.runDynamic('values({"a": 10, "b": 20}).reduce((a, v) => a + v, 0)');
 		assert(r == 30, "global values() + reduce");
 
-		// ─────────────────────────────────────────
 		// 8. GC CONTROL
-		// ─────────────────────────────────────────
 		trace("\n8. GC control");
 
 		// AGGRESSIVE: caches wiped every execute()
@@ -449,9 +433,7 @@ class TodoFeaturesTest {
 		r = interp.runDynamic('str(99)');
 		assert(r == "99", "manual gc() then execute still works");
 
-		// ─────────────────────────────────────────
 		// DONE
-		// ─────────────────────────────────────────
 		trace("\n========================================");
 		trace("ALL TODO FEATURES TESTS PASSED! ✓");
 		trace("========================================");

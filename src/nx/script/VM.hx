@@ -1382,6 +1382,8 @@ class VM {
 
 			var ctorVars = new Map<String, Value>();
 			ctorVars.set("this", inst);
+			if (classData.superClass != null && classes.exists(classData.superClass))
+				ctorVars.set("super", VClass(classes.get(classData.superClass)));
 			var ctorFrame:CallFrame = {
 				chunk: ctor.chunk,
 				ip: 0,
@@ -1789,7 +1791,10 @@ class VM {
 				while (currentClass != null) {
 					if (currentClass.methods.exists(field)) {
 						var method = currentClass.methods.get(field);
-						var bound = VFunction(method, ["this" => object]);
+						var superVal:Value = VNull;
+						if (classData.superClass != null && classes.exists(classData.superClass))
+							superVal = VClass(classes.get(classData.superClass));
+						var bound = VFunction(method, ["this" => object, "super" => superVal]);
 						if (cachedInstanceMethods == null) {
 							cachedInstanceMethods = new Map<String, Value>();
 							instanceMethodCache.set(fields, cachedInstanceMethods);
@@ -1817,10 +1822,19 @@ class VM {
 				// Static fields
 				if (classData.staticFields.exists(field))
 					return classData.staticFields.get(field);
-				// Instance method lookup (for e.g. passing methods as values)
+				// super.new() — constructor accessed on a class value.
+				// Return VFunction with __inherit_this__ marker so the caller
+				// knows to inject the current "this" into the frame.
+				if (field == "new" && classData.constructor != null) {
+					var thisVal = getVariable("this") ?? VNull;
+					return VFunction(classData.constructor, ["this" => thisVal, "__super_ctor__" => VBool(true)]);
+				}
+				// Instance method accessed on class (super.method())
 				var method = classData.methods.get(field);
-				if (method != null)
-					return VFunction(method, EMPTY_MAP);
+				if (method != null) {
+					var thisVal = getVariable("this") ?? VNull;
+					return VFunction(method, ["this" => thisVal]);
+				}
 				return VNull;
 
 

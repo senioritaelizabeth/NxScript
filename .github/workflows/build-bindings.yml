@@ -21,8 +21,8 @@ jobs:
             artifact: nxscript-windows-x64
 
           - os: macos-latest
-            platform: macos-arm64
-            artifact: nxscript-macos-arm64
+            platform: macos-x64
+            artifact: nxscript-macos-x64
 
     steps:
       - name: Checkout NxScript
@@ -45,9 +45,6 @@ jobs:
         run: sudo apt-get install -y gcc g++ make
 
 
-      - name: WHERE AM I?
-        working-directory: .
-        run: pwd
       - name: Build NxBinding
         working-directory: .
         run: >

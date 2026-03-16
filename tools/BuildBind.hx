@@ -29,6 +29,8 @@ class BuildBind {
             case "Mac":     outputDir + ".dylib";
             default:       throw "Unsupported OS: " + Sys.systemName();
         };
+        var out = get_arg("out", "binaries/");
+        targetFile = out + targetFile;
         if (sys.FileSystem.exists(outputFile)) {
             sys.FileSystem.rename(outputFile, targetFile);
             trace("Renamed " + outputFile + " to " + targetFile);

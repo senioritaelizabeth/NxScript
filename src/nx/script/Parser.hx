@@ -179,6 +179,7 @@ class Parser {
 		}
 
 		skipNewlines();
+		skipNewlines();
 		expect(TLeftBrace, "Expected '{' before class body");
 
 		var fields:Array<ClassField> = [];
@@ -330,13 +331,12 @@ class Parser {
 				TArray(elementType);
 			case TIdentifier(name):
 				advance();
-				// Haxe generics: Array<T>, Map<K,V>, etc — consume and discard type params
 				if (check(TOperator(OLess))) {
-					advance(); // consume <
+					advance();
 					var depth = 1;
 					while (!isEOF() && depth > 0) {
-						if (check(TOperator(OLess)))       { depth++; advance(); }
-						else if (check(TOperator(OGreater))){ depth--; advance(); }
+						if (check(TOperator(OLess)))        { depth++; advance(); }
+						else if (check(TOperator(OGreater))) { depth--; advance(); }
 						else if (check(TNewLine) || check(TRightBrace)) break;
 						else advance();
 					}
@@ -903,12 +903,11 @@ class Parser {
 				expr;
 
 			case TKeyword(KFunc) | TKeyword(KFn) | TKeyword(KFun) | TKeyword(KFunction):
-				// Anonymous function as expression: function(a:T, b:T) { ... }
-				advance(); // consume func/function
+				advance();
 				expect(TLeftParen, "Expected '(' after function");
 				var params = parseParameters();
 				expect(TRightParen, "Expected ')' after parameters");
-				if (match(TColon) || match(TArrow)) parseTypeHint(); // optional return type
+				if (match(TColon) || match(TArrow)) parseTypeHint();
 				skipNewlines();
 				expect(TLeftBrace, "Expected '{' before function body");
 				var body = parseBlockBody();
@@ -996,14 +995,11 @@ class Parser {
 		skipNewlines();
 		expect(TLeftBrace, "Expected '{' after switch(...)");
 		skipSeparators();
-
 		var cases:Array<MatchCase> = [];
 		var defaultBody:Null<Array<Stmt>> = null;
-
 		while (!check(TRightBrace) && !isEOF()) {
 			skipSeparators();
 			if (check(TRightBrace)) break;
-
 			if (match(TKeyword(KDefault))) {
 				expect(TColon, "Expected ':' after default");
 				defaultBody = parseSwitchBody();
@@ -1016,7 +1012,6 @@ class Parser {
 			}
 			skipSeparators();
 		}
-
 		expect(TRightBrace, "Expected '}' after switch block");
 		return SMatch(subject, cases, defaultBody);
 	}

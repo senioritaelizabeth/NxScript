@@ -30,9 +30,7 @@ class BridgeAndUsingTest {
 		trace("BRIDGE + USING TEST");
 		trace("========================================\n");
 
-		// ─────────────────────────────────────────
 		// 1. `using` with NxScript class
-		// ─────────────────────────────────────────
 		trace("1. using — NxScript extension methods");
 
 		var interp = new Interpreter();
@@ -128,9 +126,7 @@ class BridgeAndUsingTest {
 		');
 		assert(r == 21, "using: multiple using classes");
 
-		// ─────────────────────────────────────────
 		// 2. Int / Float subtypes
-		// ─────────────────────────────────────────
 		trace("\n2. Int / Float / Number subtypes");
 
 		r = interp.runDynamic('type(42)');
@@ -155,9 +151,7 @@ class BridgeAndUsingTest {
 		r = interp.runDynamic('Float_from(2.718)');
 		assertApprox(r, 2.718, "Float_from(2.718)");
 
-		// ─────────────────────────────────────────
 		// 3. fromNumber / fromInt / fromFloat
-		// ─────────────────────────────────────────
 		trace("\n3. fromNumber / fromInt / fromFloat");
 
 		r = interp.runDynamic('fromNumber(42)');
@@ -188,9 +182,7 @@ class BridgeAndUsingTest {
 		r = interp.runDynamic('fromFloat("1.5")');
 		assertApprox(r, 1.5, "fromFloat(\"1.5\")");
 
-		// ─────────────────────────────────────────
 		// 4. NxStd bridge
-		// ─────────────────────────────────────────
 		trace("\n4. NxStd bridge");
 
 		var interp2 = new Interpreter();
@@ -225,9 +217,7 @@ class BridgeAndUsingTest {
 		// haxeToValue of parsed JSON array
 		assert(r == 3, "jsonParse array length");
 
-		// ─────────────────────────────────────────
 		// 5. NxDate bridge
-		// ─────────────────────────────────────────
 		trace("\n5. NxDate bridge");
 
 		var interp3 = new Interpreter();
@@ -243,9 +233,7 @@ class BridgeAndUsingTest {
 		// Date is a native object
 		assert(r == "Date", "dateNow() type is Date");
 
-		// ─────────────────────────────────────────
 		// 6. Perf: ENTER_SCOPE only on blocks with let
-		// ─────────────────────────────────────────
 		trace("\n6. ENTER_SCOPE only when needed");
 
 		// This loop should NOT emit ENTER/EXIT_SCOPE on each iteration
@@ -285,9 +273,7 @@ class BridgeAndUsingTest {
 		');
 		assert(r == 3, "if block without let: no scope overhead");
 
-		// ─────────────────────────────────────────
 		// 7. Enums
-		// ─────────────────────────────────────────
 		trace("\n7. Enums");
 
 		r = interp.runDynamic('
@@ -337,9 +323,7 @@ class BridgeAndUsingTest {
 		');
 		assert(r == "its green", "match on enum variant");
 
-		// ─────────────────────────────────────────
 		// 8. `is` type check operator
-		// ─────────────────────────────────────────
 		trace("\n8. is operator");
 
 		r = interp.runDynamic('42 is Number');
@@ -360,9 +344,7 @@ class BridgeAndUsingTest {
 		r = interp.runDynamic('null is Null');
 		assert(r == true, "null is Null");
 
-		// ─────────────────────────────────────────
 		// 9. Braceless if/while/for
-		// ─────────────────────────────────────────
 		trace("\n9. Braceless control flow");
 
 		r = interp.runDynamic('
@@ -394,9 +376,7 @@ class BridgeAndUsingTest {
 		');
 		assert(r == 6, "braceless for-in");
 
-		// ─────────────────────────────────────────
 		// 10. Abstract types
-		// ─────────────────────────────────────────
 		trace("\n10. Abstract types");
 
 		r = interp.runDynamic('

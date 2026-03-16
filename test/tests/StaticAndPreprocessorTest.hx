@@ -170,7 +170,7 @@ class StaticAndPreprocessorTest {
 		') == true, "class static var mutation");
 
 		// Instance count pattern
-		ok(i.runDynamic('
+		i.runDynamic('
 			class Entity {
 				static var count = 0
 				var id = 0
@@ -180,11 +180,12 @@ class StaticAndPreprocessorTest {
 					this.id = Entity.count
 				}
 			}
-			var a = new Entity()
-			var b = new Entity()
-			var c = new Entity()
-			[a.id, b.id, c.id, Entity.count]
-		') == [1.0, 2.0, 3.0, 3.0], "instance count via static var");
+		');
+		i.runDynamic("var a = new Entity()\nvar b = new Entity()\nvar c = new Entity()");
+		ok(i.runDynamic("a.id") == 1, "entity a.id == 1");
+		ok(i.runDynamic("b.id") == 2, "entity b.id == 2");
+		ok(i.runDynamic("c.id") == 3, "entity c.id == 3");
+		ok(i.runDynamic("Entity.count") == 3, "instance count via static var");
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
@@ -466,15 +467,17 @@ class StaticAndPreprocessorTest {
 		ok(i.runDynamic('var a = new Animal("Cat","meow")\na.speak()') == "Cat says meow",
 			"class still visible in run C");
 
-		// Class defined in run B can extend class from run A
+		// Cross-run inheritance — Dog extends Animal defined in a prior run
 		i.runDynamic('
 			class Dog extends Animal {
 				func new(n) { super.new(n, "woof") }
 				func fetch() { return this.name + " fetches!" }
 			}
 		');
-		ok(i.runDynamic('var d = new Dog("Rex")\nd.speak() + " / " + d.fetch()') == "Rex says woof / Rex fetches!",
-			"class extending class from another run");
+		ok(i.runDynamic('var d = new Dog("Rex")\nd.speak()') == "Rex says woof",
+			"cross-run inheritance: speak()");
+		ok(i.runDynamic('d.fetch()') == "Rex fetches!",
+			"cross-run inheritance: fetch()");
 
 		// Multiple classes, each defined separately
 		i.runDynamic('class Point { var x=0\nvar y=0\nfunc new(px,py){ this.x=px\nthis.y=py } }');
@@ -505,13 +508,14 @@ class StaticAndPreprocessorTest {
 			"class still usable after reset_context");
 
 		// New instances after reset are independent
-		ok(i.runDynamic('
+		i.runDynamic('
 			var t1 = new Timer()
 			var t2 = new Timer()
 			t1.tick(1.0)
 			t1.tick(1.0)
 			t2.tick(0.5)
-			[t1.get(), t2.get()]
-		') == [2.0, 0.5], "instances independent after reset");
+		');
+		ok(i.runDynamic("t1.get()") == 2.0, "t1 elapsed = 2.0");
+		ok(i.runDynamic("t2.get()") == 0.5, "t2 elapsed = 0.5");
 	}
 }

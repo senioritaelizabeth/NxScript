@@ -1347,7 +1347,7 @@ class Parser {
 
 	function statementNeedsTerminator(stmt:Stmt):Bool {
 		return switch (stmt) {
-			case SIf(_, _, _), SWhile(_, _), SFor(_, _, _), SBlock(_), STryCatch(_, _, _), SFunc(_, _, _, _), SClass(_, _, _, _): false;
+			case SIf(_, _, _), SWhile(_, _), SFor(_, _, _), SBlock(_), STryCatch(_, _, _), SFunc(_, _, _, _), SClass(_, _, _, _), SMatch(_, _, _): false;
 			default: true;
 		}
 	}

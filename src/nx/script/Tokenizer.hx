@@ -410,26 +410,61 @@ class Tokenizer {
 
 	function readNumber():Token {
 		var start = pos;
-		var hasDot = false;
 
-		while (!isEOF() && (isDigit(peek()) || peek() == '.')) {
+		// Hex literal: 0x / 0X
+		if (peek() == 'x' || peek() == 'X') {
+			advance(); // consume x
+			while (!isEOF() && isHexDigit(peek())) advance();
+			var hexStr = input.substring(start + 2, pos); // skip "0x"
+			return TNumber(Std.parseInt("0x" + hexStr));
+		}
+
+		// Binary literal: 0b / 0B
+		if (peek() == 'b' || peek() == 'B') {
+			advance(); // consume b
+			while (!isEOF() && (peek() == '0' || peek() == '1')) advance();
+			var binStr = input.substring(start + 2, pos);
+			var val = 0;
+			for (i in 0...binStr.length) val = val * 2 + (binStr.charAt(i) == '1' ? 1 : 0);
+			return TNumber(val);
+		}
+
+		// Octal literal: 0o / 0O
+		if (peek() == 'o' || peek() == 'O') {
+			advance();
+			while (!isEOF() && peek() >= '0' && peek() <= '7') advance();
+			var octStr = input.substring(start + 2, pos);
+			var val = 0;
+			for (i in 0...octStr.length) val = val * 8 + (octStr.charCodeAt(i) - 48);
+			return TNumber(val);
+		}
+
+		// Decimal / float
+		var hasDot = false;
+		while (!isEOF() && (isDigit(peek()) || peek() == '_' || peek() == '.')) {
+			if (peek() == '_') { advance(); continue; } // numeric separator: 1_000_000
 			if (peek() == '.') {
-				// Stop at range operator `..` or `...`
-				if (peekNext() == '.')
-					break;
-				// Only consume the dot if what follows is a digit (4.5)
-				// NOT if it's a letter/underscore (4.squared => TNumber(4) TDot TIdent)
-				if (!isDigit(peekNext()))
-					break;
-				if (hasDot)
-					break;
+				if (peekNext() == '.') break; // range ..
+				if (!isDigit(peekNext())) break; // 4.method()
+				if (hasDot) break;
 				hasDot = true;
 			}
 			advance();
 		}
 
-		var numStr = input.substring(start, pos);
+		// Scientific notation: 1e10, 1.5e-3
+		if (!isEOF() && (peek() == 'e' || peek() == 'E')) {
+			advance();
+			if (!isEOF() && (peek() == '+' || peek() == '-')) advance();
+			while (!isEOF() && isDigit(peek())) advance();
+		}
+
+		var numStr = input.substring(start, pos).split("_").join("");
 		return TNumber(Std.parseFloat(numStr));
+	}
+
+	inline function isHexDigit(c:String):Bool {
+		return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 	}
 
 	function readIdentifier():Token {

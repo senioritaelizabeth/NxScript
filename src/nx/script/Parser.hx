@@ -61,6 +61,7 @@ class Parser {
 			case TKeyword(KTry): parseTryCatch();
 			case TKeyword(KThrow): parseThrow();
 			case TKeyword(KMatch): parseMatch();
+			case TKeyword(KSwitch): parseSwitch();
 			case TKeyword(KUsing): parseUsing();
 			case TKeyword(KEnum): parseEnum();
 			case TKeyword(KAbstract): parseAbstract();
@@ -985,6 +986,54 @@ class Parser {
 
 		expect(TRightBrace, "Expected '}' after dictionary pairs");
 		return EDict(pairs);
+	}
+
+	function parseSwitch():Stmt {
+		advance(); // consume 'switch'
+		expect(TLeftParen, "Expected '(' after switch");
+		var subject = parseExpression();
+		expect(TRightParen, "Expected ')' after switch expression");
+		skipNewlines();
+		expect(TLeftBrace, "Expected '{' after switch(...)");
+		skipSeparators();
+
+		var cases:Array<MatchCase> = [];
+		var defaultBody:Null<Array<Stmt>> = null;
+
+		while (!check(TRightBrace) && !isEOF()) {
+			skipSeparators();
+			if (check(TRightBrace)) break;
+
+			if (match(TKeyword(KDefault))) {
+				expect(TColon, "Expected ':' after default");
+				defaultBody = parseSwitchBody();
+			} else {
+				expect(TKeyword(KCase), "Expected 'case' in switch block");
+				var pattern = parseMatchPattern();
+				expect(TColon, "Expected ':' after case value");
+				var body = parseSwitchBody();
+				cases.push({ pattern: pattern, body: body });
+			}
+			skipSeparators();
+		}
+
+		expect(TRightBrace, "Expected '}' after switch block");
+		return SMatch(subject, cases, defaultBody);
+	}
+
+	function parseSwitchBody():Array<Stmt> {
+		var stmts:Array<Stmt> = [];
+		skipSeparators();
+		// Collect statements until next case/default/}
+		while (!isEOF() && !check(TRightBrace)
+			&& !check(TKeyword(KCase)) && !check(TKeyword(KDefault))) {
+			var s = parseStatement();
+			stmts.push(s);
+			// Handle break keyword — stop collecting (don't emit anything, match doesn't fall through)
+			if (check(TKeyword(KBreak))) { advance(); skipSeparators(); break; }
+			skipSeparators();
+		}
+		return stmts;
 	}
 
 	function parseMatch():Stmt {

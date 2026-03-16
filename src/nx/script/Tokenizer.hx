@@ -53,6 +53,7 @@ class Tokenizer {
 		"throw" => KThrow,
 		"match" => KMatch,
 		"case" => KCase,
+		"switch" => KSwitch,
 		"default" => KDefault,
 		"using" => KUsing,
 		"enum" => KEnum,

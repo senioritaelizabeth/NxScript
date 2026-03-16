@@ -34,6 +34,7 @@ enum Keyword {
 	KCatch; // catch
 	KThrow; // throw
 	KMatch; // match
+	KSwitch; // switch (alias for match)
 	KCase; // case (in match)
 	KDefault; // default (in match)
 	KUsing; // using — extension methods

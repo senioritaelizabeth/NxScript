@@ -773,6 +773,17 @@ class Compiler {
 
 			// left ?? right — evaluates left, if null/VNull uses right
 			// Bytecode: eval left, DUP, JUMP_IF_NOT_NULL→skip, POP, eval right, skip:
+			case ETernary(cond, then, els):
+				// cond ? then : els
+				// Bytecode: eval cond, JUMP_IF_FALSE→else, eval then, JUMP→end, else: eval els, end:
+				compileExpression(cond);
+				var jumpElse = emitJump(Op.JUMP_IF_FALSE);
+				compileExpression(then);
+				var jumpEnd = emitJump(Op.JUMP);
+				patchJump(jumpElse);
+				compileExpression(els);
+				patchJump(jumpEnd);
+
 			case ENullCoal(left, right):
 				compileExpression(left);
 				emit(Op.DUP);

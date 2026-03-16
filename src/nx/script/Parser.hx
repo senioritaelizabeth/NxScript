@@ -61,7 +61,6 @@ class Parser {
 			case TKeyword(KTry): parseTryCatch();
 			case TKeyword(KThrow): parseThrow();
 			case TKeyword(KMatch): parseMatch();
-			case TKeyword(KSwitch): parseSwitch();
 			case TKeyword(KUsing): parseUsing();
 			case TKeyword(KEnum): parseEnum();
 			case TKeyword(KAbstract): parseAbstract();
@@ -178,7 +177,6 @@ class Parser {
 			superClass = expectIdentifier();
 		}
 
-		skipNewlines();
 		skipNewlines();
 		expect(TLeftBrace, "Expected '{' before class body");
 
@@ -331,16 +329,7 @@ class Parser {
 				TArray(elementType);
 			case TIdentifier(name):
 				advance();
-				if (check(TOperator(OLess))) {
-					advance();
-					var depth = 1;
-					while (!isEOF() && depth > 0) {
-						if (check(TOperator(OLess)))        { depth++; advance(); }
-						else if (check(TOperator(OGreater))) { depth--; advance(); }
-						else if (check(TNewLine) || check(TRightBrace)) break;
-						else advance();
-					}
-				}
+				// Soporte para clases externas (FlxSound, etc)
 				TCustom(name);
 			default:
 				throw 'Expected type hint at line ${token.line}, col ${token.col}';
@@ -350,7 +339,7 @@ class Parser {
 	function parseReturn():Stmt {
 		advance(); // consume 'return'
 
-		if (check(TNewLine) || check(TSemicolon) || check(TRightBrace) || isEOF()) {
+		if (check(TNewLine) || check(TRightBrace) || isEOF()) {
 			return SReturn(null);
 		}
 
@@ -513,15 +502,24 @@ class Parser {
 	}
 
 	function parseRange():Expr {
-		var left = parseNullCoal();
+		var left = parseTernary();
 		while (match(TRange)) {
-			var right = parseNullCoal();
+			var right = parseTernary();
 			left = ECall(EIdentifier("range"), [left, right]);
 		}
 		return left;
 	}
 
 	// ?? has lower precedence than || but higher than assignment
+	function parseTernary():Expr {
+		var cond = parseNullCoal();
+		if (!match(TQuestion)) return cond;
+		var then = parseExpression();
+		expect(TColon, "Expected ':' in ternary expression");
+		var els = parseExpression();
+		return ETernary(cond, then, els);
+	}
+
 	function parseNullCoal():Expr {
 		var left = parseLogicalOr();
 		while (match(TOperator(ONullCoal))) {
@@ -902,18 +900,6 @@ class Parser {
 				expect(TRightParen, "Expected ')' after expression");
 				expr;
 
-			case TKeyword(KFunc) | TKeyword(KFn) | TKeyword(KFun) | TKeyword(KFunction):
-				advance();
-				expect(TLeftParen, "Expected '(' after function");
-				var params = parseParameters();
-				expect(TRightParen, "Expected ')' after parameters");
-				if (match(TColon) || match(TArrow)) parseTypeHint();
-				skipNewlines();
-				expect(TLeftBrace, "Expected '{' before function body");
-				var body = parseBlockBody();
-				expect(TRightBrace, "Expected '}' after function body");
-				ELambda(params, Right(body));
-
 			case TLeftBracket:
 				parseArrayLiteral();
 
@@ -985,49 +971,6 @@ class Parser {
 
 		expect(TRightBrace, "Expected '}' after dictionary pairs");
 		return EDict(pairs);
-	}
-
-	function parseSwitch():Stmt {
-		advance(); // consume 'switch'
-		expect(TLeftParen, "Expected '(' after switch");
-		var subject = parseExpression();
-		expect(TRightParen, "Expected ')' after switch expression");
-		skipNewlines();
-		expect(TLeftBrace, "Expected '{' after switch(...)");
-		skipSeparators();
-		var cases:Array<MatchCase> = [];
-		var defaultBody:Null<Array<Stmt>> = null;
-		while (!check(TRightBrace) && !isEOF()) {
-			skipSeparators();
-			if (check(TRightBrace)) break;
-			if (match(TKeyword(KDefault))) {
-				expect(TColon, "Expected ':' after default");
-				defaultBody = parseSwitchBody();
-			} else {
-				expect(TKeyword(KCase), "Expected 'case' in switch block");
-				var pattern = parseMatchPattern();
-				expect(TColon, "Expected ':' after case value");
-				var body = parseSwitchBody();
-				cases.push({ pattern: pattern, body: body });
-			}
-			skipSeparators();
-		}
-		expect(TRightBrace, "Expected '}' after switch block");
-		return SMatch(subject, cases, defaultBody);
-	}
-
-	function parseSwitchBody():Array<Stmt> {
-		var stmts:Array<Stmt> = [];
-		skipSeparators();
-		while (!isEOF() && !check(TRightBrace)
-			&& !check(TKeyword(KCase)) && !check(TKeyword(KDefault))) {
-			var s = parseStatement();
-			consumeStatementTerminator(s);
-			stmts.push(s);
-			if (check(TKeyword(KBreak))) { advance(); skipSeparators(); break; }
-			skipSeparators();
-		}
-		return stmts;
 	}
 
 	function parseMatch():Stmt {
@@ -1341,7 +1284,7 @@ class Parser {
 
 	function statementNeedsTerminator(stmt:Stmt):Bool {
 		return switch (stmt) {
-			case SIf(_, _, _), SWhile(_, _), SFor(_, _, _), SBlock(_), STryCatch(_, _, _), SFunc(_, _, _, _), SClass(_, _, _, _), SMatch(_, _, _): false;
+			case SIf(_, _, _), SWhile(_, _), SFor(_, _, _), SBlock(_), STryCatch(_, _, _), SFunc(_, _, _, _), SClass(_, _, _, _): false;
 			default: true;
 		}
 	}

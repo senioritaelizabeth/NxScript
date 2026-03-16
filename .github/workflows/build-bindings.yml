@@ -31,7 +31,17 @@ jobs:
             artifact: nxscript-macos-arm64
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout NxScript
+        uses: actions/checkout@v4
+        with:
+          path: NxScript
+
+      - name: Checkout NxScript.Outbindings
+        uses: actions/checkout@v4
+        with:
+          repository: Kitsumizy/NxScript.Outbindings
+          path: NxScript.Outbindings
+          token: ${{ secrets.OUTBINDING_TOKEN }}
 
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
@@ -41,43 +51,49 @@ jobs:
       - name: Install hxcpp
         run: haxelib install hxcpp --quiet
 
+      - name: Register NxScript source with haxelib
+        run: haxelib dev nxscript NxScript/src
+
       - name: Linux build deps
         if: runner.os == 'Linux'
         run: sudo apt-get install -y gcc g++ make
 
+      # ── C binding ────────────────────────────────────────────────────
       - name: Build C binding
-        working-directory: bindings/c
-        run: haxe c_binding.hxml -D HXCPP_OPTIMIZE_FOR_SIZE
+        working-directory: NxScript.Outbindings/c
+        run: haxe c_binding.hxml
 
       - name: Collect C lib
         shell: bash
         run: |
           mkdir -p dist/c
-          find bindings/c/out -maxdepth 3 \
+          find NxScript.Outbindings/c/out -maxdepth 4 \
             \( -name "*.dll" -o -name "*.so" -o -name "*.dylib" \) \
             | head -1 | xargs -I{} cp {} dist/c/${{ matrix.c_lib }} 2>/dev/null || true
-          cp bindings/c/nxscript.h dist/c/
+          cp NxScript.Outbindings/c/nxscript.h dist/c/
           ls -lh dist/c/
 
+      # ── GDExtension binding ──────────────────────────────────────────
       - name: Build GDExtension binding
-        working-directory: bindings/gdextension
-        run: haxe gdext_binding.hxml -D HXCPP_OPTIMIZE_FOR_SIZE
+        working-directory: NxScript.Outbindings/gdextension
+        run: haxe gdext_binding.hxml
 
       - name: Collect GDExtension lib
         shell: bash
         run: |
           mkdir -p dist/gdextension
-          find bindings/gdextension/out -maxdepth 3 \
+          find NxScript.Outbindings/gdextension/out -maxdepth 4 \
             \( -name "*.dll" -o -name "*.so" -o -name "*.dylib" \) \
             | head -1 | xargs -I{} cp {} dist/gdextension/${{ matrix.gd_lib }} 2>/dev/null || true
-          cp bindings/gdextension/NxScriptGDExt.cpp dist/gdextension/
+          cp NxScript.Outbindings/gdextension/NxScriptGDExt.cpp    dist/gdextension/
+          cp NxScript.Outbindings/gdextension/nxscript.gdextension dist/gdextension/ 2>/dev/null || true
           ls -lh dist/gdextension/
 
       - name: Copy shared files
         shell: bash
         run: |
-          cp bindings/unity/NxScriptUnity.cs dist/
-          cp bindings/README.md              dist/
+          cp NxScript.Outbindings/unity/NxScriptUnity.cs dist/
+          cp NxScript.Outbindings/README.md               dist/ 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

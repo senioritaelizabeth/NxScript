@@ -1,0 +1,357 @@
+TestSuite.hx:48: ╔════════════════════════════════════╗
+TestSuite.hx:49: ║       NxScript Test Suite            ║
+TestSuite.hx:50: ╚════════════════════════════════════╝
+
+--- Basics ---
+TestSuite.hx:26:   ✓ variables and addition
+TestSuite.hx:26:   ✓ function call
+TestSuite.hx:26:   ✓ if/else
+TestSuite.hx:26:   ✓ while loop
+TestSuite.hx:26:   ✓ array push+length
+TestSuite.hx:26:   ✓ prefix ++
+TestSuite.hx:26:   ✓ prefix --
+TestSuite.hx:26:   ✓ postfix ++
+TestSuite.hx:26:   ✓ postfix --
+TestSuite.hx:26:   ✓ modulo
+TestSuite.hx:26:   ✓ && false
+TestSuite.hx:26:   ✓ || true
+TestSuite.hx:26:   ✓ ! negation
+
+--- Classes ---
+TestSuite.hx:26:   ✓ instantiation field x
+TestSuite.hx:26:   ✓ instantiation field y
+TestSuite.hx:26:   ✓ method call sum()
+TestSuite.hx:26:   ✓ field modify + method
+
+--- Methods ---
+TestSuite.hx:26:   ✓ Number.floor()
+TestSuite.hx:26:   ✓ Number.abs()
+TestSuite.hx:26:   ✓ Number.pow()
+TestSuite.hx:26:   ✓ Number.ceil()
+TestSuite.hx:26:   ✓ Number.round()
+TestSuite.hx:26:   ✓ Number.sqrt()
+TestSuite.hx:26:   ✓ String.upper()
+TestSuite.hx:26:   ✓ String.lower()
+TestSuite.hx:26:   ✓ String.trim()
+TestSuite.hx:26:   ✓ String.length
+TestSuite.hx:26:   ✓ String.charAt()
+TestSuite.hx:26:   ✓ String.indexOf()
+TestSuite.hx:26:   ✓ String.substr()
+TestSuite.hx:26:   ✓ String.split()
+TestSuite.hx:26:   ✓ Array.length
+TestSuite.hx:26:   ✓ Array.first()
+TestSuite.hx:26:   ✓ Array.last()
+TestSuite.hx:26:   ✓ Array.pop()
+TestSuite.hx:26:   ✓ Array.unshift()
+TestSuite.hx:26:   ✓ Array.join()
+TestSuite.hx:26:   ✓ Array.reverse()
+TestSuite.hx:26:   ✓ Array.includes()
+TestSuite.hx:26:   ✓ Number chain abs().floor()
+TestSuite.hx:26:   ✓ String chain trim().lower()
+
+--- Bug fix regressions ---
+TestSuite.hx:26:   ✓ array index assignment
+TestSuite.hx:26:   ✓ sequential this.x= in method
+TestSuite.hx:26:   ✓ instructionCount resets
+TestSuite.hx:26:   ✓ for-from-to with continue
+TestSuite.hx:26:   ✓ elseif keyword
+TestSuite.hx:26:   ✓ postfix++: getObj() called once
+TestSuite.hx:26:   ✓ postfix++: returns old value
+TestSuite.hx:26:   ✓ postfix++: target incremented
+TestSuite.hx:26:   ✓ 4 not tokenized as float 4.
+
+--- Imports ---
+TestSuite.hx:26:   ✓ import "haxe.ds.StringMap"
+TestSuite.hx:26:   ✓ import bare identifier
+TestSuite.hx:26:   ✓ Haxe-style :ReturnType syntax
+
+--- Error format ---
+l | ifx(true){
+l | var x=1
+> ^
+> [31mError: Undefined variable: ifx[0m - t.nx:1
+Stack trace (most recent call last):
+  at <main> (t.nx:1:1)
+TestSuite.hx:26:   ✓ shows context lines 'l |'
+TestSuite.hx:26:   ✓ shows caret ^
+TestSuite.hx:26:   ✓ shows 'Error:' label
+TestSuite.hx:26:   ✓ shows script path
+l | func boom(){
+l | var x=undeclared
+> ^
+> [31mError: Undefined variable: undeclared[0m - t.nx:1
+Stack trace (most recent call last):
+  at boom (t.nx:1:1)
+  at <main> (t.nx:4:1)
+TestSuite.hx:26:   ✓ runtime error includes stack trace
+TestSuite.hx:26:   ✓ stack trace includes function name
+
+--- try/catch/throw + strict mode ---
+TestSuite.hx:26:   ✓ try/catch catches thrown value
+TestSuite.hx:26:   ✓ try runs normally when no throw
+TestSuite.hx:26:   ✓ catch from function
+l | var a=1
+l | var b=2
+>        ^
+> [31mError: Expected ';' in strict mode at line 1, col 8. Got TNewLine[0m - script:1
+TestSuite.hx:26:   ✓ strict rejects missing semicolons
+TestSuite.hx:26:   ✓ strict accepts semicolons
+l | "use strict";
+l | var x=1
+l | var y=2
+>        ^
+> [31mError: Expected ';' in strict mode at line 2, col 8. Got TNewLine[0m - script:2
+TestSuite.hx:26:   ✓ "use strict" enables strict
+TestSuite.hx:26:   ✓ "use strict" with semicolons
+
+--- Trailing commas ---
+TestSuite.hx:26:   ✓ array literal
+TestSuite.hx:26:   ✓ params and call
+TestSuite.hx:26:   ✓ dict literal
+
+--- Shorthand lambdas => ---
+TestSuite.hx:26:   ✓ x => expr
+TestSuite.hx:26:   ✓ (a,b) => expr
+TestSuite.hx:26:   ✓ x => { block }
+TestSuite.hx:26:   ✓ => in filter
+
+--- Template strings ---
+TestSuite.hx:26:   ✓ backtick basic
+TestSuite.hx:26:   ✓ backtick expr
+TestSuite.hx:26:   ✓ plain backtick
+TestSuite.hx:26:   ✓ single-quote ${} 
+TestSuite.hx:26:   ✓ single-quote expr
+TestSuite.hx:26:   ✓ double-quote ${}
+TestSuite.hx:26:   ✓ double-quote computed
+
+--- Array methods (functional) ---
+TestSuite.hx:26:   ✓ map
+TestSuite.hx:26:   ✓ filter
+TestSuite.hx:26:   ✓ reduce
+TestSuite.hx:26:   ✓ forEach
+TestSuite.hx:26:   ✓ find
+TestSuite.hx:26:   ✓ findIndex
+TestSuite.hx:26:   ✓ every true
+TestSuite.hx:26:   ✓ every false
+TestSuite.hx:26:   ✓ some
+TestSuite.hx:26:   ✓ slice length
+TestSuite.hx:26:   ✓ slice first
+TestSuite.hx:26:   ✓ concat
+TestSuite.hx:26:   ✓ flat
+TestSuite.hx:26:   ✓ copy independence
+TestSuite.hx:26:   ✓ sort ascending
+TestSuite.hx:26:   ✓ sortBy
+
+--- String methods (extended) ---
+TestSuite.hx:26:   ✓ startsWith true
+TestSuite.hx:26:   ✓ startsWith false
+TestSuite.hx:26:   ✓ endsWith
+TestSuite.hx:26:   ✓ replace
+TestSuite.hx:26:   ✓ repeat
+TestSuite.hx:26:   ✓ padStart
+TestSuite.hx:26:   ✓ padEnd
+
+--- Dict methods ---
+TestSuite.hx:26:   ✓ size()
+TestSuite.hx:26:   ✓ has() true
+TestSuite.hx:26:   ✓ has() false
+TestSuite.hx:26:   ✓ remove()
+TestSuite.hx:26:   ✓ set()
+TestSuite.hx:26:   ✓ keys()
+TestSuite.hx:26:   ✓ values()
+
+--- Global natives ---
+TestSuite.hx:26:   ✓ range(5)
+TestSuite.hx:26:   ✓ range(2,6)[0]
+TestSuite.hx:26:   ✓ str()
+TestSuite.hx:26:   ✓ int()
+TestSuite.hx:26:   ✓ abs()
+TestSuite.hx:26:   ✓ floor()
+TestSuite.hx:26:   ✓ sqrt()
+TestSuite.hx:26:   ✓ pow()
+TestSuite.hx:26:   ✓ min()
+TestSuite.hx:26:   ✓ max()
+TestSuite.hx:26:   ✓ PI
+TestSuite.hx:26:   ✓ 0/0 => NaN (not error)
+
+--- GC control ---
+TestSuite.hx:26:   ✓ AGGRESSIVE gc
+TestSuite.hx:26:   ✓ SOFT gc
+TestSuite.hx:26:   ✓ VERY_SOFT gc
+TestSuite.hx:26:   ✓ manual gc() then run
+
+--- Nested scopes (let) ---
+TestSuite.hx:26:   ✓ outer var survives block
+TestSuite.hx:26:   ✓ inner let shadows outer
+
+--- match pattern matching ---
+TestSuite.hx:26:   ✓ value
+TestSuite.hx:26:   ✓ default
+TestSuite.hx:26:   ✓ range
+TestSuite.hx:26:   ✓ bind match n*10
+TestSuite.hx:26:   ✓ block body
+TestSuite.hx:26:   ✓ string values
+TestSuite.hx:26:   ✓ array destructure
+
+--- Destructuring ---
+TestSuite.hx:26:   ✓ array [a,b,c]
+TestSuite.hx:26:   ✓ array _ skip
+TestSuite.hx:26:   ✓ dict {x,y}
+TestSuite.hx:435: NOTE: this test requires a new VM, calling reset_context()
+TestSuite.hx:26:   ✓ dict from fn
+
+--- safeCall ---
+TestSuite.hx:26:   ✓ safeCall returns value
+TestSuite.hx:26:   ✓ safeCall correct result
+TestSuite.hx:26:   ✓ missing fn returns null
+TestSuite.hx:26:   ✓ error returns null
+
+--- Sandbox mode ---
+TestSuite.hx:26:   ✓ maxInstructions = 500k
+TestSuite.hx:26:   ✓ maxCallDepth = 256
+TestSuite.hx:26:   ✓ sandboxed = true
+l | Sys.exit(3)
+> ^
+> [31mError: Sandbox: access to "Sys" is not allowed[0m - script:1
+Stack trace (most recent call last):
+  at <main> (script:1:1)
+TestSuite.hx:26:   ✓ sandbox blocks Sys
+
+--- using — extension methods ---
+TestSuite.hx:26:   ✓ using keyword parses without error
+
+--- Int / Float subtypes ---
+TestSuite.hx:26:   ✓ 42 is Number
+TestSuite.hx:26:   ✓ 3.14 is Number
+TestSuite.hx:26:   ✓ Int_from(7.0)=7
+l | Int_from(3.5)
+> ^
+> [31mError: Int.from: 3.5 is not a whole number[0m - script:1
+Stack trace (most recent call last):
+  at <main> (script:1:1)
+TestSuite.hx:26:   ✓ Int_from(3.5) throws
+TestSuite.hx:26:   ✓ Float_from(5)=5
+TestSuite.hx:26:   ✓ Float_from(2.718)
+
+--- fromNumber / fromInt / fromFloat ---
+TestSuite.hx:26:   ✓ fromNumber(42)
+TestSuite.hx:26:   ✓ fromNumber(true)=1
+TestSuite.hx:26:   ✓ fromNumber(false)=0
+TestSuite.hx:26:   ✓ fromNumber("3.14")
+TestSuite.hx:26:   ✓ fromInt(10)
+TestSuite.hx:26:   ✓ fromInt("7")
+l | fromInt(2.5)
+> ^
+> [31mError: fromInt: 2.5 is not a whole number[0m - script:1
+Stack trace (most recent call last):
+  at <main> (script:1:1)
+TestSuite.hx:26:   ✓ fromInt(2.5) throws
+TestSuite.hx:26:   ✓ fromFloat(5)
+TestSuite.hx:26:   ✓ fromFloat("1.5")
+
+--- NxStd bridge ---
+TestSuite.hx:26:   ✓ parseInt("42")
+TestSuite.hx:26:   ✓ parseFloat("3.14")
+TestSuite.hx:26:   ✓ isNaN(0/0)
+TestSuite.hx:26:   ✓ isNaN(NAN)
+TestSuite.hx:26:   ✓ isNaN(42)=false
+TestSuite.hx:26:   ✓ isFinite(42)
+TestSuite.hx:26:   ✓ isFinite(INF)=false
+TestSuite.hx:26:   ✓ jsonStringify(42)
+TestSuite.hx:26:   ✓ jsonParse array
+
+--- NxDate bridge ---
+TestSuite.hx:26:   ✓ timerStamp() > 0
+TestSuite.hx:26:   ✓ dateNow() is Date
+
+--- ENTER_SCOPE only on blocks with let ---
+TestSuite.hx:26:   ✓ while 10k iters < 5s (0.0399920940399169922s)
+TestSuite.hx:26:   ✓ block with let scoped
+TestSuite.hx:26:   ✓ if block no overhead
+
+--- Enums ---
+TestSuite.hx:26:   ✓ variant access
+TestSuite.hx:26:   ✓ enum.variant
+TestSuite.hx:26:   ✓ enum.enum
+TestSuite.hx:26:   ✓ payload variant
+TestSuite.hx:26:   ✓ payload value
+TestSuite.hx:26:   ✓ match enum variant
+
+--- is operator ---
+TestSuite.hx:26:   ✓ 42 is Number
+TestSuite.hx:26:   ✓ "hi" is String
+TestSuite.hx:26:   ✓ 42 is String=false
+TestSuite.hx:26:   ✓ true is Bool
+TestSuite.hx:26:   ✓ [1,2,3] is Array
+TestSuite.hx:26:   ✓ null is Null
+
+--- Braceless control flow ---
+TestSuite.hx:26:   ✓ braceless if
+TestSuite.hx:26:   ✓ braceless if/else
+TestSuite.hx:26:   ✓ braceless while
+TestSuite.hx:26:   ✓ braceless for-in
+
+--- Abstract types ---
+TestSuite.hx:26:   ✓ abstract Meters.toKm()
+TestSuite.hx:26:   ✓ abstract Email.domain()
+
+--- ?? null coalescing ---
+TestSuite.hx:26:   ✓ null ?? default
+TestSuite.hx:26:   ✓ non-null ?? returns left
+TestSuite.hx:26:   ✓ 0 ?? is 0 (not null)
+TestSuite.hx:26:   ✓ "" ?? is "" (not null)
+TestSuite.hx:26:   ✓ chained ??
+TestSuite.hx:26:   ✓ a??b??c
+
+--- ?. optional chain ---
+TestSuite.hx:26:   ✓ null?.y == null
+TestSuite.hx:26:   ✓ dict?.field returns value
+TestSuite.hx:26:   ✓ null?.field ?? fallback
+TestSuite.hx:26:   ✓ null?.y?.z chain
+
+--- Truthy JS-style coercion ---
+TestSuite.hx:26:   ✓ 1 is truthy
+TestSuite.hx:26:   ✓ 0 is falsy
+TestSuite.hx:26:   ✓ "hi" is truthy
+TestSuite.hx:26:   ✓ "" is falsy
+TestSuite.hx:26:   ✓ [1] is truthy
+TestSuite.hx:26:   ✓ [] is falsy
+TestSuite.hx:26:   ✓ null is falsy
+TestSuite.hx:26:   ✓ x=5 truthy
+TestSuite.hx:26:   ✓ x=0 falsy
+
+--- SyntaxRules — aliases ---
+TestSuite.hx:26:   ✓ fn alias for func
+TestSuite.hx:26:   ✓ let alias for var
+TestSuite.hx:26:   ✓ not alias for !
+TestSuite.hx:26:   ✓ not true == false
+TestSuite.hx:26:   ✓ and alias for &&
+TestSuite.hx:26:   ✓ or alias for ||
+TestSuite.hx:26:   ✓ pythonish: def
+TestSuite.hx:26:   ✓ pythonish: not False
+TestSuite.hx:26:   ✓ pythonish: True and not False
+
+--- static fields and methods ---
+TestSuite.hx:26:   ✓ module static var set
+TestSuite.hx:26:   ✓ module static var survives reset_context
+TestSuite.hx:26:   ✓ class static var increments per new
+TestSuite.hx:26:   ✓ static methods: 25 + 27 = 52
+TestSuite.hx:26:   ✓ class visible across runDynamic calls
+
+--- #if/#end preprocessor ---
+TestSuite.hx:26:   ✓ #if true runs
+TestSuite.hx:26:   ✓ #if false skipped
+TestSuite.hx:26:   ✓ #if/#else
+TestSuite.hx:26:   ✓ #elseif
+TestSuite.hx:26:   ✓ #if ! negation
+TestSuite.hx:26:   ✓ lines preserved
+
+--- cross-script class visibility ---
+TestSuite.hx:26:   ✓ class used across runs
+TestSuite.hx:26:   ✓ class survives reset_context
+TestSuite.hx:26:   ✓ static field = 2 after 2 new
+TestSuite.hx:26:   ✓ class static field survives reset_context
+
+╔════════════════════════════════════╗
+║  Results: 238 passed, 0 failed
+╚════════════════════════════════════╝

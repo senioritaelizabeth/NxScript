@@ -187,7 +187,8 @@ class BridgeAndUsingTest {
 
 		var interp2 = new Interpreter();
 		NxStd.registerAll(interp2.vm);
-
+		r = interp2.runDynamic('Std.int(3.14)');
+		assert(r == 3, "Std.int(3.14) = 3");
 		r = interp2.runDynamic('parseInt("42")');
 		assert(r == 42, "parseInt(\"42\")");
 

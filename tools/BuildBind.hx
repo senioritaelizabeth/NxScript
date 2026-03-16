@@ -1,5 +1,6 @@
 package tools;
 
+import sys.io.File;
 import sys.FileSystem;
 
 class BuildBind {
@@ -31,6 +32,9 @@ class BuildBind {
         };
         var out = get_arg("out", "binaries/");
         targetFile = out + targetFile;
+        if (!FileSystem.exists(out)) {
+            FileSystem.createDirectory(out);            
+        }
         if (sys.FileSystem.exists(outputFile)) {
             sys.FileSystem.rename(outputFile, targetFile);
             trace("Renamed " + outputFile + " to " + targetFile);

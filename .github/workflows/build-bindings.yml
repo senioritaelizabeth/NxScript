@@ -36,8 +36,8 @@ jobs:
       - name: setup haxelib (macOS)
         if: runner.os == 'macOS'
         run: |
-          haxelib setup ~/.haxelib
-          
+          haxelib setup ./.haxelib
+
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
         if: runner.os != 'macOS'

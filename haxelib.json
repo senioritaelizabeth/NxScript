@@ -11,7 +11,7 @@
     "interpreter"
   ],
   "description": "NxScript - A comprehensive suite of scripting languages for Haxe: Nx-Script (bytecode VM), Nz-Dialogue (interactive conversations), and Nz-Cinematic (cutscenes)",
-  "version": "0.1.0",
+  "version": "0.5.7",
   "classPath": "src/",
   "releasenote": "Complete rewrite: Added Nz-Script bytecode language with hex opcodes, stack-based VM, functions, lambdas, arrays, dictionaries, and full debugging support",
   "contributors": [

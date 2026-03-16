@@ -462,8 +462,8 @@ class TestSuite {
 		ok(i.vm.maxCallDepth == 256,       "maxCallDepth = 256");
 		ok(i.vm.sandboxed == true,         "sandboxed = true");
 	
-		ok(false, "sandbox blocks Sys");
-		// throws(() -> i.runDynamic('Sys.exit(3)'), "sandbox blocks Sys"); /
+		// ok(false, "sandbox blocks Sys");
+		throws(() -> i.runDynamic('Sys.exit(3)'), "sandbox blocks Sys"); 
 	}
 
 	// ══════════════════════════════════════════════════════════════════════

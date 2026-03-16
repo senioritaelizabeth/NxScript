@@ -11,7 +11,7 @@ import nx.script.Parser;
 import nx.script.Tokenizer;
 import nx.script.VM;
 import haxe.io.Path;
-
+using StringTools;
 /**
  * The front door. Tokenizes, parses, compiles, and runs your script in one call.
  *

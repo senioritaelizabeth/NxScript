@@ -189,10 +189,10 @@ class Tokenizer {
 		var hasInterp = false;
 
 		while (!isEOF() && peek() != quote) {
-			// Check for ${ interpolation — works in both ' and " strings
-			if (peek() == '$' && peekNext() == '{') {
+			// Check for ${ or $ident interpolation
+			if (peek() == '$' && (peekNext() == '{' || isAlpha(peekNext()) || peekNext() == '_')) {
 				hasInterp = true;
-				break; // defer to interpolation handler
+				break;
 			}
 			if (peek() == '\\') {
 				advance();
@@ -264,7 +264,19 @@ class Tokenizer {
 		var litLine = line; var litCol = col;
 
 		while (!isEOF() && peek() != quote) {
-			if (peek() == '$' && peekNext() == '{') {
+			if (peek() == '$' && peekNext() != '{' && (isAlpha(peekNext()) || peekNext() == '_')) {
+				// $ident bare interpolation
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // consume $
+				var identStart = pos;
+				while (!isEOF() && (isAlphaNumeric(peek()) || peek() == '_')) advance();
+				var identName = input.substring(identStart, pos);
+				if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+				parts.push({token: TIdentifier(identName), line: line, col: col});
+				hasContent = true;
+				litLine = line; litCol = col;
+			} else if (peek() == '$' && peekNext() == '{') {
 				pushStr(literal.toString(), litLine, litCol);
 				literal = new StringBuf();
 				advance(); // $
@@ -342,7 +354,19 @@ class Tokenizer {
 		var litLine = line; var litCol = col;
 
 		while (!isEOF() && peek() != '`') {
-			if (peek() == '$' && peekNext() == '{') {
+			if (peek() == '$' && peekNext() != '{' && (isAlpha(peekNext()) || peekNext() == '_')) {
+				// $ident in backtick string
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // $
+				var identStart = pos;
+				while (!isEOF() && (isAlphaNumeric(peek()) || peek() == '_')) advance();
+				var identName = input.substring(identStart, pos);
+				if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+				parts.push({token: TIdentifier(identName), line: line, col: col});
+				hasContent = true;
+				litLine = line; litCol = col;
+			} else if (peek() == '$' && peekNext() == '{') {
 				// Flush accumulated literal
 				pushStr(literal.toString(), litLine, litCol);
 				literal = new StringBuf();

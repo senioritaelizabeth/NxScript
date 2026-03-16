@@ -38,6 +38,8 @@ class VM {
 
 	/** Global variables. Set from Haxe with `vm.globals.set(name, value)`, or via top-level script assignments. */
 	public var globals:Map<String, Value>;
+	/** Names registered as static — preserved across reset_context(). Populated by Interpreter after compilation. */
+	public var staticNames:Map<String, Bool> = new Map();
 
 	// Let-scoped variables (block-level) and compile-time constants
 	var scopeVars:Map<String, Value>;
@@ -1005,6 +1007,11 @@ class VM {
 					handleMakeClass(arg);
 					sp = this.sp;
 
+				case Op.MAKE_CLASS_STATICS:
+					this.sp = sp;
+					handleMakeClassStatics(arg);
+					sp = this.sp;
+
 				case Op.INSTANTIATE:
 					currentFrame.ip = ip; // handleInstantiate may run nested code and restore via frame ip
 					this.sp = sp;
@@ -1235,13 +1242,45 @@ class VM {
 			nativeSuper: nativeSuper,
 			methods: methods,
 			fields: fields,
-			constructor: constructor
+			constructor: constructor,
+			staticFields:  new Map(),
+			staticMethods: new Map()
 		};
 
 		// Register class in global registry
 		classes.set(className, classData);
 
 		push(VClass(classData));
+	}
+
+	function handleMakeClassStatics(counts:Int) {
+		var staticMethodCount = counts >> 16;
+		var staticFieldCount  = counts & 0xFFFF;
+
+		// Pop static fields (name, value pairs) — popped in reverse
+		var sFields = new Map<String, Value>();
+		for (i in 0...staticFieldCount) {
+			var value = pop();
+			var name = switch (pop()) { case VString(s): s; default: throw "Static field name must be string"; };
+			sFields.set(name, value);
+		}
+
+		// Pop static methods (name, function pairs)
+		var sMethods = new Map<String, FunctionChunk>();
+		for (i in 0...staticMethodCount) {
+			var func = switch (pop()) { case VFunction(f, _): f; default: throw "Static method must be function"; };
+			var name = switch (pop()) { case VString(s): s; default: throw "Static method name must be string"; };
+			sMethods.set(name, func);
+		}
+
+		// Attach to the VClass sitting on top of stack
+		switch (stack[sp - 1]) {
+			case VClass(classData):
+				for (k in sFields.keys())  classData.staticFields.set(k, sFields.get(k));
+				for (k in sMethods.keys()) classData.staticMethods.set(k, sMethods.get(k));
+			default:
+				throw "MAKE_CLASS_STATICS: top of stack must be a VClass";
+		}
 	}
 
 	function handleThrownValue(val:Value, sp:Int) {
@@ -1771,12 +1810,17 @@ class VM {
 				}
 
 			case VClass(classData):
+				// Static methods first
+				var sMethod = classData.staticMethods.get(field);
+				if (sMethod != null)
+					return VFunction(sMethod, ["__class__" => VClass(classData)]);
+				// Static fields
+				if (classData.staticFields.exists(field))
+					return classData.staticFields.get(field);
+				// Instance method lookup (for e.g. passing methods as values)
 				var method = classData.methods.get(field);
 				if (method != null)
 					return VFunction(method, EMPTY_MAP);
-				var fieldVal = classData.fields.get(field);
-				if (fieldVal != null)
-					return fieldVal;
 				return VNull;
 
 
@@ -1851,7 +1895,8 @@ class VM {
 					}
 				}
 			case VClass(classData):
-				classData.fields.set(field, value);
+				// Write to static field (creates it if needed)
+				classData.staticFields.set(field, value);
 			case VNativeObject(obj):
 				Reflection.setField(obj, field, valueToHaxe(value));
 			default:

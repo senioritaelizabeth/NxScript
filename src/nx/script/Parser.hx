@@ -64,6 +64,7 @@ class Parser {
 			case TKeyword(KUsing): parseUsing();
 			case TKeyword(KEnum): parseEnum();
 			case TKeyword(KAbstract): parseAbstract();
+			case TKeyword(KStatic): parseStatic();
 			case TLeftBrace: parseBlock();
 			default: SExpr(parseExpression());
 		}
@@ -159,6 +160,7 @@ class Parser {
 			returnType = parseTypeHint();
 		}
 
+		skipNewlines();
 		expect(TLeftBrace, "Expected '{' before function body");
 		var body = parseBlockBody();
 		expect(TRightBrace, "Expected '}' after function body");
@@ -236,6 +238,7 @@ class Parser {
 						returnType = parseTypeHint();
 					}
 
+					skipNewlines();
 					expect(TLeftBrace, "Expected '{' before method body");
 					var body = parseBlockBody();
 					expect(TRightBrace, "Expected '}' after method body");
@@ -248,8 +251,33 @@ class Parser {
 						isConstructor: isConstructor
 					});
 
+				case TKeyword(KStatic):
+					// static var / static func inside class
+					advance(); // consume 'static'
+					skipNewlines();
+					if (match(TKeyword(KVar))) {
+						var fieldName = expectIdentifier();
+						if (match(TColon)) parseTypeHint();
+						var fieldInit:Null<Expr> = null;
+						if (match(TOperator(OAssign))) fieldInit = parseExpression();
+						fields.push({ name: fieldName, type: null, init: fieldInit, isStatic: true });
+					} else if (match(TKeyword(KFunc)) || match(TKeyword(KFunction)) || match(TKeyword(KFn)) || match(TKeyword(KFun))) {
+						var methodName = expectMemberName();
+						expect(TLeftParen, "Expected '(' after static method name");
+						var params = parseParameters();
+						expect(TRightParen, "Expected ')' after static method params");
+						if (match(TArrow) || match(TColon)) parseTypeHint();
+						skipNewlines();
+						expect(TLeftBrace, "Expected '{' before static method body");
+						var body = parseBlockBody();
+						expect(TRightBrace, "Expected '}' after static method body");
+						methods.push({ name: methodName, params: params, returnType: null, body: body, isConstructor: false, isStatic: true });
+					} else {
+						error("Expected 'var' or 'func' after 'static' in class body");
+					}
+
 				default:
-					error("Expected 'var' or 'func' in class body");
+					error("Expected 'var', 'func', or 'static' in class body");
 			}
 
 			skipSeparators();
@@ -1048,6 +1076,36 @@ class Parser {
 			var expr = parseExpression();
 			return [SExpr(expr)];
 		}
+	}
+
+	function parseStatic():Stmt {
+		advance(); // consume 'static'
+		skipNewlines();
+		// static var name = value
+		if (match(TKeyword(KVar))) {
+			var name = expectIdentifier();
+			// optional type hint
+			if (match(TColon)) parseTypeHint();
+			var init:Null<Expr> = null;
+			if (match(TOperator(OAssign)))
+				init = parseExpression();
+			return SStaticVar(name, init);
+		}
+		// static func name(...) { }
+		if (match(TKeyword(KFunc)) || match(TKeyword(KFunction))) {
+			var name = expectIdentifier();
+			expect(TLeftParen, "Expected '(' after static function name");
+			var params = parseParameters();
+			expect(TRightParen, "Expected ')' after static function params");
+			if (match(TArrow) || match(TColon)) parseTypeHint();
+			skipNewlines();
+			expect(TLeftBrace, "Expected '{' before static function body");
+			var body = parseBlockBody();
+			expect(TRightBrace, "Expected '}' after static function body");
+			return SStaticFunc(name, params, null, body);
+		}
+		error("Expected 'var' or 'func' after 'static'");
+		return SExpr(ENull);
 	}
 
 	function parseEnum():Stmt {

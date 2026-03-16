@@ -38,7 +38,8 @@ enum Keyword {
 	KDefault; // default (in match)
 	KUsing; // using — extension methods
 	KEnum; // enum
-	KAbstract; // abstract type
+	KAbstract;
+	KStatic; // abstract type
 	KIs; // type check: x is SomeType
 }
 

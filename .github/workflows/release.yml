@@ -1,0 +1,194 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "haxelib.json"
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Type the version from haxelib.json to confirm (e.g. 1.2.0)"
+        required: true
+
+jobs:
+  validate:
+    name: Validate version bump
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      should-release: ${{ steps.check.outputs.should-release }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get version from haxelib.json
+        id: get-version
+        run: |
+          VERSION=$(jq -r .version haxelib.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Check version changed (push trigger)
+        id: check-push
+        if: github.event_name == 'push'
+        run: |
+          PREV=$(git show HEAD~1:haxelib.json 2>/dev/null | jq -r .version 2>/dev/null || echo "none")
+          CURR=$(jq -r .version haxelib.json)
+          echo "Previous: $PREV → Current: $CURR"
+          if [ "$PREV" != "$CURR" ]; then
+            echo "should-release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            echo "Version unchanged — skipping"
+          fi
+
+      - name: Validate manual trigger
+        id: check-manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          EXPECTED="${{ steps.get-version.outputs.version }}"
+          INPUT="${{ github.event.inputs.version }}"
+          if [ "$INPUT" != "$EXPECTED" ]; then
+            echo "ERROR: typed '$INPUT' but haxelib.json says '$EXPECTED'"
+            exit 1
+          fi
+          echo "Confirmed: $EXPECTED"
+          echo "should-release=true" >> $GITHUB_OUTPUT
+
+      - name: Merge outputs
+        id: check
+        run: |
+          PUSH="${{ steps.check-push.outputs.should-release }}"
+          MANUAL="${{ steps.check-manual.outputs.should-release }}"
+          if [ "$PUSH" = "true" ] || [ "$MANUAL" = "true" ]; then
+            echo "should-release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-release=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    name: Build native bindings
+    needs: validate
+    if: needs.validate.outputs.should-release == 'true'
+    uses: ./.github/workflows/build-bindings.yml
+
+  release:
+    name: Publish
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    if: needs.validate.outputs.should-release == 'true'
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: "4.3.4"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts/
+
+      - name: List artifacts
+        run: find release-artifacts/ -type f | sort
+
+      - name: Push binaries to NxScript.Outbinding
+        env:
+          OUTBINDING_TOKEN: ${{ secrets.OUTBINDING_TOKEN }}
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+
+          # Clone the outbinding repo
+          git clone https://github.com/Kitsumizy/NxScript.Outbindings.git outbinding
+          cd outbinding
+
+          # Copy platform artifacts into the repo structure
+          for platform in linux-x64 windows-x64 macos-arm64; do
+            src="../release-artifacts/nxscript-$platform"
+            if [ -d "$src" ]; then
+              # C binding
+              mkdir -p "bin/$platform/c"
+              cp -r "$src/c/"* "bin/$platform/c/" 2>/dev/null || true
+              # GDExtension
+              mkdir -p "bin/$platform/gdextension"
+              cp -r "$src/gdextension/"* "bin/$platform/gdextension/" 2>/dev/null || true
+            fi
+          done
+
+          # Copy shared files (Unity wrapper, README, header)
+          cp ../release-artifacts/nxscript-linux-x64/NxScriptUnity.cs . 2>/dev/null || true
+          cp ../release-artifacts/nxscript-linux-x64/README.md         . 2>/dev/null || true
+          cp ../release-artifacts/nxscript-linux-x64/c/nxscript.h      . 2>/dev/null || true
+
+          # Write a version file
+          echo "$VERSION" > VERSION
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "binaries: NxScript v$VERSION" || echo "Nothing to commit"
+          git tag "v$VERSION" || true
+          git push origin main --tags
+
+      - name: Package haxelib zip
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+          zip -r nxscript-$VERSION-haxelib.zip src/ haxelib.json README.md LICENSE CHANGELOG.md             --exclude "*.DS_Store"
+          echo "haxelib zip: $(du -sh nxscript-$VERSION-haxelib.zip)"
+
+      - name: Package bindings zip
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+          mkdir -p bindings-dist
+          cp -r release-artifacts/*/. bindings-dist/ 2>/dev/null || true
+          zip -r nxscript-$VERSION-bindings.zip bindings-dist/
+
+      - name: Submit to haxelib
+        env:
+          HAXELIB_USER: ${{ secrets.HAXELIB_USER }}
+          HAXELIB_PASS: ${{ secrets.HAXELIB_PASS }}
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+          haxelib submit nxscript-$VERSION-haxelib.zip $HAXELIB_USER $HAXELIB_PASS
+        continue-on-error: true
+      - name: Get changelog section
+        id: changelog
+        run: |
+          VERSION=${{ needs.validate.outputs.version }}
+          NOTES=$(awk "/^## \\[$VERSION\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md 2>/dev/null || echo "See CHANGELOG.md")
+          { echo "notes<<EOF"; echo "$NOTES"; echo "EOF"; } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: NxScript v${{ needs.validate.outputs.version }}
+          body: |
+            ## NxScript v${{ needs.validate.outputs.version }}
+
+            ${{ steps.changelog.outputs.notes }}
+
+            ---
+
+            **Binaries** (compiled .dll/.so/.dylib) are in the [NxScript.Outbindings](https://github.com/Kitsumizy/NxScript.Outbindings) repo, tagged `v${{ needs.validate.outputs.version }}`.
+
+            | File | Description |
+            |------|-------------|
+            | `nxscript-*-haxelib.zip` | Haxe source — `haxelib install nxscript-*.zip` |
+            | `nxscript-*-bindings.zip` | All native libs + headers |
+
+            ```bash
+            haxelib install nxscript
+            ```
+          prerelease: ${{ contains(needs.validate.outputs.version, '-') }}
+          files: |
+            nxscript-${{ needs.validate.outputs.version }}-haxelib.zip
+            nxscript-${{ needs.validate.outputs.version }}-bindings.zip

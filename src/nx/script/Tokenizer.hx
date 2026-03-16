@@ -57,6 +57,7 @@ class Tokenizer {
 		"using" => KUsing,
 		"enum" => KEnum,
 		"abstract" => KAbstract,
+		"static"   => KStatic,
 		"is" => KIs
 	];
 

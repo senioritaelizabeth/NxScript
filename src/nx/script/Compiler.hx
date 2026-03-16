@@ -39,6 +39,8 @@ class Compiler {
 	var localSlots:Map<String, Int> = null;
 	var nextLocalSlot:Int = 0;
 	var globalSlots:Map<String, Int>;
+	/** Names of static globals — preserved by reset_context(). Read by Interpreter after compile(). */
+	public var staticGlobalNames:Map<String, Bool> = new Map();
 	var globalNames:Array<String>;
 	var globalConstMask:Array<Bool>;
 	var upvalueSlots:Map<String, Int> = null;
@@ -183,45 +185,62 @@ class Compiler {
 					emit(Op.POP);
 
 			case SClass(className, superClass, methods, fields):
+				// Separate static and instance members
+				var instanceMethods = methods.filter(m -> m.isStatic != true);
+				var staticMethods   = methods.filter(m -> m.isStatic == true);
+				var instanceFields  = fields.filter(f -> f.isStatic != true);
+				var staticFields    = fields.filter(f -> f.isStatic == true);
+
 				var classMethodNames = new Map<String, Bool>();
-				for (m in methods)
-					classMethodNames.set(m.name, true);
+				for (m in instanceMethods) classMethodNames.set(m.name, true);
+				for (m in staticMethods)   classMethodNames.set(m.name, true);
 
 				// Push class name
 				emitConstant(VString(className));
 				// Push super class (or null)
-				if (superClass != null) {
+				if (superClass != null)
 					emitWithString(Op.LOAD_VAR, superClass);
-				} else {
+				else
 					emit(Op.LOAD_NULL);
-				}
-				// Compile and push methods
-				for (method in methods) {
-					// Push method name
+
+				// Push instance methods
+				for (method in instanceMethods) {
 					emitConstant(VString(method.name));
-					// Push method function
 					var funcChunk = compileFunction(method.name, method.params, method.body, false, classMethodNames);
 					var funcIndex = functions.length;
 					functions.push(funcChunk);
 					emitWithArg(Op.MAKE_FUNC, funcIndex);
-					// Push isConstructor flag
 					emit(method.isConstructor ? Op.LOAD_TRUE : Op.LOAD_FALSE);
 				}
-				// Compile and push fields
-				for (field in fields) {
-					// Push field name
+				// Push instance fields
+				for (field in instanceFields) {
 					emitConstant(VString(field.name));
-					// Push field init value
-					if (field.init != null) {
-						compileExpression(field.init);
-					} else {
-						emit(Op.LOAD_NULL);
-					}
+					if (field.init != null) compileExpression(field.init);
+					else emit(Op.LOAD_NULL);
 				}
-				// Create class: MAKE_CLASS with encoded counts (methods << 16 | fields)
-				var counts = (methods.length << 16) | fields.length;
+				// Create class object
+				var counts = (instanceMethods.length << 16) | instanceFields.length;
 				emitWithArg(Op.MAKE_CLASS, counts);
-				// Store class
+
+				// Attach statics if any — MAKE_CLASS_STATICS pops from stack onto VClass
+				if (staticMethods.length > 0 || staticFields.length > 0) {
+					for (method in staticMethods) {
+						emitConstant(VString(method.name));
+						var funcChunk = compileFunction(method.name, method.params, method.body, false, classMethodNames);
+						var funcIndex = functions.length;
+						functions.push(funcChunk);
+						emitWithArg(Op.MAKE_FUNC, funcIndex);
+					}
+					for (field in staticFields) {
+						emitConstant(VString(field.name));
+						if (field.init != null) compileExpression(field.init);
+						else emit(Op.LOAD_NULL);
+					}
+					var sCounts = (staticMethods.length << 16) | staticFields.length;
+					emitWithArg(Op.MAKE_CLASS_STATICS, sCounts);
+				}
+
+				// Store class in global
 				emitWithArg(Op.STORE_GLOBAL, allocGlobalSlot(className));
 				if (!isLast)
 					emit(Op.POP);
@@ -511,6 +530,26 @@ class Compiler {
 				// The constructor wraps the base value.
 				// We compile it exactly like SClass but register it as abstract.
 				compileStatement(SClass(name, null, methods, []), isLast);
+
+			case SStaticVar(name, init):
+				// Module-level static var — compiled as a regular global
+				// but marked so reset_context() preserves it
+				if (init != null) compileExpression(init);
+				else emit(Op.LOAD_NULL);
+				emitWithArg(Op.STORE_GLOBAL, allocGlobalSlot(name));
+				// Mark as static so VM knows to preserve across resets
+				staticGlobalNames.set(name, true);
+				if (!isLast) emit(Op.POP);
+
+			case SStaticFunc(name, params, returnType, body):
+				// Module-level static func — compiled like SFunc but preserved across resets
+				var funcChunk = compileFunction(name, params, body, false, null);
+				var funcIndex = functions.length;
+				functions.push(funcChunk);
+				emitWithArg(Op.MAKE_FUNC, funcIndex);
+				emitWithArg(Op.STORE_GLOBAL, allocGlobalSlot(name));
+				staticGlobalNames.set(name, true);
+				if (!isLast) emit(Op.POP);
 
 			case SUsing(className):
 				// `using` is parsed but currently a no-op at runtime.

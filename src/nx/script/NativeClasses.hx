@@ -69,7 +69,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Object", classData);
@@ -91,7 +93,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("String", classData);
@@ -112,7 +116,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Number", classData);
@@ -134,7 +140,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Int", classData);
@@ -168,7 +176,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Float", classData);
@@ -241,7 +251,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Bool", classData);
@@ -263,7 +275,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Array", classData);
@@ -285,7 +299,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Function", classData);

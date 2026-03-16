@@ -19,7 +19,8 @@ package nx.script;
  *   var interp = new Interpreter(rules);
  */
 class SyntaxRules {
-	// -- Feature toggles --
+
+	// ─── feature flags ────────────────────────────────────────────────────
 
 	/** Allow truthy coercion in if/while/for: if (x) instead of if (x != null) */
 	public var truthyCoercion:Bool = true;
@@ -45,7 +46,7 @@ class SyntaxRules {
 	/** Require semicolons (strict mode) */
 	public var strictSemicolons:Bool = false;
 
-	// -- Aliases ---
+	// ─── aliases ──────────────────────────────────────────────────────────
 
 	/**
 	 * Keyword aliases: maps an alternative spelling to the canonical keyword.
@@ -62,7 +63,7 @@ class SyntaxRules {
 	 */
 	public var operatorAliases:Map<String, String> = new Map();
 
-	// --- construction ---
+	// ─── construction ─────────────────────────────────────────────────────
 
 	public function new() {}
 
@@ -76,7 +77,7 @@ class SyntaxRules {
 		return this;
 	}
 
-	// --- presets ---
+	// ─── presets ──────────────────────────────────────────────────────────
 
 	/**
 	 * Default NxScript ruleset — all features on, NxScript keywords.
@@ -94,7 +95,7 @@ class SyntaxRules {
 	 */
 	public static function haxeStyle():SyntaxRules {
 		var r = new SyntaxRules();
-		r.strictSemicolons    = true;
+		r.strictSemicolons    = false; // Haxe uses semicolons but we stay lenient
 		r.keywordAliases.set("func", "function");   // func → function (reverse)
 		r.keywordAliases.set("function", "func");   // keep function working too
 		return r;

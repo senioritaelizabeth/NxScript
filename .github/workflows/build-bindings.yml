@@ -1,0 +1,87 @@
+name: Build Bindings
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            c_lib: libNxScript.so
+            gd_lib: libNxScriptGD.so
+            artifact: nxscript-linux-x64
+
+          - os: windows-latest
+            platform: windows-x64
+            c_lib: NxScript.dll
+            gd_lib: NxScriptGD.dll
+            artifact: nxscript-windows-x64
+
+          - os: macos-latest
+            platform: macos-arm64
+            c_lib: libNxScript.dylib
+            gd_lib: libNxScriptGD.dylib
+            artifact: nxscript-macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: "4.3.4"
+
+      - name: Install hxcpp
+        run: haxelib install hxcpp --quiet
+
+      - name: Linux build deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y gcc g++ make
+
+      - name: Build C binding
+        working-directory: bindings/c
+        run: haxe c_binding.hxml -D HXCPP_OPTIMIZE_FOR_SIZE
+
+      - name: Collect C lib
+        shell: bash
+        run: |
+          mkdir -p dist/c
+          find bindings/c/out -maxdepth 3 \
+            \( -name "*.dll" -o -name "*.so" -o -name "*.dylib" \) \
+            | head -1 | xargs -I{} cp {} dist/c/${{ matrix.c_lib }} 2>/dev/null || true
+          cp bindings/c/nxscript.h dist/c/
+          ls -lh dist/c/
+
+      - name: Build GDExtension binding
+        working-directory: bindings/gdextension
+        run: haxe gdext_binding.hxml -D HXCPP_OPTIMIZE_FOR_SIZE
+
+      - name: Collect GDExtension lib
+        shell: bash
+        run: |
+          mkdir -p dist/gdextension
+          find bindings/gdextension/out -maxdepth 3 \
+            \( -name "*.dll" -o -name "*.so" -o -name "*.dylib" \) \
+            | head -1 | xargs -I{} cp {} dist/gdextension/${{ matrix.gd_lib }} 2>/dev/null || true
+          cp bindings/gdextension/NxScriptGDExt.cpp dist/gdextension/
+          ls -lh dist/gdextension/
+
+      - name: Copy shared files
+        shell: bash
+        run: |
+          cp bindings/unity/NxScriptUnity.cs dist/
+          cp bindings/README.md              dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/
+          retention-days: 30

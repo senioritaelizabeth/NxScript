@@ -1,4 +1,4 @@
---library nxscript
+-cp ../../src
 -cp .
---interp
 -main TestSuite
+--interp

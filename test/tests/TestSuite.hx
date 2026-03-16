@@ -83,6 +83,9 @@ class TestSuite {
 		testOptionalChain();
 		testTruthy();
 		testSyntaxRules();
+		testStaticFields();
+		testPreprocessor();
+		testCrossScriptClasses();
 
 		Sys.println("\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
 		Sys.println('\u2551  Results: ' + passed + ' passed, ' + failed + ' failed');
@@ -459,7 +462,8 @@ class TestSuite {
 		ok(i.vm.maxCallDepth == 256,       "maxCallDepth = 256");
 		ok(i.vm.sandboxed == true,         "sandboxed = true");
 	
-		throws(() -> i.runDynamic('Sys.exit(3)'), "sandbox blocks Sys"); 
+		ok(false, "sandbox blocks Sys");
+		// throws(() -> i.runDynamic('Sys.exit(3)'), "sandbox blocks Sys"); /
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
@@ -682,6 +686,86 @@ class TestSuite {
 		ok(i5.runDynamic('def add(a,b){return a+b}\nadd(10,5)') == 15, "pythonish: def");
 		ok(i5.runDynamic('not False') == true,         "pythonish: not False");
 		ok(i5.runDynamic('True and not False') == true,"pythonish: True and not False");
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// STATIC FIELDS
+	// ══════════════════════════════════════════════════════════════════════
+	static function testStaticFields() {
+		sec("static fields and methods");
+
+		// Module-level static var
+		var i = new Interpreter();
+		i.runDynamic('static var counter = 0');
+		i.runDynamic('counter = 5');
+		ok(i.runDynamic('counter') == 5, "module static var set");
+		i.reset_context();
+		ok(i.runDynamic('counter') == 5, "module static var survives reset_context");
+
+		// Class static field
+		var i2 = new Interpreter();
+		ok(i2.runDynamic('
+			class Counter {
+				static var count = 0
+				func new() { Counter.count++ }
+			}
+			new Counter()
+			new Counter()
+			new Counter()
+			Counter.count
+		') == 3, "class static var increments per new");
+
+		// Static method
+		ok(i2.runDynamic('
+			class MathHelper {
+				static func square(n) { return n * n }
+				static func cube(n)   { return n * n * n }
+			}
+			MathHelper.square(5) + MathHelper.cube(3)
+		') == 52, "static methods: 25 + 27 = 52");
+
+		// Class defined once, used across runs
+		var i3 = new Interpreter();
+		i3.runDynamic('class Box { var w = 0\nvar h = 0\nfunc new(w,h){ this.w=w\nthis.h=h }\nfunc area(){ return this.w*this.h } }');
+		ok(i3.runDynamic('var b = new Box(3,4)\nb.area()') == 12, "class visible across runDynamic calls");
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// PREPROCESSOR
+	// ══════════════════════════════════════════════════════════════════════
+	static function testPreprocessor() {
+		sec("#if/#end preprocessor");
+		var i = new Interpreter();
+
+		i.defines.set("test_flag", true);
+		ok(i.runDynamic('var x=0\n#if test_flag\nx=1\n#end\nx') == 1, "#if true runs");
+		ok(i.runDynamic('var x=0\n#if no_flag\nx=99\n#end\nx') == 0, "#if false skipped");
+		ok(i.runDynamic('var x=0\n#if no_flag\nx=1\n#else\nx=2\n#end\nx') == 2, "#if/#else");
+
+		i.defines.set("mode_b", true);
+		ok(i.runDynamic('var x=0\n#if mode_a\nx=1\n#elseif mode_b\nx=2\n#else\nx=3\n#end\nx') == 2, "#elseif");
+		ok(i.runDynamic('var x=0\n#if !no_flag\nx=7\n#end\nx') == 7, "#if ! negation");
+		ok(i.runDynamic('var a=1\n#if no_flag\nvar never=999\n#end\nvar b=2\na+b') == 3, "lines preserved");
+	}
+
+	// ══════════════════════════════════════════════════════════════════════
+	// CROSS-SCRIPT CLASSES
+	// ══════════════════════════════════════════════════════════════════════
+	static function testCrossScriptClasses() {
+		sec("cross-script class visibility");
+		var i = new Interpreter();
+
+		i.runDynamic('class Vec2 { var x=0\nvar y=0\nfunc new(px,py){ this.x=px\nthis.y=py }\nfunc len(){ return (this.x*this.x+this.y*this.y).sqrt() } }');
+		ok(i.runDynamic('var v=new Vec2(3,4)\nv.len()') == 5.0, "class used across runs");
+		i.reset_context();
+		ok(i.runDynamic('var v=new Vec2(3,4)\nv.len()') == 5.0, "class survives reset_context");
+
+		var i2 = new Interpreter();
+		i2.runDynamic('class Pool { static var n=0\nfunc new(){ Pool.n++ } }');
+		i2.runDynamic('new Pool()\nnew Pool()');
+		ok(i2.runDynamic('Pool.n') == 2, "static field = 2 after 2 new");
+		i2.reset_context();
+		ok(i2.runDynamic('Pool.n') == 2, "class static field survives reset_context");
 	}
 
 }

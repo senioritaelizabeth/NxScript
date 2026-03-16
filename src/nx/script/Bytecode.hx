@@ -72,6 +72,7 @@ class Op {
 	public static inline var GET_INDEX = 0x74; // Get indexed value
 	public static inline var SET_INDEX = 0x75; // Set indexed value
 	public static inline var MAKE_CLASS = 0x76; // Create a class
+	public static inline var MAKE_CLASS_STATICS = 0x79; // Attach static fields/methods to top-of-stack VClass
 	public static inline var INSTANTIATE = 0x77; // Create class instance
 	public static inline var GET_THIS = 0x78; // Get 'this' reference
 
@@ -175,6 +176,7 @@ class Op {
 			case GET_INDEX: "GET_INDEX";
 			case SET_INDEX: "SET_INDEX";
 			case MAKE_CLASS: "MAKE_CLASS";
+			case MAKE_CLASS_STATICS: "MAKE_CLASS_STATICS";
 			case INSTANTIATE: "INSTANTIATE";
 			case GET_THIS: "GET_THIS";
 			case GET_ITER: "GET_ITER";
@@ -253,8 +255,10 @@ typedef ClassData = {
 	superClass:Null<String>,
 	nativeSuper:Null<Value>,
 	methods:Map<String, FunctionChunk>,
-	fields:Map<String, Value>, // Default field values
-	constructor:Null<FunctionChunk>
+	fields:Map<String, Value>,          // Default instance field values
+	constructor:Null<FunctionChunk>,
+	staticFields:Map<String, Value>,    // Static field values — shared, not per-instance
+	staticMethods:Map<String, FunctionChunk> // Static methods — called on VClass, not VInstance
 }
 
 enum Value {

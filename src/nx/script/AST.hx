@@ -101,6 +101,10 @@ enum Stmt {
 	// Using declaration — imports a class as extension methods
 	// using MyClass  => methods of MyClass become callable on the first arg type
 	SUsing(className:String);
+	/** static var x = val  — module-level or class-level static field */
+	SStaticVar(name:String, init:Null<Expr>);
+	/** static func f(...) {...} — module-level or class-level static method */
+	SStaticFunc(name:String, params:Array<Param>, returnType:Null<String>, body:Array<Stmt>);
 
 	// Enum declaration
 	// enum Color { Red, Green, Blue }
@@ -147,10 +151,12 @@ typedef ClassMethod = {
 	params:Array<Param>,
 	returnType:Null<TypeHint>,
 	body:Array<Stmt>,
-	isConstructor:Bool
+	isConstructor:Bool,
+	?isStatic:Bool
 }
 
 typedef ClassField = {
+	?isStatic:Bool,
 	name:String,
 	type:Null<TypeHint>,
 	init:Null<Expr>

@@ -149,6 +149,7 @@ class Animal {
 }
 
 class Dog extends Animal {
+    func new(n) { super.new(n) }
     func speak() { return this.name + " says woof" }
 }
 
@@ -496,5 +497,6 @@ Apache 2.0.
 
 <div align="center">
 
-made by [@senioritaelizabeth](https://github.com/senioritaelizabeth) · thanks to [contribuitors](https://github.com/Kitsumizy/NxScript/graphs/contributors)
+made by [@senioritaelizabeth](https://github.com/senioritaelizabeth) · thanks to RapperGfDev for testing and optimizations
+
 </div>

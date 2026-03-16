@@ -1,5 +1,5 @@
 package nx.script;
-
+import nx.script.Preprocessor;
 import nx.script.SyntaxRules;
 
 import nx.script.Bytecode;
@@ -132,6 +132,9 @@ class Interpreter {
 
 	/** Active syntax rules for this interpreter. Change before calling run(). */
 	public var rules:SyntaxRules = null;
+
+	/** Preprocessor defines for #if/#end directives. Pre-populated from compile target. */
+	public var defines:Map<String, Bool> = Preprocessor.defaultDefines();
 
 	public function new(debug:Bool = false, strict:Bool = false, ?rules:SyntaxRules) {
 		this.debug = debug;
@@ -534,7 +537,8 @@ class Interpreter {
 	public function run(source:String, ?scriptName:String = "script"):Value {
 		try {
 			var prepared = preprocessImports(source, scriptName);
-			var scriptSource = prepared.source;
+			// Run #if/#end preprocessor
+			var scriptSource = Preprocessor.run(prepared.source, defines);
 			var trimmed = StringTools.trim(scriptSource);
 			var strictFromPragma = StringTools.startsWith(trimmed, '"use strict";')
 				|| StringTools.startsWith(trimmed, "'use strict';")
@@ -566,6 +570,10 @@ class Interpreter {
 			// Compile to bytecode
 			var compiler = new Compiler();
 			var chunk = compiler.compile(ast);
+
+			// Register static global names so reset_context() preserves them
+			for (name in compiler.staticGlobalNames.keys())
+				vm.staticNames.set(name, true);
 
 			#if NXDEBUG
 			trace("=== BYTECODE ===");
@@ -858,10 +866,105 @@ class Interpreter {
 	 * them interfering with each other via globals.
 	 * Note: doesn't reset registered natives since those are meant to be shared.
 	**/
+
+	/**
+	 * Reset interpreter state while preserving static globals and class registrations.
+	 *
+	 * After reset:
+	 *  - All regular (non-static) globals are cleared
+	 *  - Static globals (declared with `static var`) are preserved with their current values
+	 *  - All class definitions are preserved (re-injected into new VM globals)
+	 *  - Static fields on classes are preserved (they live in ClassData, not globals)
+	 *  - Natives registered via interp.register() are re-registered
+	 */
 	public function reset_context() {
+		// Snapshot what to preserve
+		var savedStatics:Map<String, Value> = new Map();
+		for (name in vm.staticNames.keys())
+			if (vm.globals.exists(name))
+				savedStatics.set(name, vm.globals.get(name));
+
+		// Snapshot class registrations (ClassData carries staticFields)
+		var savedClasses:Map<String, Value> = new Map();
+		for (name in vm.classes.keys())
+			if (vm.globals.exists(name))
+				savedClasses.set(name, vm.globals.get(name));
+
+		// Snapshot static names list
+		var savedStaticNames = vm.staticNames;
+
+		// Rebuild VM
 		this.vm = new VM(debug);
 		registerBuiltins();
+
+		// Restore statics
+		vm.staticNames = savedStaticNames;
+		for (name in savedStatics.keys())
+			vm.globals.set(name, savedStatics.get(name));
+
+		// Restore class registrations
+		for (name in savedClasses.keys()) {
+			vm.globals.set(name, savedClasses.get(name));
+			switch (savedClasses.get(name)) {
+				case VClass(cd): vm.classes.set(name, cd);
+				default:
+			}
+		}
 	}
+
+	/**
+	 * Load and execute a single script file.
+	 * Classes and static vars defined in it are registered globally.
+	 * Returns a dict of all globals exported by that script.
+	 *
+	 * Usage:
+	 *   var mod = interp.loadScript("path/to/Enemy.nx");
+	 *   var enemy = interp.vm.callResolved(mod["Enemy"], []);  // instantiate
+	 *   // or just: new Enemy() from any other script
+	 */
+	public function loadScript(path:String):Value {
+		var source = sys.io.File.getContent(path);
+		run(source, path);
+		// Return a VDict of all non-native globals defined by this script
+		var exports = new Map<String, Value>();
+		for (name in vm.globals.keys()) {
+			var v = vm.globals.get(name);
+			switch (v) {
+				case VNativeFunction(_, _, _): // skip builtins
+				default: exports.set(name, v);
+			}
+		}
+		return VDict(exports);
+	}
+
+	/**
+	 * Load all .nx files in a directory (non-recursive by default).
+	 * Each file is compiled and run; classes and statics accumulate in the VM.
+	 * Call before reset_context() so registrations survive the reset.
+	 *
+	 * Usage (Haxe side):
+	 *   interp.loadScripts("assets/scripts/");
+	 *   interp.reset_context();  // clears instance state, keeps classes + statics
+	 *   // now any script can: new Enemy(), new Player(), etc.
+	 *
+	 * @param recursive  If true, walks subdirectories too (default false)
+	 */
+	public function loadScripts(dir:String, recursive:Bool = false):Void {
+		var files = sys.FileSystem.readDirectory(dir);
+		for (file in files) {
+			var fullPath = (dir.endsWith("/") ? dir : dir + "/") + file;
+			if (sys.FileSystem.isDirectory(fullPath)) {
+				if (recursive) loadScripts(fullPath, true);
+			} else if (file.endsWith(".nx")) {
+				try {
+					loadScript(fullPath);
+				} catch (e:Dynamic) {
+					trace('[NxScript] loadScripts: error in $fullPath: $e');
+				}
+			}
+		}
+	}
+
 	/**
 	 * Run source code and return result as Haxe Dynamic (auto-converted)
 	 * Makes testing easier: `runDynamic("1 + 2") == 3`

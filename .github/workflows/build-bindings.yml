@@ -44,6 +44,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y gcc g++ make
 
+        
       - name: Build NxBinding
         run: >
           haxe --run tools.BuildBindings --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/

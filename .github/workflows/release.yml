@@ -101,8 +101,6 @@ jobs:
         run: find release-artifacts/ -type f | sort
 
       - name: Push binaries to NxScript.Outbinding
-        env:
-          OUTBINDING_TOKEN: ${{ secrets.OUTBINDING_TOKEN }}
         run: |
           VERSION=${{ needs.validate.outputs.version }}
 

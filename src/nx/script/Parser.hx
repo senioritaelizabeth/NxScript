@@ -1024,12 +1024,11 @@ class Parser {
 	function parseSwitchBody():Array<Stmt> {
 		var stmts:Array<Stmt> = [];
 		skipSeparators();
-		// Collect statements until next case/default/}
 		while (!isEOF() && !check(TRightBrace)
 			&& !check(TKeyword(KCase)) && !check(TKeyword(KDefault))) {
 			var s = parseStatement();
+			consumeStatementTerminator(s);
 			stmts.push(s);
-			// Handle break keyword — stop collecting (don't emit anything, match doesn't fall through)
 			if (check(TKeyword(KBreak))) { advance(); skipSeparators(); break; }
 			skipSeparators();
 		}

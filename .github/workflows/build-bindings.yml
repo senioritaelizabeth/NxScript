@@ -46,6 +46,7 @@ jobs:
 
 
       - name: Build NxBinding
+        working-directory: .
         run: >
           haxe --run tools.BuildBind --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/
 

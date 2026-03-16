@@ -53,9 +53,26 @@ jobs:
         run: >
           haxe --run tools.BuildBind --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/
 
-      - name: Upload artifact
+      - name: Upload artifact macos
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: binaries/${{ matrix.platform }}.zip
+          # path: binaries/${{ matrix.platform }}.zip
+          #  ask if macos, publish binaries/name.dylib, else binaries/name.dll or .dso
+          path: binaries/${{ matrix.artifact }}.dylib
+          retention-days: 30
+      - name: Upload artifact windows
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: binaries/${{ matrix.artifact }}.dll
+          retention-days: 30
+      - name: Upload artifact linux
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: binaries/${{ matrix.artifact }}.dso
           retention-days: 30

@@ -37,26 +37,6 @@ class BuildBind {
             trace("Expected output file not found: " + outputFile);
         }
 
-        var read_platform = get_arg("platform", "unknown");
-        var read_outdir = get_arg("out", "unknown");
-        trace("Read platform argument: " + read_platform);
-        trace("Read outdir argument: " + read_outdir);
-        // zip targetFile to outdir for uploading as artifact
-        if (!FileSystem.exists(read_outdir)) {
-            FileSystem.createDirectory(read_outdir);
-        }
-        var zipPath = read_outdir + "/" + read_platform + ".zip";
-        // var zipResult = Sys.command("zip", ["-j", zipPath, targetFile]);
-        // just zip the .sdo/.dll/.dylib file without the directory structure
-        var zipResult = Sys.command("zip", ["-j", zipPath, targetFile]);
-        if (zipResult == 0) {
-            trace("Created zip archive: " + zipPath);
-        } else {
-            trace("Failed to create zip archive with exit code " + zipResult);
-            trace("Error output: " + Sys.getEnv("HAXE_ERROR"));
-            Sys.exit(zipResult);
-        }
-
     }
   static function get_arg(name:String, deft:String = ""):String {
         // for (arg in Sys.args()) {

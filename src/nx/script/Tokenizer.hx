@@ -53,7 +53,6 @@ class Tokenizer {
 		"throw" => KThrow,
 		"match" => KMatch,
 		"case" => KCase,
-		"switch" => KSwitch,
 		"default" => KDefault,
 		"using" => KUsing,
 		"enum" => KEnum,
@@ -142,7 +141,8 @@ class Tokenizer {
 
 		// Numbers
 		if (isDigit(c) || (c == '.' && isDigit(peekNext()))) {
-			return readNumber();
+			advance(); // consume the first char before passing to readNumber
+			return readNumber(c);
 		}
 
 		// Identifiers and keywords
@@ -408,58 +408,51 @@ class Tokenizer {
 		}
 	}
 
-	function readNumber():Token {
-		var start = pos;
-
-		// Hex literal: 0x / 0X
-		if (peek() == 'x' || peek() == 'X') {
-			advance(); // consume x
-			while (!isEOF() && isHexDigit(peek())) advance();
-			var hexStr = input.substring(start + 2, pos); // skip "0x"
-			return TNumber(Std.parseInt("0x" + hexStr));
+	function readNumber(firstChar:String):Token {
+		if (firstChar == "0") {
+			if (peek() == 'x' || peek() == 'X') {
+				advance();
+				var start = pos;
+				while (!isEOF() && isHexDigit(peek())) advance();
+				return TNumber(Std.parseInt("0x" + input.substring(start, pos)));
+			}
+			if (peek() == 'b' || peek() == 'B') {
+				advance();
+				var start = pos;
+				while (!isEOF() && (peek() == '0' || peek() == '1')) advance();
+				var s = input.substring(start, pos);
+				var val = 0;
+				for (i in 0...s.length) val = val * 2 + (s.charAt(i) == '1' ? 1 : 0);
+				return TNumber(val);
+			}
+			if (peek() == 'o' || peek() == 'O') {
+				advance();
+				var start = pos;
+				while (!isEOF() && peek() >= '0' && peek() <= '7') advance();
+				var s = input.substring(start, pos);
+				var val = 0;
+				for (i in 0...s.length) val = val * 8 + (s.charCodeAt(i) - 48);
+				return TNumber(val);
+			}
 		}
-
-		// Binary literal: 0b / 0B
-		if (peek() == 'b' || peek() == 'B') {
-			advance(); // consume b
-			while (!isEOF() && (peek() == '0' || peek() == '1')) advance();
-			var binStr = input.substring(start + 2, pos);
-			var val = 0;
-			for (i in 0...binStr.length) val = val * 2 + (binStr.charAt(i) == '1' ? 1 : 0);
-			return TNumber(val);
-		}
-
-		// Octal literal: 0o / 0O
-		if (peek() == 'o' || peek() == 'O') {
-			advance();
-			while (!isEOF() && peek() >= '0' && peek() <= '7') advance();
-			var octStr = input.substring(start + 2, pos);
-			var val = 0;
-			for (i in 0...octStr.length) val = val * 8 + (octStr.charCodeAt(i) - 48);
-			return TNumber(val);
-		}
-
-		// Decimal / float
-		var hasDot = false;
+		var startPos = pos - firstChar.length;
+		var hasDot = firstChar == ".";
 		while (!isEOF() && (isDigit(peek()) || peek() == '_' || peek() == '.')) {
-			if (peek() == '_') { advance(); continue; } // numeric separator: 1_000_000
+			if (peek() == '_') { advance(); continue; }
 			if (peek() == '.') {
-				if (peekNext() == '.') break; // range ..
-				if (!isDigit(peekNext())) break; // 4.method()
+				if (peekNext() == '.') break;
+				if (!isDigit(peekNext())) break;
 				if (hasDot) break;
 				hasDot = true;
 			}
 			advance();
 		}
-
-		// Scientific notation: 1e10, 1.5e-3
 		if (!isEOF() && (peek() == 'e' || peek() == 'E')) {
 			advance();
 			if (!isEOF() && (peek() == '+' || peek() == '-')) advance();
 			while (!isEOF() && isDigit(peek())) advance();
 		}
-
-		var numStr = input.substring(start, pos).split("_").join("");
+		var numStr = input.substring(startPos, pos).split("_").join("");
 		return TNumber(Std.parseFloat(numStr));
 	}
 

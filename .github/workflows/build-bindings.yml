@@ -45,9 +45,8 @@ jobs:
         run: sudo apt-get install -y gcc g++ make
 
       - name: Build NxBinding
-        working-directory: NxScript
         run: >
-          haxe --run tools.BuildBindings --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/${{ matrix.platform }}.zip
+          haxe --run tools.BuildBindings --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

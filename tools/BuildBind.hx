@@ -38,7 +38,7 @@ class BuildBind {
         }
 
         var read_platform = get_arg("platform", "unknown");
-        var read_outdir = get_arg("outdir", "unknown");
+        var read_outdir = get_arg("out", "unknown");
         trace("Read platform argument: " + read_platform);
         trace("Read outdir argument: " + read_outdir);
         // zip targetFile to outdir for uploading as artifact

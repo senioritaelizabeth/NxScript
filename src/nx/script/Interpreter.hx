@@ -1,6 +1,9 @@
 package nx.script;
+import nx.script.Preprocessor;
+import nx.script.SyntaxRules;
 
 import nx.script.Bytecode;
+import nx.script.NativeProxy;
 import nx.script.BytecodeSerializer;
 import nx.script.Compiler;
 import nx.script.NxProxy;
@@ -8,7 +11,7 @@ import nx.script.Parser;
 import nx.script.Tokenizer;
 import nx.script.VM;
 import haxe.io.Path;
-
+using StringTools;
 /**
  * The front door. Tokenizes, parses, compiles, and runs your script in one call.
  *
@@ -37,13 +40,106 @@ class Interpreter {
 	@:deprecated("Use 'natives' instead")
 	public var methods(get, never):Map<String, Value>;
 
+	/** Controls VM cache flushing strategy. See GcKind for options. Default: SOFT. */
+	public var gc_kind(get, set):GcKind;
+	inline function get_gc_kind():GcKind return vm.gc_kind;
+	inline function set_gc_kind(v:GcKind):GcKind { vm.gc_kind = v; return v; }
+
+	/** Object count threshold used in SOFT gc mode before flushing caches. Default: 512. */
+	public var gc_softThreshold(get, set):Int;
+	inline function get_gc_softThreshold():Int return vm.gc_softThreshold;
+	inline function set_gc_softThreshold(v:Int):Int { vm.gc_softThreshold = v; return v; }
+
+	/** Manually flush all VM internal caches, regardless of gc_kind. */
+	public function gc():Void vm.gc();
+
+	/**
+	 * Run a script function once per native Haxe object — loop executes in Haxe, not in script.
+	 *
+	 * This is the fix for the "10k sprites = 24fps" problem. The script loop:
+	 *
+	 *   while (j < sprites.length) { spr.angle += 120*dt ... j++ }
+	 *
+	 * pays full VM overhead (bytecode fetch, stack ops, LT, JUMP) per iteration.
+	 * With 10k sprites that is ~50k extra VM instructions per frame just for looping.
+	 *
+	 * Migration — instead of the script loop, write a script function:
+	 *
+	 *   func updateSprite(spr, i, dt) {
+	 *       spr.angle += 120 * dt
+	 *       var phase = counter + i
+	 *       spr.x += 60 * dt * sin(phase)
+	 *       spr.y += 30 * dt * cos(phase)
+	 *       spr.color = color
+	 *   }
+	 *
+	 * And call from Haxe each frame:
+	 *
+	 *   var fn = interp.resolveCallable("updateSprite");
+	 *   interp.nativeForEach(sprites, fn, [interp.vm.haxeToValue(dt)]);
+	 *
+	 * The function body still runs in the VM (so reflection overhead remains for
+	 * native field access), but loop overhead is gone — pure Haxe iteration.
+	 */
+	public function nativeForEach(items:Array<Dynamic>, fn:Value, ?extraArgs:Array<Value>):Void
+		vm.nativeForEach(items, fn, extraArgs);
+
+	/** Resolve a script callable by name for repeated host calls. Cache the result. */
+	public function resolveCallable(name:String):Value
+		return vm.resolveCallable(name);
+
+	/** Call a script function by name, returning null on any error instead of throwing. */
+	public function safeCall(name:String, ?args:Array<Value>):Null<Value>
+		return vm.safeCall(name, args);
+
+	/** Enable sandbox mode — blocks filesystem/network natives, limits instructions. */
+	public function enableSandbox(?extraBlocklist:Array<String>):Void
+		vm.enableSandbox(extraBlocklist);
+
+
+	/**
+	 * Wrap a single native Haxe object (e.g. FlxSprite) as a VDict proxy.
+	 * Fields are read once into a shadow Map<String,Value> — script accesses
+	 * are pure Map ops with no Reflection in the hot path.
+	 *
+	 * Call proxy.flush() after the script update to write changes back.
+	 *
+	 *   var proxy = interp.wrapNative(sprite, ["x","y","angle","color"]);
+	 *   vm.globals.set("spr", proxy.value);
+	 *   interp.run('update(spr, dt)');
+	 *   proxy.flush();
+	 */
+	public function wrapNative(obj:Dynamic, ?fields:Array<String>):NativeProxy
+		return NativeProxy.wrap(vm, obj, fields);
+
+	/**
+	 * Wrap many native objects at once (same field list for all).
+	 * Returns a WrapManyResult with a VArray of VDicts for the script
+	 * and the proxy list for calling flushAll() after the update.
+	 *
+	 *   var r = interp.wrapNativeMany(sprites, ["x","y","angle","color"]);
+	 *   vm.globals.set("sprites", r.value);  // VArray of VDicts
+	 *   interp.run('for (spr in sprites) update(spr, dt)');
+	 *   NativeProxy.flushAll(r.proxies);
+	 */
+	public function wrapNativeMany(objects:Array<Dynamic>, ?fields:Array<String>):nx.script.WrapManyResult
+		return NativeProxy.wrapMany(vm, objects, fields);
+
+	/** Kept for API compat. Use -D NXDEBUG compile flag for actual debug output. */
 	var debug:Bool = false;
 	var strictByDefault:Bool = false;
 
-	public function new(debug:Bool = false, strict:Bool = false) {
+	/** Active syntax rules for this interpreter. Change before calling run(). */
+	public var rules:SyntaxRules = null;
+
+	/** Preprocessor defines for #if/#end directives. Pre-populated from compile target. */
+	public var defines:Map<String, Bool> = Preprocessor.defaultDefines();
+
+	public function new(debug:Bool = false, strict:Bool = false, ?rules:SyntaxRules) {
 		this.debug = debug;
 		this.strictByDefault = strict;
 		this.vm = new VM(debug);
+		this.rules = rules ?? SyntaxRules.nxScript();
 
 		// Register built-in functions
 		registerBuiltins();
@@ -116,6 +212,7 @@ class Interpreter {
 				case VNativeFunction(_, _, _): "function";
 				case VNativeObject(_): "object";
 				case VIterator(_, _): "iterator";
+				case VEnumValue(eName, _, _): eName;
 			});
 		});
 
@@ -310,28 +407,20 @@ class Interpreter {
 			}
 		});
 
-		register("range", 2, function(args:Array<Value>):Value {
-			var start = switch (args[0]) {
-				case VNumber(n): Std.int(n);
-				default: throw "range(start, end) expects numbers";
-			}
-			var end = switch (args[1]) {
-				case VNumber(n): Std.int(n);
-				default: throw "range(start, end) expects numbers";
-			}
-			var out:Array<Value> = [];
-			if (start <= end) {
-				for (i in start...end)
-					out.push(VNumber(i));
+		// range: variadic — range(n) -> [0..n-1], range(from, to) -> [from..to-1]
+		vm.natives.set("range", VNativeFunction("range", -1, function(args:Array<Value>):Value {
+			var from = 0;
+			var to = 0;
+			if (args.length == 1) {
+				to = switch (args[0]) { case VNumber(n): Std.int(n); default: throw "range expects a number"; };
+			} else if (args.length == 2) {
+				from = switch (args[0]) { case VNumber(n): Std.int(n); default: throw "range expects numbers"; };
+				to   = switch (args[1]) { case VNumber(n): Std.int(n); default: throw "range expects numbers"; };
 			} else {
-				var i = start;
-				while (i > end) {
-					out.push(VNumber(i));
-					i--;
-				}
+				throw "range expects 1 or 2 arguments";
 			}
-			return VArray(out);
-		});
+			return VArray([for (i in from...to) VNumber(i)]);
+		}));
 
 		register("contains", 2, function(args:Array<Value>):Value {
 			return switch (args[0]) {
@@ -447,7 +536,8 @@ class Interpreter {
 	public function run(source:String, ?scriptName:String = "script"):Value {
 		try {
 			var prepared = preprocessImports(source, scriptName);
-			var scriptSource = prepared.source;
+			// Run #if/#end preprocessor
+			var scriptSource = Preprocessor.run(prepared.source, defines);
 			var trimmed = StringTools.trim(scriptSource);
 			var strictFromPragma = StringTools.startsWith(trimmed, '"use strict";')
 				|| StringTools.startsWith(trimmed, "'use strict';")
@@ -459,52 +549,58 @@ class Interpreter {
 			vm.scriptName = scriptName;
 
 			// Tokenize
-			var tokenizer = new Tokenizer(scriptSource);
+			var tokenizer = new Tokenizer(scriptSource, rules);
 			var tokens = tokenizer.tokenize();
 
-			if (debug) {
-				trace("=== TOKENS ===");
-				for (t in tokens) {
-					trace('${t.line}:${t.col} -> ${t.token}');
-				}
-			}
+			#if NXDEBUG
+			trace("=== TOKENS ===");
+			for (t in tokens) trace('${t.line}:${t.col} -> ${t.token}');
+			#end
 
 			// Parse
-			var parser = new Parser(tokens, strictMode);
+			var parser = new Parser(tokens, strictMode, rules);
 			var ast = parser.parse();
 
-			if (debug) {
-				trace("=== AST ===");
-				for (stmt in ast) {
-					trace(stmt);
-				}
-			}
+			#if NXDEBUG
+			trace("=== AST ===");
+			for (stmt in ast) trace(stmt);
+			#end
 
 			// Compile to bytecode
 			var compiler = new Compiler();
 			var chunk = compiler.compile(ast);
 
-			if (debug) {
-				trace("=== BYTECODE ===");
-				disassemble(chunk);
-			}
+			// Register static global names so reset_context() preserves them
+			for (name in compiler.staticGlobalNames.keys())
+				vm.staticNames.set(name, true);
+
+			#if NXDEBUG
+			trace("=== BYTECODE ===");
+			disassemble(chunk);
+			#end
 
 			// Execute
 			var result = vm.execute(chunk);
 
-			if (debug) {
-				trace("=== RESULT ===");
-				trace(result);
-			}
+			#if NXDEBUG
+			trace("=== RESULT ===");
+			trace(result);
+			#end
 
 			return result;
 		} catch (e:Dynamic) {
 			var pretty = formatPrettyError(Std.string(e), source, scriptName);
-			Sys.println(pretty);
+			__print_ln(pretty);
 			throw pretty;
 		}
 	}
-
+	static function __print_ln(s:String):Void {
+		#if sys
+		Sys.println(s);
+		#else
+		trace(s);
+		#end
+	}
 	function preprocessImports(source:String, scriptName:String, ?visited:Map<String, Bool>):{source:String} {
 		if (visited == null)
 			visited = new Map<String, Bool>();
@@ -528,11 +624,14 @@ class Interpreter {
 								out.push("");
 								out.push(nested.source);
 							} else {
-								Sys.println('Warning: Cant load script import: ' + module + ' (resolved: ' + importPath + ')');
+								__print_ln('Warning: Cant load script import: ' + module + ' (resolved: ' + importPath + ')');
 							}
 						}
 					} else if (!resolveImportedModule(module)) {
-						Sys.println('Warning: Cant find module that package name: ' + module);
+						// Check if it's already registered as a global native (e.g. Sys, Math)
+						if (!vm.globals.exists(module) && !vm.natives.exists(module)) {
+							__print_ln('Warning: Cant find module that package name: ' + module);
+						}
 					}
 				}
 				// Keep line count stable for diagnostics.
@@ -760,12 +859,125 @@ class Interpreter {
 			throw 'Unable to load script file: ' + normalized;
 		return run(content, normalized);
 	}
+	/**
+	 * Reset the VM context — clears globals, reloads built-ins, etc.
+	 * Useful if you want to run multiple scripts in the same process without
+	 * them interfering with each other via globals.
+	 * Note: doesn't reset registered natives since those are meant to be shared.
+	**/
+
+	/**
+	 * Reset interpreter state while preserving static globals and class registrations.
+	 *
+	 * After reset:
+	 *  - All regular (non-static) globals are cleared
+	 *  - Static globals (declared with `static var`) are preserved with their current values
+	 *  - All class definitions are preserved (re-injected into new VM globals)
+	 *  - Static fields on classes are preserved (they live in ClassData, not globals)
+	 *  - Natives registered via interp.register() are re-registered
+	 */
+	public function reset_context() {
+		// Snapshot what to preserve
+		var savedStatics:Map<String, Value> = new Map();
+		for (name in vm.staticNames.keys())
+			if (vm.globals.exists(name))
+				savedStatics.set(name, vm.globals.get(name));
+
+		// Snapshot class registrations (ClassData carries staticFields)
+		var savedClasses:Map<String, Value> = new Map();
+		for (name in vm.classes.keys())
+			if (vm.globals.exists(name))
+				savedClasses.set(name, vm.globals.get(name));
+
+		// Snapshot static names list
+		var savedStaticNames = vm.staticNames;
+
+		// Rebuild VM
+		this.vm = new VM(debug);
+		registerBuiltins();
+
+		// Restore statics
+		vm.staticNames = savedStaticNames;
+		for (name in savedStatics.keys())
+			vm.globals.set(name, savedStatics.get(name));
+
+		// Restore class registrations
+		for (name in savedClasses.keys()) {
+			vm.globals.set(name, savedClasses.get(name));
+			switch (savedClasses.get(name)) {
+				case VClass(cd): vm.classes.set(name, cd);
+				default:
+			}
+		}
+	}
+
+	/**
+	 * Load and execute a single script file.
+	 * Classes and static vars defined in it are registered globally.
+	 * Returns a dict of all globals exported by that script.
+	 *
+	 * Usage:
+	 *   var mod = interp.loadScript("path/to/Enemy.nx");
+	 *   var enemy = interp.vm.callResolved(mod["Enemy"], []);  // instantiate
+	 *   // or just: new Enemy() from any other script
+	 */
+	public function loadScript(path:String):Value {
+		#if sys 
+		var source = sys.io.File.getContent(path);
+		run(source, path);
+		// Return a VDict of all non-native globals defined by this script
+		var exports = new Map<String, Value>();
+		for (name in vm.globals.keys()) {
+			var v = vm.globals.get(name);
+			switch (v) {
+				case VNativeFunction(_, _, _): // skip builtins
+				default: exports.set(name, v);
+			}
+		}
+		return VDict(exports);
+		#else 
+		return VNull;
+		#end
+	}
+
+	/**
+	 * Load all .nx files in a directory (non-recursive by default).
+	 * Each file is compiled and run; classes and statics accumulate in the VM.
+	 * Call before reset_context() so registrations survive the reset.
+	 *
+	 * Usage (Haxe side):
+	 *   interp.loadScripts("assets/scripts/");
+	 *   interp.reset_context();  // clears instance state, keeps classes + statics
+	 *   // now any script can: new Enemy(), new Player(), etc.
+	 *
+	 * @param recursive  If true, walks subdirectories too (default false)
+	 */
+	public function loadScripts(dir:String, recursive:Bool = false):Void {
+		#if sys
+		var files = sys.FileSystem.readDirectory(dir);
+		for (file in files) {
+			var fullPath = (dir.endsWith("/") ? dir : dir + "/") + file;
+			if (sys.FileSystem.isDirectory(fullPath)) {
+				if (recursive) loadScripts(fullPath, true);
+			} else if (file.endsWith(".nx")) {
+				try {
+					loadScript(fullPath);
+				} catch (e:Dynamic) {
+					trace('[NxScript] loadScripts: error in $fullPath: $e');
+				}
+			}
+		}
+		#else
+			trace('[NXScript] loadScripts: we cant use Sys!');
+		#end
+	}
 
 	/**
 	 * Run source code and return result as Haxe Dynamic (auto-converted)
 	 * Makes testing easier: `runDynamic("1 + 2") == 3`
 	 */
 	public function runDynamic(source:String, ?scriptName:String = "script"):Dynamic {
+
 		var result = run(source, scriptName);
 		return vm.valueToHaxe(result);
 	}
@@ -801,11 +1013,11 @@ class Interpreter {
 		var strictMode = strictByDefault || strictFromPragma;
 
 		// Tokenize
-		var tokenizer = new Tokenizer(scriptSource);
+		var tokenizer = new Tokenizer(scriptSource, rules);
 		var tokens = tokenizer.tokenize();
 
 		// Parse
-		var parser = new Parser(tokens, strictMode);
+		var parser = new Parser(tokens, strictMode, rules);
 		var ast = parser.parse();
 
 		// Compile to bytecode
@@ -906,10 +1118,6 @@ class Interpreter {
 		return vm.callMethod(name, EMPTY_ARGS);
 	}
 
-	/** Resolve a function once for repeated host->script calls in performance-sensitive loops. */
-	public inline function resolveCallable(name:String):Value {
-		return vm.resolveCallable(name);
-	}
 
 	/** Call a resolved callable with custom arguments. */
 	public inline function callResolved(callee:Value, args:Array<Value>):Value {

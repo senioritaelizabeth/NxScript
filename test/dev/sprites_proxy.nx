@@ -1,0 +1,36 @@
+// sprites_proxy.nx — NativeProxy version
+// Script syntax IDENTICAL to the original. The speedup is transparent.
+
+var hue     = 0.0
+var counter = 0.0
+
+func HSBtoRGB(h, s, v) {
+    var c = v * s
+    var x = c * (1 - abs((h / 60) % 2 - 1))
+    var m = v - c
+    var r = 0.0; var g = 0.0; var b = 0.0
+    if (h < 60)       { r = c; g = x; b = 0 }
+    else if (h < 120) { r = x; g = c; b = 0 }
+    else if (h < 180) { r = 0; g = c; b = x }
+    else if (h < 240) { r = 0; g = x; b = c }
+    else if (h < 300) { r = x; g = 0; b = c }
+    else              { r = c; g = 0; b = x }
+    return ((r + m) * 255 << 16) | ((g + m) * 255 << 8) | ((b + m) * 255)
+}
+
+func update(sprites, dt) {
+    counter = counter + dt
+    hue = hue + dt * 70
+    if (hue > 360) { hue = hue - 360 }
+    var color = HSBtoRGB(hue, 1, 1)
+
+    var j = 0
+    while (j < sprites.length) {
+        var spr = sprites[j]
+        spr.angle = spr.angle + 120 * dt
+        spr.x = spr.x + 60 * dt * sin(counter + j)
+        spr.y = spr.y + 30 * dt * cos(counter + j)
+        spr.color = color
+        j++
+    }
+}

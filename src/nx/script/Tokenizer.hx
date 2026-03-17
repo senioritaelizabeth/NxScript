@@ -17,6 +17,8 @@ class Tokenizer {
 	var pos:Int = 0;
 	var line:Int = 1;
 	var col:Int = 1;
+	// Queue for multi-token emissions (template string interpolation)
+	var pendingTokens:Array<TokenPos> = [];
 
 	static var keywords = [
 		"let" => KLet,
@@ -48,17 +50,36 @@ class Tokenizer {
 		"null" => KNull,
 		"try" => KTry,
 		"catch" => KCatch,
-		"throw" => KThrow
+		"throw" => KThrow,
+		"match" => KMatch,
+		"case" => KCase,
+		"switch" => KSwitch,
+		"default" => KDefault,
+		"using" => KUsing,
+		"enum" => KEnum,
+		"abstract" => KAbstract,
+		"static"   => KStatic,
+		"is" => KIs
 	];
 
-	public function new(input:String) {
+	public var rules:SyntaxRules = null;
+
+	public function new(input:String, ?rules:SyntaxRules) {
 		this.input = input.replace('\r\n', '\n').replace('\r', '\n');
+		this.rules = rules;
 	}
 
 	public function tokenize():Array<TokenPos> {
 		var tokens:Array<TokenPos> = [];
 
-		while (!isEOF()) {
+		while (!isEOF() || pendingTokens.length > 0) {
+			// Drain any tokens queued by template string expansion
+			if (pendingTokens.length > 0) {
+				for (t in pendingTokens) tokens.push(t);
+				pendingTokens = [];
+				continue;
+			}
+
 			skipWhitespaceExceptNewline();
 
 			if (isEOF())
@@ -68,7 +89,12 @@ class Tokenizer {
 			var startCol = col;
 			var token = nextToken();
 
-			if (token != null) {
+			if (pendingTokens.length > 0) {
+				// Template string emitted multiple tokens — first was already pushed via pending
+				var allPending = pendingTokens.copy();
+				pendingTokens = [];
+				for (t in allPending) tokens.push(t);
+			} else if (token != null) {
 				tokens.push({token: token, line: startLine, col: startCol});
 			}
 		}
@@ -109,10 +135,15 @@ class Tokenizer {
 		if (c == '"' || c == "'") {
 			return readString();
 		}
+		if (c == '`') {
+			readTemplateString();
+			return null;
+		}
 
 		// Numbers
 		if (isDigit(c) || (c == '.' && isDigit(peekNext()))) {
-			return readNumber();
+			advance(); // consume the first char before passing to readNumber
+			return readNumber(c);
 		}
 
 		// Identifiers and keywords
@@ -155,8 +186,14 @@ class Tokenizer {
 	function readString():Token {
 		var quote = advance();
 		var value = '';
+		var hasInterp = false;
 
 		while (!isEOF() && peek() != quote) {
+			// Check for ${ or $ident interpolation
+			if (peek() == '$' && (peekNext() == '{' || isAlpha(peekNext()) || peekNext() == '_')) {
+				hasInterp = true;
+				break;
+			}
 			if (peek() == '\\') {
 				advance();
 				if (isEOF())
@@ -187,31 +224,265 @@ class Tokenizer {
 			}
 		}
 
-		if (isEOF())
-			throw 'Unterminated string at line $line, col $col';
+		if (!hasInterp) {
+			if (isEOF())
+				throw 'Unterminated string at line $line, col $col';
+			advance(); // closing quote
+			return TString(value);
+		}
 
-		advance(); // closing quote
-		return TString(value);
+		// Has ${ — hand off to interpolation logic (same as template strings)
+		// We already read `value` as the prefix before the first ${
+		readStringInterpolation(quote, value);
+		return null; // pendingTokens populated
 	}
 
-	function readNumber():Token {
-		var start = pos;
-		var hasDot = false;
+	/**
+	 * Handles ${ ... } interpolation inside regular strings (' or ").
+	 * Called from readString when ${ is detected.
+	 * prefix: text already accumulated before the first ${
+	 * quote: the opening quote char (' or ")
+	 */
+	function readStringInterpolation(quote:String, prefix:String):Void {
+		var startLine = line;
+		var startCol  = col;
+		var parts:Array<TokenPos> = [];
+		var hasContent = false;
 
-		while (!isEOF() && (isDigit(peek()) || peek() == '.')) {
+		inline function pushStr(s:String, l:Int, c:Int) {
+			if (s.length > 0) {
+				if (hasContent) parts.push({token: TOperator(OAdd), line: l, col: c});
+				parts.push({token: TString(s), line: l, col: c});
+				hasContent = true;
+			}
+		}
+
+		// Flush the prefix already read
+		pushStr(prefix, startLine, startCol);
+
+		var literal = new StringBuf();
+		var litLine = line; var litCol = col;
+
+		while (!isEOF() && peek() != quote) {
+			if (peek() == '$' && peekNext() != '{' && (isAlpha(peekNext()) || peekNext() == '_')) {
+				// $ident bare interpolation
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // consume $
+				var identStart = pos;
+				while (!isEOF() && (isAlphaNumeric(peek()) || peek() == '_')) advance();
+				var identName = input.substring(identStart, pos);
+				if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+				parts.push({token: TIdentifier(identName), line: line, col: col});
+				hasContent = true;
+				litLine = line; litCol = col;
+			} else if (peek() == '$' && peekNext() == '{') {
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // $
+				advance(); // {
+				var exprBuf = new StringBuf();
+				var depth = 1;
+				while (!isEOF() && depth > 0) {
+					var c = peek();
+					if (c == '{') depth++;
+					else if (c == '}') { depth--; if (depth == 0) { advance(); break; } }
+					if (c == '\n') { line++; col = 0; }
+					exprBuf.add(advance());
+				}
+				var exprStr = exprBuf.toString();
+				var subTok = new Tokenizer(exprStr);
+				var subTokens = subTok.tokenize();
+				if (subTokens.length > 1) {
+					var exprToks = subTokens.slice(0, subTokens.length - 1);
+					if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+					parts.push({token: TLeftParen, line: line, col: col});
+					for (t in exprToks) parts.push(t);
+					parts.push({token: TRightParen, line: line, col: col});
+					hasContent = true;
+				}
+				litLine = line; litCol = col;
+			} else if (peek() == '\\') {
+				advance();
+				if (!isEOF()) {
+					switch (advance()) {
+						case 'n': literal.add('\n');
+						case 't': literal.add('\t');
+						case 'r': literal.add('\r');
+						case '\\': literal.add('\\');
+						case c: literal.add(c);
+					}
+				}
+			} else {
+				if (peek() == '\n') { line++; col = 0; }
+				literal.add(advance());
+			}
+		}
+
+		if (!isEOF()) advance(); // closing quote
+		pushStr(literal.toString(), litLine, litCol);
+
+		if (parts.length == 0) {
+			pendingTokens.push({token: TString(""), line: startLine, col: startCol});
+		} else {
+			for (p in parts) pendingTokens.push(p);
+		}
+	}
+
+	/**
+	 * Template strings: `Hello ${name}, you are ${age} years old!`
+	 * Expands into a sequence of tokens representing string concatenation.
+	 * e.g.:  TString("Hello ") TOperator(OAdd) TIdentifier("name") TOperator(OAdd) TString(", you are ") ...
+	 */
+	function readTemplateString():Void {
+		advance(); // consume opening `
+		var startLine = line;
+		var startCol  = col;
+
+		var parts:Array<TokenPos> = [];
+		var hasContent = false;
+
+		inline function pushStr(s:String, l:Int, c:Int) {
+			if (s.length > 0) {
+				if (hasContent) parts.push({token: TOperator(OAdd), line: l, col: c});
+				parts.push({token: TString(s), line: l, col: c});
+				hasContent = true;
+			}
+		}
+
+		var literal = new StringBuf();
+		var litLine = line; var litCol = col;
+
+		while (!isEOF() && peek() != '`') {
+			if (peek() == '$' && peekNext() != '{' && (isAlpha(peekNext()) || peekNext() == '_')) {
+				// $ident in backtick string
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // $
+				var identStart = pos;
+				while (!isEOF() && (isAlphaNumeric(peek()) || peek() == '_')) advance();
+				var identName = input.substring(identStart, pos);
+				if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+				parts.push({token: TIdentifier(identName), line: line, col: col});
+				hasContent = true;
+				litLine = line; litCol = col;
+			} else if (peek() == '$' && peekNext() == '{') {
+				// Flush accumulated literal
+				pushStr(literal.toString(), litLine, litCol);
+				literal = new StringBuf();
+				advance(); // $
+				advance(); // {
+				// Tokenize until matching }
+				var depth = 1;
+				var exprStart = pos;
+				var exprTokens:Array<TokenPos> = [];
+				var innerizer = new Tokenizer(input.substring(exprStart));
+				// We need the raw sub-tokenizer — but since we share pos/line/col
+				// we instead walk manually and collect chars
+				var exprBuf = new StringBuf();
+				while (!isEOF() && depth > 0) {
+					var c = peek();
+					if (c == '{') depth++;
+					else if (c == '}') { depth--; if (depth == 0) { advance(); break; } }
+					if (c == '\n') { line++; col = 0; }
+					exprBuf.add(advance());
+				}
+				// Re-tokenize the expression fragment
+				var exprStr = exprBuf.toString();
+				var subTok = new Tokenizer(exprStr);
+				var subTokens = subTok.tokenize();
+				// subTokens ends with EOF — strip it
+				if (subTokens.length > 1) {
+					var exprToks = subTokens.slice(0, subTokens.length - 1);
+					// Wrap in parens: TLeftParen, ...expr..., TRightParen
+					if (hasContent) parts.push({token: TOperator(OAdd), line: line, col: col});
+					parts.push({token: TLeftParen, line: line, col: col});
+					for (t in exprToks) parts.push(t);
+					parts.push({token: TRightParen, line: line, col: col});
+					hasContent = true;
+				}
+				litLine = line; litCol = col;
+			} else if (peek() == '\\') {
+				advance();
+				if (!isEOF()) {
+					switch (advance()) {
+						case 'n': literal.add('\n');
+						case 't': literal.add('\t');
+						case 'r': literal.add('\r');
+						case '\\': literal.add('\\');
+						case '`': literal.add('`');
+						case c: literal.add(c);
+					}
+				}
+			} else {
+				if (peek() == '\n') { line++; col = 0; }
+				literal.add(advance());
+			}
+		}
+
+		if (!isEOF()) advance(); // consume closing `
+
+		// Flush remaining literal
+		pushStr(literal.toString(), litLine, litCol);
+
+		// If empty template string
+		if (parts.length == 0) {
+			pendingTokens.push({token: TString(""), line: startLine, col: startCol});
+		} else {
+			for (p in parts) pendingTokens.push(p);
+		}
+	}
+
+	function readNumber(firstChar:String):Token {
+		if (firstChar == "0") {
+			if (peek() == 'x' || peek() == 'X') {
+				advance();
+				var start = pos;
+				while (!isEOF() && isHexDigit(peek())) advance();
+				return TNumber(Std.parseInt("0x" + input.substring(start, pos)));
+			}
+			if (peek() == 'b' || peek() == 'B') {
+				advance();
+				var start = pos;
+				while (!isEOF() && (peek() == '0' || peek() == '1')) advance();
+				var s = input.substring(start, pos);
+				var val = 0;
+				for (i in 0...s.length) val = val * 2 + (s.charAt(i) == '1' ? 1 : 0);
+				return TNumber(val);
+			}
+			if (peek() == 'o' || peek() == 'O') {
+				advance();
+				var start = pos;
+				while (!isEOF() && peek() >= '0' && peek() <= '7') advance();
+				var s = input.substring(start, pos);
+				var val = 0;
+				for (i in 0...s.length) val = val * 8 + (s.charCodeAt(i) - 48);
+				return TNumber(val);
+			}
+		}
+		var startPos = pos - firstChar.length;
+		var hasDot = firstChar == ".";
+		while (!isEOF() && (isDigit(peek()) || peek() == '_' || peek() == '.')) {
+			if (peek() == '_') { advance(); continue; }
 			if (peek() == '.') {
-				// Range operator support: stop number token before `...`
-				if (peekNext() == '.')
-					break;
-				if (hasDot)
-					break;
+				if (peekNext() == '.') break;
+				if (!isDigit(peekNext())) break;
+				if (hasDot) break;
 				hasDot = true;
 			}
 			advance();
 		}
-
-		var numStr = input.substring(start, pos);
+		if (!isEOF() && (peek() == 'e' || peek() == 'E')) {
+			advance();
+			if (!isEOF() && (peek() == '+' || peek() == '-')) advance();
+			while (!isEOF() && isDigit(peek())) advance();
+		}
+		var numStr = input.substring(startPos, pos).split("_").join("");
 		return TNumber(Std.parseFloat(numStr));
+	}
+
+	inline function isHexDigit(c:String):Bool {
+		return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 	}
 
 	function readIdentifier():Token {
@@ -223,9 +494,28 @@ class Tokenizer {
 
 		var id = input.substring(start, pos);
 
+		// SyntaxRules: operator aliases (e.g. "not" → "!", "and" → "&&")
+		if (rules != null && rules.operatorAliases.exists(id)) {
+			var opStr = rules.operatorAliases.get(id);
+			return switch (opStr) {
+				case "!":  TOperator(ONot);
+				case "&&": TOperator(OAnd);
+				case "||": TOperator(OOr);
+				case "==": TOperator(OEqual);
+				case "!=": TOperator(ONotEqual);
+				case "??": TOperator(ONullCoal);
+				default:   TIdentifier(id); // unknown alias, treat as identifier
+			};
+		}
+
+		// SyntaxRules: keyword aliases (e.g. "fn" → "func", "elif" → "elseif")
+		var resolvedId = (rules != null && rules.keywordAliases.exists(id))
+			? rules.keywordAliases.get(id)
+			: id;
+
 		// Check if it's a keyword
-		if (keywords.exists(id)) {
-			var keyword = keywords.get(id);
+		if (keywords.exists(resolvedId)) {
+			var keyword = keywords.get(resolvedId);
 			// Handle boolean literals
 			if (keyword == KTrue)
 				return TBool(true);
@@ -236,7 +526,7 @@ class Tokenizer {
 			return TKeyword(keyword);
 		}
 
-		return TIdentifier(id);
+		return TIdentifier(resolvedId != id ? resolvedId : id);
 	}
 
 	function readOperatorOrDelimiter():Token {
@@ -323,6 +613,10 @@ class Tokenizer {
 					advance();
 					return TOperator(OEqual);
 				}
+				if (peek() == '>') {
+					advance();
+					return TFatArrow;
+				}
 				return TOperator(OAssign);
 
 			case '!':
@@ -367,6 +661,17 @@ class Tokenizer {
 					return TOperator(OOr);
 				}
 				return TOperator(OBitOr);
+
+			case '?':
+				if (peek() == '?') {
+					advance();
+					return TOperator(ONullCoal); // ??
+				}
+				if (peek() == '.') {
+					advance();
+					return TOperator(OOptChain); // ?.
+				}
+				return TQuestion; // lone ? (ternary future use)
 
 			default:
 				throw 'Unexpected character "$c" at line $line, col $col';

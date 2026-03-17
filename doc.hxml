@@ -1,22 +1,9 @@
 -cp src/
 -xml doc.xml
 -neko doc.n
+--library prismcli
 --no-output
 
-# script engine
-nx.script.VM
-nx.script.Interpreter
-nx.script.Compiler
-nx.script.Parser
-nx.script.Tokenizer
-nx.script.Bytecode
-nx.script.AST
-nx.script.Token
-nx.script.NativeClasses
-nx.script.BytecodeSerializer
-nx.script.IScriptInstance
-nx.script.NxProxy
-nx.script.ScriptClass
+--macro include('nx')
 
-# dialogue system
-# nx.dialogue.Dialogue
+--c-arg arg

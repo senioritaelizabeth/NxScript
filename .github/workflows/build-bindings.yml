@@ -1,0 +1,84 @@
+name: Build Bindings
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            artifact: nxscript-linux-x64
+
+          - os: windows-latest
+            platform: windows-x64
+            artifact: nxscript-windows-x64
+
+          - os: macos-latest
+            platform: macos-x64
+            artifact: nxscript-macos-x64
+
+    steps:
+      - name: Checkout NxScript
+        uses: actions/checkout@v4
+      #   with:
+         
+      - name: Install Haxe (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install haxe neko
+      - name: setup haxelib (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          haxelib setup ./.haxelib
+
+      - name: Setup Haxe
+        uses: krdlab/setup-haxe@v1
+        if: runner.os != 'macOS'
+        with:
+          haxe-version: "4.3.7"
+
+      - name: Install dependencies
+        run: |
+          haxelib install hxcpp --quiet
+          haxelib install prismcli --quiet
+
+      - name: Linux build deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y gcc g++ make
+
+
+      - name: Build NxBinding
+        working-directory: .
+        run: >
+          haxe --run tools.BuildBind --platform ${{ matrix.platform }} --name ${{ matrix.artifact }} --out binaries/
+
+      - name: Upload artifact macos
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          # path: binaries/${{ matrix.platform }}.zip
+          #  ask if macos, publish binaries/name.dylib, else binaries/name.dll or .dso
+          path: binaries/${{ matrix.artifact }}.dylib
+          retention-days: 30
+      - name: Upload artifact windows
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: binaries/${{ matrix.artifact }}.dll
+          retention-days: 30
+      - name: Upload artifact linux
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: binaries/${{ matrix.artifact }}.dso
+          retention-days: 30

@@ -1,3 +1,0 @@
-hxcpp_api_level=430
-hxcpp_smart_strings=1
-hxcpp=/home/johanna/haxelib/hxcpp/4,3,2/

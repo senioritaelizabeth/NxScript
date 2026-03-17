@@ -38,10 +38,17 @@ class VM {
 
 	/** Global variables. Set from Haxe with `vm.globals.set(name, value)`, or via top-level script assignments. */
 	public var globals:Map<String, Value>;
+	/** Names registered as static — preserved across reset_context(). Populated by Interpreter after compilation. */
+	public var staticNames:Map<String, Bool> = new Map();
 
 	// Let-scoped variables (block-level) and compile-time constants
 	var scopeVars:Map<String, Value>;
 	var constVars:Map<String, Value>;
+	// Stack of scope frames for nested block-level `let` vars (module-level only)
+	// Each entry is the list of scopeVar keys that existed BEFORE this scope.
+	// On EXIT_SCOPE, any key not in that list was introduced by the scope and gets removed.
+	// Array<String> instead of Map snapshot — much cheaper alloc.
+	var scopeStack:Array<Array<String>> = [];
 
 	// The call stack. frames[last] is currentFrame. Don't touch frames directly in hot code.
 	var frames:Array<CallFrame> = [];
@@ -50,16 +57,82 @@ class VM {
 	/** Externally-registered native Haxe functions. Prefer `Interpreter.register()` over writing to this directly. */
 	public var natives:Map<String, Value>;
 
+	/** Classes registered via `using ClassName` — searched for extension methods. */
+	public var usingClasses:Array<String> = [];
+
 	/** Class registry. Populated by MAKE_CLASS instructions and NativeClasses.registerAll(). Used for inheritance lookups during instantiation. */
 	public var classes:Map<String, ClassData>;
 
-	public var debug:Bool = false;
 
 	/** Maximum instructions before the VM throws. Default 10,000,000. Raise it if you have a very long-running script; lower it if you want a tighter sandbox. */
 	public var maxInstructions:Int = 10000000;
 
 	/** Maximum call depth before the VM throws. Default 10,000. Set <= 0 to disable this guard. */
 	public var maxCallDepth:Int = 10000;
+
+	/**
+	 * Sandboxed execution mode.
+	 *
+	 * When true, the VM blocks access to any native registered under a name
+	 * in `sandboxBlocklist`. By default the blocklist is empty — populate it
+	 * before executing untrusted scripts.
+	 *
+	 * Also enforces tighter defaults:
+	 *   maxInstructions = 500_000  (prevent infinite loops)
+	 *   maxCallDepth    = 256      (prevent stack overflow exploits)
+	 *
+	 * Usage:
+	 *   vm.sandboxed = true;
+	 *   vm.sandboxBlocklist.set("Sys", true);
+	 *   vm.sandboxBlocklist.set("sys", true);
+	 */
+	public var sandboxed:Bool = false;
+
+	/**
+	 * Extension method registry populated by `using ClassName` declarations.
+	 * Maps className -> list of static method containers (VClass or VNativeObject).
+	 * When getMember fails to find a method, these are searched with obj as first arg.
+	 */
+// usingExtensions removed (using feature removed with VProxy)
+
+	/** Set of native/global names blocked in sandboxed mode. */
+	public var sandboxBlocklist:Map<String, Bool> = new Map();
+
+	/**
+	 * Enable sandbox with sensible defaults in one call.
+	 * Blocks: Sys, sys, File, FileSystem, Http, Socket, Process.
+	 * Sets maxInstructions=500_000, maxCallDepth=256.
+	 */
+	public function enableSandbox(?extraBlocklist:Array<String>):Void {
+		sandboxed = true;
+		maxInstructions = 500000;
+		maxCallDepth = 256;
+		for (name in ["Sys", "sys", "File", "FileSystem", "Http", "Socket", "Process", "Reflect", "Type"])
+			sandboxBlocklist.set(name, true);
+		if (extraBlocklist != null)
+			for (name in extraBlocklist)
+				sandboxBlocklist.set(name, true);
+	}
+
+	/**
+	 * Controls how aggressively the VM reclaims internal caches between script executions.
+	 *
+	 *   AGGRESSIVE  — Clears all caches (arrayMethodCache, instanceMethodCache, nativeArgBuffers,
+	 *                 caches) on every execute() call. Minimises memory at the cost of
+	 *                 re-warming caches on each run. Best for short-lived scripts or tight memory.
+	 *
+	 *   SOFT        — Clears caches only when the number of tracked objects exceeds a threshold
+	 *                 (default 512). Good balance for long-running hosts that re-run scripts often.
+	 *
+	 *   VERY_SOFT   — Never proactively clears caches; relies entirely on the host GC. Maximum
+	 *                 throughput for hot re-execution loops where the same objects are reused.
+	 *
+	 * Default: SOFT.
+	 */
+	public var gc_kind:GcKind = SOFT;
+
+	/** Object count threshold used by SOFT mode before flushing caches. Default: 512. */
+	public var gc_softThreshold:Int = 512;
 
 	var catchStack:Array<CatchHandler> = [];
 	var globalSlotValues:Array<Value>;
@@ -71,13 +144,28 @@ class VM {
 	var instanceMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 	var nativeArgBuffers:Map<Int, Array<Value>>;
 	// Caches Type.getClassName per object instance — one pointer lookup instead of reflection per access
-	var _typeNameCache:haxe.ds.ObjectMap<Dynamic, String>;
+	// _typeNameCache removed
+	// Per-class field descriptor cache: className -> fieldName -> NativeFieldKind
+	// Resolved once on first access, reused for every subsequent get/set on any instance of that class.
+	// NativeFieldCache removed — cache overhead exceeded Reflection cost on CPP
 
 	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
 
-	/** The instruction currently executing. Only populated when `debug = true`. Null otherwise. */
+	/** The instruction currently executing. Only populated when compiled with -D NXDEBUG. */
 	public var currentInstruction:Instruction = null;
+
+	/** Kept for API compat. No effect on hot loop without -D NXDEBUG. */
+	public var debug(get, set):Bool;
+	var _debug:Bool = false;
+	function get_debug() return _debug;
+	function set_debug(v:Bool):Bool {
+		_debug = v;
+		#if !NXDEBUG
+		if (v) trace("[NxScript] Warning: debug=true has no effect without -D NXDEBUG compile flag");
+		#end
+		return v;
+	}
 
 	// Preallocated frame + frames array for host->script calls (callFunction/callResolved).
 	// Mutated in-place every call — zero heap allocation per frame in the hot path.
@@ -89,12 +177,13 @@ class VM {
 	 * Don't pass debug=true in production unless you enjoy reading walls of text.
 	 */
 	public function new(debug:Bool = false) {
-		this.debug = debug;
+		this._debug = debug;
 		stack = [for (_ in 0...512) VNull]; // pre-allocated — resizing at runtime would be embarrassing
 		sp = 0;
 		globals = new Map();
 		scopeVars = new Map();
 		constVars = new Map();
+		scopeStack = []; // Array<Array<String>>
 		natives = new Map();
 		classes = new Map();
 		catchStack = [];
@@ -105,9 +194,11 @@ class VM {
 		globalSlotConstInit = [];
 		arrayMethodCache = new ObjectMap();
 		instanceMethodCache = new ObjectMap();
-		_typeNameCache = new haxe.ds.ObjectMap();
+		// _typeNameCache removed
 		nativeArgBuffers = new Map();
+		// _nativeFieldCache removed
 
+// usingExtensions init removed
 		initializeNativeFunctions();
 		NativeClasses.registerAll(this);
 	}
@@ -121,8 +212,8 @@ class VM {
 		sp = 0;
 		frames = [];
 		catchStack = [];
-		arrayMethodCache = new ObjectMap();
-		instanceMethodCache = new ObjectMap();
+		usingClasses = []; // reset per-run so using declarations don't bleed between scripts
+		applyGcPolicy();
 		bindGlobalSlots(chunk);
 
 		if (chunk.code == null)
@@ -281,6 +372,9 @@ class VM {
 						if (value == null) {
 							value = constVars.get(name);
 							if (value == null) {
+								// Sandbox check before globals/natives (inlined path must respect blocklist)
+								if (sandboxed && sandboxBlocklist.exists(name))
+									throw 'Sandbox: access to "$name" is not allowed';
 								value = globals.get(name);
 								if (value == null) {
 									value = natives.get(name);
@@ -385,8 +479,7 @@ class VM {
 						case VNumber(x):
 							switch (b) {
 								case VNumber(y):
-									if (y == 0)
-										throw 'Division by zero';
+									// IEEE 754: n/0 = Inf, 0/0 = NaN (match JS/Haxe float behaviour)
 									stack[sp++] = VNumber(x / y);
 								default:
 									throw 'Cannot divide';
@@ -498,6 +591,20 @@ class VM {
 					if (isTruthy(stack[sp - 1]))
 						ip += arg * 2;
 					sp--;
+
+				// JUMP_IF_NULL / JUMP_IF_NOT_NULL — used by ?? and ?.
+				// Does NOT pop TOS — leaves it for the consuming instruction.
+				case Op.JUMP_IF_NULL:
+					switch (stack[sp - 1]) {
+						case VNull: ip += arg * 2;
+						default:
+					}
+
+				case Op.JUMP_IF_NOT_NULL:
+					switch (stack[sp - 1]) {
+						case VNull:
+						default: ip += arg * 2;
+					}
 
 				// Functions
 				case Op.CALL:
@@ -684,6 +791,30 @@ class VM {
 									continue;
 								default:
 							}
+						case VNativeObject(nobj) if (Std.isOfType(nobj, Array)):
+							var narr:Array<Dynamic> = cast nobj;
+							var argStart = objectIndex + 1;
+							switch (memberField) {
+								case "push":
+									narr.push(valueToHaxe(stack[argStart]));
+									sp = objectIndex;
+									stack[sp++] = VNumber(narr.length);
+									continue;
+								case "pop":
+									sp = objectIndex;
+									stack[sp++] = narr.length == 0 ? VNull : haxeToValue(narr.pop());
+									continue;
+								case "shift":
+									sp = objectIndex;
+									stack[sp++] = narr.length == 0 ? VNull : haxeToValue(narr.shift());
+									continue;
+								case "unshift":
+									narr.unshift(valueToHaxe(stack[argStart]));
+									sp = objectIndex;
+									stack[sp++] = VNull;
+									continue;
+								default:
+							}
 						default:
 					}
 
@@ -849,8 +980,9 @@ class VM {
 				case Op.GET_MEMBER:
 					var field = strings[arg];
 					var object = stack[--sp];
-					if (debug)
-						trace('GET_MEMBER: field=$field, object type=${Type.enumConstructor(object)}');
+					#if NXDEBUG
+					trace('GET_MEMBER: field=$field, object type=${Type.enumConstructor(object)}');
+					#end
 					stack[sp++] = getMember(object, field);
 
 				case Op.SET_MEMBER:
@@ -876,6 +1008,11 @@ class VM {
 				case Op.MAKE_CLASS:
 					this.sp = sp;
 					handleMakeClass(arg);
+					sp = this.sp;
+
+				case Op.MAKE_CLASS_STATICS:
+					this.sp = sp;
+					handleMakeClassStatics(arg);
 					sp = this.sp;
 
 				case Op.INSTANTIATE:
@@ -931,6 +1068,24 @@ class VM {
 
 				case Op.POP_TRY:
 					catchStack.pop();
+
+				case Op.REGISTER_USING:
+					var className = strings[arg];
+					if (!usingClasses.contains(className))
+						usingClasses.push(className);
+
+				case Op.ENTER_SCOPE:
+					// Snapshot just the key names (no Map alloc, no value copies).
+					scopeStack.push([ for (k in scopeVars.keys()) k ]);
+
+				case Op.EXIT_SCOPE:
+					// Remove keys introduced inside this scope frame.
+					if (scopeStack.length > 0) {
+						var keysBefore = scopeStack.pop();
+						for (k in scopeVars.keys())
+							if (keysBefore.indexOf(k) < 0)
+								scopeVars.remove(k);
+					}
 
 				// Iteration
 				case Op.GET_ITER:
@@ -1095,13 +1250,45 @@ class VM {
 			nativeSuper: nativeSuper,
 			methods: methods,
 			fields: fields,
-			constructor: constructor
+			constructor: constructor,
+			staticFields:  new Map(),
+			staticMethods: new Map()
 		};
 
 		// Register class in global registry
 		classes.set(className, classData);
 
 		push(VClass(classData));
+	}
+
+	function handleMakeClassStatics(counts:Int) {
+		var staticMethodCount = counts >> 16;
+		var staticFieldCount  = counts & 0xFFFF;
+
+		// Pop static fields (name, value pairs) — popped in reverse
+		var sFields = new Map<String, Value>();
+		for (i in 0...staticFieldCount) {
+			var value = pop();
+			var name = switch (pop()) { case VString(s): s; default: throw "Static field name must be string"; };
+			sFields.set(name, value);
+		}
+
+		// Pop static methods (name, function pairs)
+		var sMethods = new Map<String, FunctionChunk>();
+		for (i in 0...staticMethodCount) {
+			var func = switch (pop()) { case VFunction(f, _): f; default: throw "Static method must be function"; };
+			var name = switch (pop()) { case VString(s): s; default: throw "Static method name must be string"; };
+			sMethods.set(name, func);
+		}
+
+		// Attach to the VClass sitting on top of stack
+		switch (stack[sp - 1]) {
+			case VClass(classData):
+				for (k in sFields.keys())  classData.staticFields.set(k, sFields.get(k));
+				for (k in sMethods.keys()) classData.staticMethods.set(k, sMethods.get(k));
+			default:
+				throw "MAKE_CLASS_STATICS: top of stack must be a VClass";
+		}
 	}
 
 	function handleThrownValue(val:Value, sp:Int) {
@@ -1203,6 +1390,8 @@ class VM {
 
 			var ctorVars = new Map<String, Value>();
 			ctorVars.set("this", inst);
+			if (classData.superClass != null && classes.exists(classData.superClass))
+				ctorVars.set("super", VClass(classes.get(classData.superClass)));
 			var ctorFrame:CallFrame = {
 				chunk: ctor.chunk,
 				ip: 0,
@@ -1277,6 +1466,8 @@ class VM {
 			return scopeVars.get(name);
 		if (constVars.exists(name))
 			return constVars.get(name);
+		if (sandboxed && sandboxBlocklist.exists(name))
+			throw 'Sandbox: access to "$name" is not allowed';
 		if (globals.exists(name))
 			return globals.get(name);
 		if (natives.exists(name))
@@ -1318,13 +1509,27 @@ class VM {
 	// Conversion between Haxe and Script values
 
 	public function haxeToValue(value:Dynamic):Value {
+		if (value == null) {
+			return VNull;
+		}
 		return switch (Type.typeof(value)) {
 			case TNull: VNull;
 			case TBool: VBool(value);
 			case TInt: VNumber(value);
 			case TFloat: VNumber(value);
 			case TClass(String): VString(value);
-			case TClass(Array): VArray([for (v in (value : Array<Dynamic>)) haxeToValue(v)]);
+			case TClass(Array):
+				// Return a live VArray wrapping the SAME Array<Dynamic>.
+				// Script push/pop/[] operate on the original array — no copy.
+				// Each element is lazily converted via haxeToValue per access.
+				// We store a shared reference by aliasing Array<Dynamic> as Array<Value>
+				// using a thin adapter stored in a VNativeArray wrapper.
+				//
+				// Implementation: build a VArray backed by a proxy Array<Value>
+				// that syncs both ways with the original.
+				// Simpler approach that works: keep the original array as VNativeObject
+				// and handle push/length/[] on VNativeObject(Array) specially in getMember.
+				VNativeObject(value);
 			case TFunction: VNativeFunction("", -1, (args:Array<Value>) -> {
 					var haxeArgs = [for (a in args) valueToHaxe(a)];
 					return haxeToValue(Reflection.callMethod(null, value, haxeArgs));
@@ -1342,6 +1547,7 @@ class VM {
 			case VNull: null;
 			case VArray(arr): [for (v in arr) valueToHaxe(v)];
 			case VNativeObject(obj): obj;
+			case VEnumValue(_, _, _): valueToString(value); // "Color.Red" or "Result.Ok(hello)"
 			// unwrap VInstance to native base if it has one
 			case VInstance(_, fields, _):
 				var nativeBase = fields.get(NATIVE_SUPER_INSTANCE_FIELD);
@@ -1492,8 +1698,7 @@ class VM {
 	function divide(a:Value, b:Value):Value {
 		return switch [a, b] {
 			case [VNumber(x), VNumber(y)]:
-				if (y == 0)
-					throw 'Division by zero';
+				// IEEE 754: n/0 = Inf, 0/0 = NaN
 				VNumber(x / y);
 			default: throw 'Cannot divide';
 		}
@@ -1523,6 +1728,7 @@ class VM {
 			case [VString(x), VString(y)]: x == y;
 			case [VBool(x), VBool(y)]: x == y;
 			case [VNull, VNull]: true;
+			case [VEnumValue(e1,v1,_), VEnumValue(e2,v2,_)]: e1 == e2 && v1 == v2;
 			default: false;
 		}
 	}
@@ -1537,15 +1743,31 @@ class VM {
 
 	inline function isTruthy(value:Value):Bool {
 		return switch (value) {
-			case VNull: false;
-			case VBool(b): b;
-			case VNumber(n): n != 0;
-			case VString(s): s.length > 0;
+			case VNull:       false;
+			case VBool(b):    b;
+			case VNumber(n):  n != 0 && !Math.isNaN(n);
+			case VString(s):  s.length > 0;
+			case VArray(a):   a.length > 0;
+			case VDict(m):    Lambda.count(m) > 0;
 			default: true;
 		}
 	}
 
 	// Member access
+	function tryUsingMethod(object:Value, field:String):Value {
+		for (className in usingClasses) {
+			var cd = classes.get(className);
+			if (cd == null) continue;
+			var method = cd.methods.get(field);
+			if (method == null) continue;
+			return VNativeFunction(field, -1, function(args:Array<Value>):Value {
+				var fullArgs = [object].concat(args);
+				return callFunction(method, new Map(), fullArgs);
+			});
+		}
+		return null;
+	}
+
 	public function getMember(object:Value, field:String):Value {
 		return switch (object) {
 			case VNumber(n):
@@ -1558,24 +1780,43 @@ class VM {
 				getArrayMethod(arr, field);
 
 			case VDict(map):
-				map.exists(field) ? map.get(field) : VNull;
+				switch (field) {
+					case "keys":   return VNativeFunction("keys",   0, (_) -> VArray([for (k in map.keys()) VString(k)]));
+					case "values": return VNativeFunction("values", 0, (_) -> VArray([for (k in map.keys()) map.get(k)]));
+					case "has":    return VNativeFunction("has",    1, (args) -> VBool(switch (args[0]) {
+						case VString(k): map.exists(k);
+						default: map.exists(valueToString(args[0]));
+					}));
+					case "remove": return VNativeFunction("remove", 1, (args) -> {
+						var k = switch (args[0]) { case VString(s): s; default: valueToString(args[0]); };
+						map.remove(k); return VNull;
+					});
+					case "set":    return VNativeFunction("set",    2, (args) -> {
+						var k = switch (args[0]) { case VString(s): s; default: valueToString(args[0]); };
+						map.set(k, args[1]); return VNull;
+					});
+					case "size":   return VNativeFunction("size",   0, (_) -> VNumber(Lambda.count(map)));
+					case "clear":  return VNativeFunction("clear",  0, (_) -> { map.clear(); return VNull; });
+					default:
+						map.exists(field) ? map.get(field) : VNull;
+				}
 
 			case VInstance(className, fields, classData):
-				// instance fields first
 				if (fields.exists(field))
 					return fields.get(field);
 
-				// method cache
 				var cachedInstanceMethods = instanceMethodCache.get(fields);
 				if (cachedInstanceMethods != null && cachedInstanceMethods.exists(field))
 					return cachedInstanceMethods.get(field);
 
-				// walk class hierarchy for methods
 				var currentClass = classData;
 				while (currentClass != null) {
 					if (currentClass.methods.exists(field)) {
 						var method = currentClass.methods.get(field);
-						var bound = VFunction(method, ["this" => object]);
+						var superVal2:Value = VNull;
+						if (classData.superClass != null && classes.exists(classData.superClass))
+							superVal2 = VClass(classes.get(classData.superClass));
+						var bound = VFunction(method, ["this" => object, "super" => superVal2]);
 						if (cachedInstanceMethods == null) {
 							cachedInstanceMethods = new Map<String, Value>();
 							instanceMethodCache.set(fields, cachedInstanceMethods);
@@ -1589,31 +1830,80 @@ class VM {
 						currentClass = null;
 				}
 
-				// fallback to native base (script class extending native class)
 				var nativeBase = fields.get(NATIVE_SUPER_INSTANCE_FIELD);
 				switch (nativeBase) {
 					case VNativeObject(_): return getMember(nativeBase, field);
-					default:
-						return VNull;
+					default: return VNull;
 				}
 
 			case VClass(classData):
-				var method = classData.methods.get(field);
-				if (method != null)
-					return VFunction(method, EMPTY_MAP);
-				var fieldVal = classData.fields.get(field);
-				if (fieldVal != null)
-					return fieldVal;
-				return VNull;
-			case VNativeObject(obj):
-				var value:Dynamic = Reflection.getField(obj, field);
-				if (Reflection.isFunction(value)) {
-					return VNativeFunction(field, -1, (args:Array<Value>) -> {
-						var haxeArgs = [for (a in args) valueToHaxe(a)];
-						return haxeToValue(Reflection.callMethod(obj, value, haxeArgs));
-					});
+				// Static methods first
+				var sMethod = classData.staticMethods.get(field);
+				if (sMethod != null)
+					return VFunction(sMethod, ["__class__" => VClass(classData)]);
+				// Static fields
+				if (classData.staticFields.exists(field))
+					return classData.staticFields.get(field);
+				// super.new() or super.method() — inject current this so the parent method runs on this instance
+				if (field == "new" && classData.constructor != null) {
+					var thisVal = getVariable("this") ?? VNull;
+					return VFunction(classData.constructor, ["this" => thisVal, "__super_ctor__" => VBool(true)]);
 				}
-				return haxeToValue(value);
+				var method = classData.methods.get(field);
+				if (method != null) {
+					var thisVal = getVariable("this") ?? VNull;
+					return VFunction(method, ["this" => thisVal]);
+				}
+				return VNull;
+
+
+			case VEnumValue(eName, variant, vals):
+				switch (field) {
+					case "variant": return VString(variant);
+					case "name":    return VString(variant);
+					case "enum":    return VString(eName);
+					case "values":  return VArray(vals.copy());
+					default:
+						var idxStr = field;
+						if (StringTools.startsWith(idxStr, "value")) {
+							var i = Std.parseInt(idxStr.substr(5));
+							if (i != null && i >= 0 && i < vals.length) return vals[i];
+						}
+						return VNull;
+				}
+
+			case VNativeObject(obj):
+				// Live Array<Dynamic> — handle ops directly
+				if (Std.isOfType(obj, Array)) {
+					var arr:Array<Dynamic> = cast obj;
+					switch (field) {
+						case "length": return VNumber(arr.length);
+						case "push":   return VNativeFunction("push",   1, (args) -> { arr.push(valueToHaxe(args[0])); return VNumber(arr.length); });
+						case "pop":    return VNativeFunction("pop",    0, (_)    -> arr.length == 0 ? VNull : haxeToValue(arr.pop()));
+						case "shift":  return VNativeFunction("shift",  0, (_)    -> arr.length == 0 ? VNull : haxeToValue(arr.shift()));
+						case "unshift":return VNativeFunction("unshift",1, (args) -> { arr.unshift(valueToHaxe(args[0])); return VNull; });
+						case "first":  return arr.length > 0 ? haxeToValue(arr[0]) : VNull;
+						case "last":   return arr.length > 0 ? haxeToValue(arr[arr.length-1]) : VNull;
+						case "join":   return VNativeFunction("join", 1, (args) -> {
+								var sep = switch(args[0]) { case VString(s): s; default: ""; };
+								return VString(arr.map(v -> Std.string(v)).join(sep));
+							});
+						case "reverse":return VNativeFunction("reverse",0,(_) -> { arr.reverse(); return VNativeObject(arr); });
+						case "indexOf":return VNativeFunction("indexOf",1,(args) -> VNumber(arr.indexOf(valueToHaxe(args[0]))));
+						case "contains" | "includes": return VNativeFunction(field,1,(args)->VBool(arr.indexOf(valueToHaxe(args[0]))>=0));
+						case "copy":   return VNativeObject(arr.copy());
+						default: // fall through to Reflection
+					}
+				}
+				// Standard native object — direct Reflection, no cache
+				var raw:Dynamic = Reflection.getField(obj, field);
+				if (raw == null) return VNull;
+				if (!Reflection.isFunction(raw)) return haxeToValue(raw);
+				var capturedObj = obj; var capturedFn = raw;
+				return VNativeFunction(field, -1, (args:Array<Value>) -> {
+					var haxeArgs = [for (a in args) valueToHaxe(a)];
+					return haxeToValue(Reflection.callMethod(capturedObj, capturedFn, haxeArgs));
+				});
 
 			default:
 				throw 'Cannot access member $field on $object';
@@ -1638,25 +1928,18 @@ class VM {
 					}
 				}
 			case VClass(classData):
-				classData.fields.set(field, value);
+				// Write to static field (creates it if needed)
+				classData.staticFields.set(field, value);
 			case VNativeObject(obj):
-				// Set Haxe object field/property
-				try {
-					// Try setProperty first (works with getters/setters like set_angle)
-					try {
-						final val = valueToHaxe(value);
-						Reflection.setField(obj, field, val);
-					} catch (e:Dynamic) {
-						// Fallback to setField
-						Reflect.setField(obj, field, valueToHaxe(value));
-					}
-				} catch (e:Dynamic) {
-					throw 'Cannot set field $field on native object: $e';
-				}
+				Reflection.setField(obj, field, valueToHaxe(value));
 			default:
 				throw 'Cannot set member $field';
 		}
 	}
+
+	// nativeSet removed — inlined to Reflection.setField directly
+
+	// nativeClassName removed with NativeFieldCache
 
 	function getIndex(object:Value, index:Value):Value {
 		return switch [object, index] {
@@ -1665,6 +1948,12 @@ class VM {
 				if (idx < 0 || idx >= arr.length)
 					throw 'Index out of bounds: $idx';
 				arr[idx];
+			case [VNativeObject(obj), VNumber(i)] if (Std.isOfType(obj, Array)):
+				var arr:Array<Dynamic> = cast obj;
+				var idx = Std.int(i);
+				if (idx < 0 || idx >= arr.length)
+					throw 'Index out of bounds: $idx';
+				haxeToValue(arr[idx]);
 			case [VDict(map), _]:
 				var key = valueToString(index);
 				map.exists(key) ? map.get(key) : VNull;
@@ -1713,6 +2002,12 @@ class VM {
 				if (idx < 0 || idx >= arr.length)
 					throw 'Index out of bounds: $idx';
 				arr[idx] = value;
+			case [VNativeObject(obj), VNumber(i)] if (Std.isOfType(obj, Array)):
+				var arr:Array<Dynamic> = cast obj;
+				var idx = Std.int(i);
+				if (idx < 0 || idx >= arr.length)
+					throw 'Index out of bounds: $idx';
+				arr[idx] = valueToHaxe(value);
 			case [VDict(map), _]:
 				map.set(valueToString(index), value);
 			default:
@@ -1727,6 +2022,14 @@ class VM {
 				VDict([
 					"_iter_type" => VString("array"),
 					"_iter_data" => VArray(arr),
+					"_iter_index" => VNumber(0)
+				]);
+			case VNativeObject(obj) if (Std.isOfType(obj, Array)):
+				// Wrap the native array as a VArray for iteration (snapshot is OK for for-in)
+				var arr:Array<Dynamic> = cast obj;
+				VDict([
+					"_iter_type" => VString("array"),
+					"_iter_data" => VArray([for (v in arr) haxeToValue(v)]),
 					"_iter_index" => VNumber(0)
 				]);
 			default: throw 'Value is not iterable';
@@ -1820,7 +2123,10 @@ class VM {
 					default: throw 'Expected number';
 				});
 
-			default: throw 'Unknown Number method: $method';
+			default:
+				var ext = tryUsingMethod(VNumber(n), method);
+				if (ext != null) return ext;
+				throw 'Unknown Number method: $method';
 		}
 	}
 
@@ -1874,7 +2180,52 @@ class VM {
 					default: throw 'Expected string';
 				});
 
-			default: throw 'Unknown String method: $method';
+			// Search extras
+			case "startsWith": VNativeFunction("startsWith", 1, (args) -> switch (args[0]) {
+					case VString(prefix): VBool(s.length >= prefix.length && s.substr(0, prefix.length) == prefix);
+					default: throw 'Expected string';
+				});
+			case "endsWith": VNativeFunction("endsWith", 1, (args) -> switch (args[0]) {
+					case VString(suffix): VBool(s.length >= suffix.length && s.substr(s.length - suffix.length) == suffix);
+					default: throw 'Expected string';
+				});
+
+			// Modification
+			case "replace": VNativeFunction("replace", 2, (args) -> {
+					var from = switch (args[0]) { case VString(x): x; default: throw 'Expected string'; };
+					var to   = switch (args[1]) { case VString(x): x; default: throw 'Expected string'; };
+					VString(StringTools.replace(s, from, to));
+				});
+			case "repeat": VNativeFunction("repeat", 1, (args) -> switch (args[0]) {
+					case VNumber(n):
+						var count = Std.int(n);
+						if (count < 0) throw 'repeat count must be >= 0';
+						var sb = new StringBuf();
+						for (_ in 0...count) sb.add(s);
+						VString(sb.toString());
+					default: throw 'Expected number';
+				});
+			case "padStart": VNativeFunction("padStart", 2, (args) -> {
+					var len = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'Expected number'; };
+					var pad = switch (args[1]) { case VString(x): x; default: " "; };
+					if (pad.length == 0) pad = " ";
+					var result = s;
+					while (result.length < len) result = pad + result;
+					VString(result.substr(result.length - Std.int(Math.max(len, s.length))));
+				});
+			case "padEnd": VNativeFunction("padEnd", 2, (args) -> {
+					var len = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'Expected number'; };
+					var pad = switch (args[1]) { case VString(x): x; default: " "; };
+					if (pad.length == 0) pad = " ";
+					var result = s;
+					while (result.length < len) result = result + pad;
+					VString(result.substr(0, Std.int(Math.max(len, s.length))));
+				});
+
+			default:
+				var ext = tryUsingMethod(VString(s), method);
+				if (ext != null) return ext;
+				throw 'Unknown String method: $method';
 		}
 	}
 
@@ -1932,6 +2283,17 @@ class VM {
 					arr.reverse();
 					VArray(arr);
 				});
+			case "includes": VNativeFunction("includes", 1, (args) -> {
+					var searchValue = args[0];
+					var found = false;
+					for (item in arr) {
+						if (valuesEqual(item, searchValue)) {
+							found = true;
+							break;
+						}
+					}
+					VBool(found);
+				});
 			case "join": VNativeFunction("join", 1, (args) -> {
 					var delim = switch (args[0]) {
 						case VString(s): s;
@@ -1941,7 +2303,96 @@ class VM {
 					VString(parts.join(delim));
 				});
 
-			default: throw 'Unknown Array method: $method';
+			// Higher-order
+		case "map": VNativeFunction("map", 1, (args) -> {
+				var fn = args[0];
+				VArray([for (item in arr) callResolved(fn, [item])]);
+			});
+		case "filter": VNativeFunction("filter", 1, (args) -> {
+				var fn = args[0];
+				VArray([for (item in arr) if (isTruthy(callResolved(fn, [item]))) item]);
+			});
+		case "reduce": VNativeFunction("reduce", 2, (args) -> {
+				var fn = args[0];
+				var acc = args[1];
+				for (item in arr) acc = callResolved(fn, [acc, item]);
+				acc;
+			});
+		case "forEach": VNativeFunction("forEach", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) callResolved(fn, [item]);
+				VNull;
+			});
+		case "find": VNativeFunction("find", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) if (isTruthy(callResolved(fn, [item]))) return item;
+				VNull;
+			});
+		case "findIndex": VNativeFunction("findIndex", 1, (args) -> {
+				var fn = args[0];
+				for (i in 0...arr.length) if (isTruthy(callResolved(fn, [arr[i]]))) return VNumber(i);
+				VNumber(-1);
+			});
+		case "every": VNativeFunction("every", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) if (!isTruthy(callResolved(fn, [item]))) return VBool(false);
+				VBool(true);
+			});
+		case "some": VNativeFunction("some", 1, (args) -> {
+				var fn = args[0];
+				for (item in arr) if (isTruthy(callResolved(fn, [item]))) return VBool(true);
+				VBool(false);
+			});
+
+		// Slicing / copying
+		case "slice": VNativeFunction("slice", 2, (args) -> {
+				var start = switch (args[0]) { case VNumber(n): Std.int(n); default: 0; };
+				var end_  = switch (args[1]) { case VNumber(n): Std.int(n); case VNull: arr.length; default: arr.length; };
+				if (start < 0) start = Std.int(Math.max(0, arr.length + start));
+				if (end_  < 0) end_  = Std.int(Math.max(0, arr.length + end_));
+				VArray(arr.slice(start, end_));
+			});
+		case "concat": VNativeFunction("concat", 1, (args) -> {
+				switch (args[0]) {
+					case VArray(other): VArray(arr.concat(other));
+					default: throw 'concat expects an array';
+				}
+			});
+		case "flat": VNativeFunction("flat", 0, (_) -> {
+				var result:Array<Value> = [];
+				for (item in arr) switch (item) {
+					case VArray(inner): for (v in inner) result.push(v);
+					default: result.push(item);
+				}
+				VArray(result);
+			});
+		case "copy": VNativeFunction("copy", 0, (_) -> VArray(arr.copy()));
+
+		// Sorting
+		case "sort": VNativeFunction("sort", 1, (args) -> {
+				var fn = args[0];
+				var sorted = arr.copy();
+				sorted.sort((a, b) -> {
+					switch (callResolved(fn, [a, b])) {
+						case VNumber(n): Std.int(n);
+						case VBool(true): 1;
+						case VBool(false): -1;
+						default: 0;
+					}
+				});
+				VArray(sorted);
+			});
+		case "sortBy": VNativeFunction("sortBy", 1, (args) -> {
+				var keyFn = args[0];
+				var sorted = arr.copy();
+				sorted.sort((a, b) -> compare(callResolved(keyFn, [a]), callResolved(keyFn, [b])));
+				VArray(sorted);
+			});
+
+		default:
+			var ext = tryUsingMethod(VArray(arr), method);
+			if (ext != null) return ext;
+			throw 'Unknown Array method: $method';
 		}
 
 		if (cachedMethods == null) {
@@ -2011,6 +2462,49 @@ class VM {
 		return callResolved(func, args);
 	}
 
+	/**
+	 * Safe wrapper around callMethod — catches script errors and returns null instead of throwing.
+	 * Useful for optional script hooks in game objects where a missing/broken function
+	 * should degrade gracefully rather than crash the host.
+	 *
+	 *   var result = vm.safeCall("onUpdate", [VNumber(dt)]);
+	 *   if (result == null) { /* script had an error or function not found  }
+	 */
+	public function safeCall(name:String, ?args:Array<Value>):Null<Value> {
+		try {
+			var func = getVariable(name);
+			if (func == null) return null;
+			return callResolved(func, args != null ? args : []);
+		} catch (e:Dynamic) {
+			#if NXDEBUG
+			trace('[NxScript] safeCall("$name") caught: $e');
+			#end
+			return null;
+		}
+	}
+
+	/**
+	 * Safe wrapper around callResolved — catches script errors and returns null.
+	 * Use when you already have a resolved Value (from resolveCallable).
+	 */
+	public function safeCallResolved(fn:Value, ?args:Array<Value>):Null<Value> {
+		try {
+			return callResolved(fn, args != null ? args : []);
+		} catch (e:Dynamic) {
+			#if NXDEBUG
+			trace('[NxScript] safeCallResolved caught: $e');
+			#end
+			return null;
+		}
+	}
+
+	/**
+	 * Get a global variable safely — returns null instead of throwing if missing.
+	 */
+	public function safeGet(name:String):Null<Value> {
+		try { return getVariable(name); } catch (_:Dynamic) { return null; }
+	}
+
 	/** Resolve a callable by name once, then reuse it with callResolved in host hot loops. */
 	public function resolveCallable(name:String):Value {
 		syncGlobalSlotsFromMap();
@@ -2018,6 +2512,87 @@ class VM {
 		if (func == null)
 			throw 'Undefined function: $name';
 		return func;
+	}
+
+	/**
+	 * Host-driven forEach — the loop runs in Haxe, not in script bytecode.
+	 *
+	 * This is the correct way to update 10k+ native objects from a script function.
+	 * Instead of writing `while(j < sprites.length)` in NxScript (which pays full
+	 * VM overhead per iteration), register a per-item script function and call this
+	 * from your Haxe update loop:
+	 *
+	 *   var fn = vm.resolveCallable("updateSprite");
+	 *   vm.nativeForEach(sprites, fn, [VNumber(dt)]);
+	 *
+	 * The script function receives (item, index, ...extraArgs).
+	 * Extra args are passed as-is after index — pre-box them with haxeToValue().
+	 *
+	 * Zero script-loop overhead: no LOAD_VAR, no LT, no JUMP, no stack churn
+	 * for the iteration itself. Only the function body runs in the VM.
+	 */
+	public function nativeForEach(items:Array<Dynamic>, fn:Value, ?extraArgs:Array<Value>):Void {
+		if (extraArgs == null) extraArgs = [];
+		var args = [VNull, VNull].concat(extraArgs); // pre-allocate: [item, index, ...extra]
+		for (i in 0...items.length) {
+			args[0] = haxeToValue(items[i]);
+			args[1] = VNumber(i);
+			callResolved(fn, args);
+		}
+	}
+
+	/**
+	 * Same as nativeForEach but items are already boxed as Value[].
+	 * Use when your array is already a script VArray (e.g. from a script variable).
+	 */
+	public function scriptForEach(items:Array<Value>, fn:Value, ?extraArgs:Array<Value>):Void {
+		if (extraArgs == null) extraArgs = [];
+		var args = [VNull, VNull].concat(extraArgs);
+		for (i in 0...items.length) {
+			args[0] = items[i];
+			args[1] = VNumber(i);
+			callResolved(fn, args);
+		}
+	}
+
+	/**
+	 * Applies the current gc_kind policy.
+	 * Called automatically at the start of every execute().
+	 * You can also call gc() manually at any time to force a flush.
+	 */
+	function applyGcPolicy():Void {
+		switch (gc_kind) {
+			case AGGRESSIVE:
+				flushCaches();
+			case SOFT:
+				// Count tracked objects across both caches
+				var count = 0;
+				for (_ in arrayMethodCache.keys()) count++;
+				for (_ in instanceMethodCache.keys()) count++;
+				if (count >= gc_softThreshold)
+					flushCaches();
+			case VERY_SOFT:
+				// Never flush — trust the host GC entirely.
+				// Still allocate fresh caches on first execute if null.
+				if (arrayMethodCache == null)    arrayMethodCache    = new ObjectMap();
+				if (instanceMethodCache == null) instanceMethodCache = new ObjectMap();
+		}
+	}
+
+	/**
+	 * Manually flushes all internal VM caches, regardless of gc_kind.
+	 * Useful after a large batch of script executions to let the GC reclaim memory.
+	 */
+	public function gc():Void {
+		flushCaches();
+	}
+
+	inline function flushCaches():Void {
+		arrayMethodCache    = new ObjectMap();
+		instanceMethodCache = new ObjectMap();
+		nativeArgBuffers    = new Map();
+		// _typeNameCache removed
+		// _nativeFieldCache removed
 	}
 
 	function bindGlobalSlots(chunk:Chunk):Void {
@@ -2065,6 +2640,7 @@ class VM {
 	}
 
 	public function valueToString(value:Value):String {
+		if (value == null) return "null";
 		return switch (value) {
 			case VNumber(n): Std.string(n);
 			case VString(s): s;
@@ -2080,6 +2656,8 @@ class VM {
 			case VClass(classData): '<class ${classData.name}>';
 			case VInstance(className, _, _): '<instance of $className>';
 			case VIterator(_, idx): '<iterator @${idx[0]}>';
+			case VEnumValue(eName, variant, vals):
+				vals.length == 0 ? '$eName.$variant' : '$eName.$variant(${[for(v in vals) valueToString(v)].join(", ")})';
 		}
 	}
 
@@ -2108,9 +2686,148 @@ class VM {
 				case VClass(classData): "Class<" + classData.name + ">";
 				case VInstance(className, _, _): className;
 				case VIterator(_, _): "Iterator";
+				case VEnumValue(eName, variant, _): eName;
 			}
 			return VString(typeName);
 		}));
+
+		// print / println
+		natives.set("print", VNativeFunction("print", -1, (args) -> {
+			var parts = [for (a in args) valueToString(a)];
+			trace(parts.join(" "));
+			VNull;
+		}));
+		natives.set("println", VNativeFunction("println", -1, (args) -> {
+			var parts = [for (a in args) valueToString(a)];
+			trace(parts.join(" "));
+			VNull;
+		}));
+
+		// range(n) -> [0..n-1],  range(from, to) -> [from..to-1]
+		natives.set("range", VNativeFunction("range", -1, (args) -> {
+			var from = 0;
+			var to = 0;
+			if (args.length == 1) {
+				to = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'range expects numbers'; };
+			} else if (args.length == 2) {
+				from = switch (args[0]) { case VNumber(n): Std.int(n); default: throw 'range expects numbers'; };
+				to   = switch (args[1]) { case VNumber(n): Std.int(n); default: throw 'range expects numbers'; };
+			} else {
+				throw 'range expects 1 or 2 arguments';
+			}
+			VArray([for (i in from...to) VNumber(i)]);
+		}));
+
+		// keys(dict) / values(dict) — global convenience wrappers
+		natives.set("keys", VNativeFunction("keys", 1, (args) -> switch (args[0]) {
+			case VDict(map): VArray([for (k in map.keys()) VString(k)]);
+			default: throw 'keys() expects a dict';
+		}));
+		natives.set("values", VNativeFunction("values", 1, (args) -> switch (args[0]) {
+			case VDict(map): VArray([for (k in map.keys()) map.get(k)]);
+			default: throw 'values() expects a dict';
+		}));
+
+		// str(x) — explicit to-string
+		natives.set("str", VNativeFunction("str", 1, (args) -> VString(valueToString(args[0]))));
+
+		// int(x) / float(x) — explicit numeric conversions
+		natives.set("int", VNativeFunction("int", 1, (args) -> switch (args[0]) {
+			case VNumber(n): VNumber(Math.floor(n));
+			case VString(s): var n = Std.parseInt(s); VNumber(n != null ? n : 0);
+			case VBool(b): VNumber(b ? 1 : 0);
+			default: VNumber(0);
+		}));
+		natives.set("float", VNativeFunction("float", 1, (args) -> switch (args[0]) {
+			case VNumber(n): VNumber(n);
+			case VString(s): VNumber(Std.parseFloat(s));
+			case VBool(b): VNumber(b ? 1.0 : 0.0);
+			default: VNumber(0.0);
+		}));
+
+		// Enum construction — called by SEnum compilation
+		natives.set("__make_enum__", VNativeFunction("__make_enum__", 2, (args) -> {
+			var enumName = switch (args[0]) { case VString(s): s; default: throw "enum name must be string"; };
+			var variantArr = switch (args[1]) { case VArray(a): a; default: throw "enum variants must be array"; };
+			// Build a dict: Color -> { Red: VEnumValue, Green: VEnumValue, Ok: VNativeFunction(...) }
+			var enumDict = new Map<String, Value>();
+			var i = 0;
+			while (i < variantArr.length) {
+				var vname = switch (variantArr[i]) { case VString(s): s; default: throw "variant name must be string"; };
+				var arity = switch (variantArr[i+1]) { case VNumber(n): Std.int(n); default: 0; };
+				i += 2;
+				if (arity == 0) {
+					enumDict.set(vname, VEnumValue(enumName, vname, []));
+				} else {
+					var capturedEName = enumName;
+					var capturedVName = vname;
+					var capturedArity  = arity;
+					enumDict.set(vname, VNativeFunction(vname, capturedArity, (fargs) -> {
+						return VEnumValue(capturedEName, capturedVName, fargs.copy());
+					}));
+				}
+			}
+			return VDict(enumDict);
+		}));
+
+		// `is` type check — called by EIs compilation: __is__(value, "TypeName")
+		natives.set("__is__", VNativeFunction("__is__", 2, (args) -> {
+			var val = args[0];
+			var typeName = switch (args[1]) { case VString(s): s; default: throw "__is__: type name must be string"; };
+			return VBool(switch (val) {
+				case VNumber(_):       typeName == "Number" || typeName == "Int" || typeName == "Float";
+				case VString(_):       typeName == "String";
+				case VBool(_):         typeName == "Bool";
+				case VNull:            typeName == "Null";
+				case VArray(_):        typeName == "Array";
+				case VDict(_):         typeName == "Dict";
+				case VFunction(_, _) | VNativeFunction(_, _, _): typeName == "Function";
+				case VInstance(cls, _, _): cls == typeName;
+				case VEnumValue(eName, variant, _): typeName == eName || typeName == variant || typeName == (eName + "." + variant);
+				default: false;
+			});
+		}));
+
+		// Range matching — called by MPRange: __range_match__(subject, from, to) -> Bool
+		natives.set("__range_match__", VNativeFunction("__range_match__", 3, (args) -> {
+			var subject = switch (args[0]) { case VNumber(n): n; default: return VBool(false); };
+			var from    = switch (args[1]) { case VNumber(n): n; default: return VBool(false); };
+			var to      = switch (args[2]) { case VNumber(n): n; default: return VBool(false); };
+			return VBool(subject >= from && subject <= to);
+		}));
+
+		// Enum variant matching — called by MPEnum in compileMatch
+		// __enum_variant_match__(subject, variantName) -> Bool
+		// Returns true if subject is VEnumValue with matching variant name.
+		// Used to distinguish enum case vs variable bind in match.
+		natives.set("__enum_variant_match__", VNativeFunction("__enum_variant_match__", 2, (args) -> {
+			return switch (args[0]) {
+				case VEnumValue(_, variant, _):
+					VBool(variant == switch (args[1]) { case VString(s): s; default: ""; });
+				default: VBool(false); // not an enum value — fall through to bind
+			};
+		}));
+
+		// __using_register__ removed
+
+		// math constants
+		natives.set("PI",  VNumber(Math.PI));
+		natives.set("INF", VNumber(Math.POSITIVE_INFINITY));
+		natives.set("NAN", VNumber(Math.NaN));
+
+		// math functions
+		natives.set("abs",   VNativeFunction("abs",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.abs(n));   default: throw 'Expected number'; }));
+		natives.set("floor", VNativeFunction("floor", 1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.floor(n)); default: throw 'Expected number'; }));
+		natives.set("ceil",  VNativeFunction("ceil",  1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.ceil(n));  default: throw 'Expected number'; }));
+		natives.set("round", VNativeFunction("round", 1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.round(n)); default: throw 'Expected number'; }));
+		natives.set("sqrt",  VNativeFunction("sqrt",  1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.sqrt(n));  default: throw 'Expected number'; }));
+		natives.set("pow",   VNativeFunction("pow",   2, (args) -> switch [args[0], args[1]] { case [VNumber(a), VNumber(b)]: VNumber(Math.pow(a, b)); default: throw 'Expected numbers'; }));
+		natives.set("min",   VNativeFunction("min",   2, (args) -> switch [args[0], args[1]] { case [VNumber(a), VNumber(b)]: VNumber(Math.min(a, b)); default: throw 'Expected numbers'; }));
+		natives.set("max",   VNativeFunction("max",   2, (args) -> switch [args[0], args[1]] { case [VNumber(a), VNumber(b)]: VNumber(Math.max(a, b)); default: throw 'Expected numbers'; }));
+		natives.set("random", VNativeFunction("random", 0, (_) -> VNumber(Math.random())));
+		natives.set("sin",   VNativeFunction("sin",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.sin(n));   default: throw 'Expected number'; }));
+		natives.set("cos",   VNativeFunction("cos",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.cos(n));   default: throw 'Expected number'; }));
+		natives.set("tan",   VNativeFunction("tan",   1, (args) -> switch (args[0]) { case VNumber(n): VNumber(Math.tan(n));   default: throw 'Expected number'; }));
 	}
 }
 
@@ -2148,4 +2865,24 @@ class ScriptException {
 	public function new(v:Value) {
 		value = v;
 	}
+}
+
+/**
+ * Describes how a native Haxe object field is accessed.
+ * NativeFieldCache removed — direct Reflection used instead.
+ */
+// NativeFieldKind removed
+
+
+/**
+ * Controls how aggressively the VM flushes its internal object caches.
+ * See VM.gc_kind for full documentation.
+ */
+enum GcKind {
+	/** Flush all caches on every execute() call. Lowest memory, highest re-warm cost. */
+	AGGRESSIVE;
+	/** Flush caches when tracked object count exceeds the soft threshold (default 512). */
+	SOFT;
+	/** Never flush caches proactively. Maximum throughput for hot re-execution. */
+	VERY_SOFT;
 }

@@ -8,6 +8,15 @@ import sys.FileSystem;
 import sys.io.File;
 #end
 
+#if (cpp && HX_NX)
+import cpp.Pointer;
+import switchLib.services.Applet;
+import switchLib.services.Hid.HidNpadButton;
+import switchLib.services.Hid.HidNpadStyleTag;
+import switchLib.runtime.Pad;
+import switchLib.runtime.Nxlink;
+#end
+
 typedef Scenario = {
 	var id:String;
 	var name:String;
@@ -36,8 +45,21 @@ class ScriptTargetBench {
 	static var CSV_ROWS:Array<String> = [];
 	static var EMPTY_DYNAMIC_ARGS:Array<Dynamic> = [];
 
+	#if (cpp && HX_NX)
+	@:unreflective
+	static var pad:PadState;
+	#end
+
 	static function main() {
+		#if (cpp && HX_NX)
+		initSwitchThings();
+		#end
+
+		#if sys
 		configureFromArgs(Sys.args());
+		#else
+		configureFromArgs([]);
+		#end
 
 		#if !sys
 		trace("no tenemo sys");
@@ -64,6 +86,10 @@ class ScriptTargetBench {
 		}
 
 		exportCsv();
+
+		#if (cpp && HX_NX)
+		mainSwitchLoop();
+		#end
 	}
 
 	static function runSanitySuite():Void {
@@ -582,9 +608,13 @@ class ScriptTargetBench {
 
 	static function exportCsv():Void {
 		#if sys
-		var outDir = "test_results";
+		var outDir =
+			#if (cpp && HX_NX)
+			"sdmc:/" + #end "test_results";
 		if (!FileSystem.exists(outDir))
 			FileSystem.createDirectory(outDir);
+
+
 		var outPath = outDir + '/script_target_bench_' + targetName() + '.csv';
 		File.saveContent(outPath, CSV_ROWS.join("\n") + "\n");
 		trace('\nCSV exported: ' + outPath);
@@ -651,4 +681,26 @@ class ScriptTargetBench {
 		return "unknown";
 		#end
 	}
+
+	#if (cpp && HX_NX)
+	static function initSwitchThings():Void {
+		if (Nxlink.nxlinkStdio() < 0) {
+			Sys.println("Failed to redirect logs to NXLink! Maybe it's not running or not required?");
+		}
+
+		Pad.padConfigureInput(1, HidNpadStyleTag.HidNpadStyleSet_NpadStandard);
+		pad = new PadState();
+		Pad.padInitializeDefault(Pointer.addressOf(pad));
+	}
+
+	static function mainSwitchLoop():Void {
+		while (Applet.appletMainLoop()) {
+			Pad.padUpdate(Pointer.addressOf(pad));
+			var kDown:Int = Pad.padGetButtonsDown(Pointer.addressOf(pad)).toInt();
+			if (kDown & HidNpadButton.HidNpadButton_Plus != 0) {
+				break;
+			}
+		}
+	}
+	#end
 }

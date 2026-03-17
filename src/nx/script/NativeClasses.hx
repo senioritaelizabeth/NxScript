@@ -23,10 +23,34 @@ class NativeClasses {
 		registerObject(vm);
 		registerString(vm);
 		registerNumber(vm);
+		registerInt(vm);
+		registerFloat(vm);
 		registerBool(vm);
 		registerArray(vm);
 		registerFunction(vm);
+		registerConversions(vm);
+		#if sys
+		registerSys(vm);
+		#end
 	}
+
+	#if sys
+	/**
+	 * Exposes Haxe's Sys class as a native object in NxScript.
+	 * Allows scripts to call: Sys.command("echo hi"), Sys.println("x"), etc.
+	 * Only available on sys targets (HL, CPP, Neko, Node).
+	 *
+	 * Usage in script:
+	 *   import Sys;
+	 *   Sys.command('echo Hello');
+	 *
+	 * Or without import (it's a global):
+	 *   Sys.println("hi")
+	 */
+	private static function registerSys(vm:VM):Void {
+		vm.globals.set("Sys", VNativeObject(Sys));
+	}
+	#end
 
 	// ========================================
 	// Object - Base class for all classes
@@ -45,7 +69,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Object", classData);
@@ -67,7 +93,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("String", classData);
@@ -82,18 +110,130 @@ class NativeClasses {
 		var methods = new Map<String, FunctionChunk>();
 		var fields = new Map<String, Value>();
 
-		// Number extends Object
 		var classData:ClassData = {
 			name: "Number",
 			superClass: "Object",
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Number", classData);
 		vm.globals.set("Number", VClass(classData));
+	}
+
+	// ========================================
+	// Int — integer subtype of Number
+	// Accepts only whole numbers. Throws on fractional values.
+	// ========================================
+
+	private static function registerInt(vm:VM):Void {
+		var methods = new Map<String, FunctionChunk>();
+		var fields  = new Map<String, Value>();
+
+		var classData:ClassData = {
+			name: "Int",
+			superClass: "Number",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
+		vm.classes.set("Int", classData);
+		vm.globals.set("Int", VClass(classData));
+
+		// Int.from(value) — converts Number/Float to Int, throws on non-integer
+		vm.natives.set("Int_from", VNativeFunction("Int_from", 1, (args) -> {
+			switch (args[0]) {
+				case VNumber(n):
+					if (n != Math.floor(n))
+						throw 'Int.from: ${n} is not a whole number';
+					return VNumber(Math.floor(n));
+				default:
+					throw 'Int.from expects a Number';
+			}
+		}));
+	}
+
+	// ========================================
+	// Float — float subtype of Number
+	// Accepts both integers and decimals. Coerces Int to Float.
+	// ========================================
+
+	private static function registerFloat(vm:VM):Void {
+		var methods = new Map<String, FunctionChunk>();
+		var fields  = new Map<String, Value>();
+
+		var classData:ClassData = {
+			name: "Float",
+			superClass: "Number",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
+		vm.classes.set("Float", classData);
+		vm.globals.set("Float", VClass(classData));
+
+		// Float.from(value) — converts Number/Int to Float
+		vm.natives.set("Float_from", VNativeFunction("Float_from", 1, (args) -> {
+			switch (args[0]) {
+				case VNumber(n): return VNumber(n); // already a float internally
+				default: throw 'Float.from expects a Number';
+			}
+		}));
+	}
+
+	// ========================================
+	// Conversion natives: fromNumber, fromInt, fromFloat
+	// ========================================
+
+	private static function registerConversions(vm:VM):Void {
+		// fromNumber(x) — identity, accepts VNumber, VBool, VString(numeric)
+		vm.natives.set("fromNumber", VNativeFunction("fromNumber", 1, (args) -> {
+			return switch (args[0]) {
+				case VNumber(n): VNumber(n);
+				case VBool(b): VNumber(b ? 1.0 : 0.0);
+				case VString(s):
+					var n = Std.parseFloat(s);
+					Math.isNaN(n) ? throw 'fromNumber: cannot parse "${s}"' : VNumber(n);
+				default: throw "fromNumber expects a Number, Bool, or numeric String";
+			};
+		}));
+
+		// fromInt(x) — like fromNumber but enforces whole number
+		vm.natives.set("fromInt", VNativeFunction("fromInt", 1, (args) -> {
+			return switch (args[0]) {
+				case VNumber(n):
+					if (n != Math.floor(n))
+						throw 'fromInt: ${n} is not a whole number';
+					VNumber(Math.floor(n));
+				case VString(s):
+					var n = Std.parseInt(s);
+					n == null ? throw 'fromInt: cannot parse "${s}"' : VNumber(n);
+				default: throw "fromInt expects a Number or numeric String";
+			};
+		}));
+
+		// fromFloat(x) — accepts any Number/Int, returns as float
+		vm.natives.set("fromFloat", VNativeFunction("fromFloat", 1, (args) -> {
+			return switch (args[0]) {
+				case VNumber(n): VNumber(n);
+				case VString(s):
+					var n = Std.parseFloat(s);
+					Math.isNaN(n) ? throw 'fromFloat: cannot parse "${s}"' : VNumber(n);
+				default: throw "fromFloat expects a Number or numeric String";
+			};
+		}));
 	}
 
 	// ========================================
@@ -111,7 +251,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Bool", classData);
@@ -133,7 +275,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Array", classData);
@@ -155,7 +299,9 @@ class NativeClasses {
 			nativeSuper: null,
 			methods: methods,
 			fields: fields,
-			constructor: null
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
 		};
 
 		vm.classes.set("Function", classData);

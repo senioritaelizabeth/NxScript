@@ -25,10 +25,8 @@ class BytecodeSerializer {
 	public static function serialize(chunk:Chunk):Bytes {
 		var output = new BytesOutput();
 
-		// Escribir magic number
 		output.writeInt32(MAGIC_V3);
 
-		// Serializar chunk principal
 		writeChunk(output, chunk);
 
 		return output.getBytes();
@@ -41,7 +39,6 @@ class BytecodeSerializer {
 	public static function deserialize(bytes:Bytes):Chunk {
 		var input = new BytesInput(bytes);
 
-		// Verificar magic number
 		var magic = input.readInt32();
 		var version = switch (magic) {
 			case MAGIC_V1: 1;
@@ -51,7 +48,6 @@ class BytecodeSerializer {
 				throw 'Invalid bytecode file format (expected 0x${StringTools.hex(MAGIC_V3, 8)}, 0x${StringTools.hex(MAGIC_V2, 8)} or 0x${StringTools.hex(MAGIC_V1, 8)}, got 0x${StringTools.hex(magic, 8)})';
 		};
 
-		// Deserializar chunk principal
 		return readChunk(input, version);
 	}
 

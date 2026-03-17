@@ -1,5 +1,0 @@
--cp ../../src
--cp .
--main NewFeaturesTest
--neko out_new.n
---run out_new.n

@@ -1,43 +1,17 @@
+import nx.bridge.NxStd;
 import nx.script.Interpreter;
-import package_test.Module;
+import struc.Module;
 
 class T {
 	static function main() {
 		var i = new Interpreter();
-		var s = Sys.time();
+		NxStd.registerAll(i.vm);
+		// i.globals.set("Module", i.vm.haxeToValue(Module));
 		var result = i.run('
-        import package_test.Module;
-
-        println("Hello from NxScript!");
-        println("Module.foo: " + Module.foo);
-
-        var x = 10;
-        var y = 20;
-        function update() {
-            x = x + 1;
-            y = y + 2;
-            var mod_instance = new Module();
-            println(mod_instance)
-
-            println("baz is: " + mod_instance.baz);
-            # change
-            mod_instance.baz += 1;
-            println("baz is now: " + mod_instance.baz);
-        }
-
-
-  ');
-		// three update calls in 3 secconds
-		for (j in 0...3) {
-			i.call0('update');
-			Sys.sleep(1);
-		}
-		var x = i.getVar('x');
-		if (x.equals(VNumber(13))) {
-			trace("x is correct: " + x);
-		} else {
-			trace("x is incorrect: " + x);
-		}
-		trace("Execution time: " + (Sys.time() - s) + " seconds");
+			import struc.Module;
+			var m = Module.struct;
+			m.a + m.b.length + Std.int(m.c) + (m.d ? 1 : 0)
+			trace("Result: " + m.a + ", " + m.b + ", " + m.c + ", " + m.d);
+  		');
 	}
 }

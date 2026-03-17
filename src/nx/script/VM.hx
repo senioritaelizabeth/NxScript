@@ -1899,6 +1899,7 @@ class VM {
 				}
 				// Standard native object — direct Reflection, no cache
 				var raw:Dynamic = Reflection.getField(obj, field);
+				if (raw == null) return VNull;
 				if (!Reflection.isFunction(raw)) return haxeToValue(raw);
 				var capturedObj = obj; var capturedFn = raw;
 				return VNativeFunction(field, -1, (args:Array<Value>) -> {

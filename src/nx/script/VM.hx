@@ -1509,27 +1509,18 @@ class VM {
 	// Conversion between Haxe and Script values
 
 	public function haxeToValue(value:Dynamic):Value {
-		if (value == null) {
-			return VNull;
-		}
+		// hxcpp guard.. dynamic can be of type bool as null !?tM
+		if(value == true)
+			return VBool(true);
+		if(value == false)
+			return VBool(false);
 		return switch (Type.typeof(value)) {
 			case TNull: VNull;
 			case TBool: VBool(value);
 			case TInt: VNumber(value);
 			case TFloat: VNumber(value);
 			case TClass(String): VString(value);
-			case TClass(Array):
-				// Return a live VArray wrapping the SAME Array<Dynamic>.
-				// Script push/pop/[] operate on the original array — no copy.
-				// Each element is lazily converted via haxeToValue per access.
-				// We store a shared reference by aliasing Array<Dynamic> as Array<Value>
-				// using a thin adapter stored in a VNativeArray wrapper.
-				//
-				// Implementation: build a VArray backed by a proxy Array<Value>
-				// that syncs both ways with the original.
-				// Simpler approach that works: keep the original array as VNativeObject
-				// and handle push/length/[] on VNativeObject(Array) specially in getMember.
-				VNativeObject(value);
+			case TClass(Array): VArray([for (v in (value : Array<Dynamic>)) haxeToValue(v)]);
 			case TFunction: VNativeFunction("", -1, (args:Array<Value>) -> {
 					var haxeArgs = [for (a in args) valueToHaxe(a)];
 					return haxeToValue(Reflection.callMethod(null, value, haxeArgs));
@@ -1897,7 +1888,6 @@ class VM {
 				}
 				// Standard native object — direct Reflection, no cache
 				var raw:Dynamic = Reflection.getField(obj, field);
-				if (raw == null) return VNull;
 				if (!Reflection.isFunction(raw)) return haxeToValue(raw);
 				var capturedObj = obj; var capturedFn = raw;
 				return VNativeFunction(field, -1, (args:Array<Value>) -> {

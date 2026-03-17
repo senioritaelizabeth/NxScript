@@ -1520,7 +1520,18 @@ class VM {
 			case TInt: VNumber(value);
 			case TFloat: VNumber(value);
 			case TClass(String): VString(value);
-			case TClass(Array): VArray([for (v in (value : Array<Dynamic>)) haxeToValue(v)]);
+			case TClass(Array):
+				// Return a live VArray wrapping the SAME Array<Dynamic>.
+				// Script push/pop/[] operate on the original array — no copy.
+				// Each element is lazily converted via haxeToValue per access.
+				// We store a shared reference by aliasing Array<Dynamic> as Array<Value>
+				// using a thin adapter stored in a VNativeArray wrapper.
+				//
+				// Implementation: build a VArray backed by a proxy Array<Value>
+				// that syncs both ways with the original.
+				// Simpler approach that works: keep the original array as VNativeObject
+				// and handle push/length/[] on VNativeObject(Array) specially in getMember.
+				VNativeObject(value);
 			case TFunction: VNativeFunction("", -1, (args:Array<Value>) -> {
 					var haxeArgs = [for (a in args) valueToHaxe(a)];
 					return haxeToValue(Reflection.callMethod(null, value, haxeArgs));

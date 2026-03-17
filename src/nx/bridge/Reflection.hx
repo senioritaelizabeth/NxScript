@@ -66,10 +66,14 @@ class Reflection {
 	 * Check if a Dynamic value is a callable function.
 	 * CPP: checks the internal HX type tag (2 = function) directly — no Reflect overhead.
 	 * Other: Reflect.isFunction.
+	 * 
+	 * on hxcpp dynamic types of Bool are treated as Null !?
+	 * so we just quick return false if so. 
 	 */
 	public static inline function isFunction(v:Dynamic):Bool {
 		#if cpp
-		return v != null && untyped __cpp__("{0}.mPtr && {0}.mPtr->__GetType() == 2", v);
+		if (v == null || v == false || v == true) return false;
+		return untyped __cpp__("{0}.mPtr && {0}.mPtr->__GetType() == 2", v);
 		#else
 		return Reflect.isFunction(v);
 		#end

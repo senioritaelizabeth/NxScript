@@ -1509,9 +1509,11 @@ class VM {
 	// Conversion between Haxe and Script values
 
 	public function haxeToValue(value:Dynamic):Value {
-		if (value == null) {
-			return VNull;
-		}
+		// hxcpp guard.. dynamic can be of type bool as null !?tM
+		if(value == true)
+			return VBool(true);
+		if(value == false)
+			return VBool(false);
 		return switch (Type.typeof(value)) {
 			case TNull: VNull;
 			case TBool: VBool(value);

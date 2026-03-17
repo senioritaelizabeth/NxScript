@@ -922,6 +922,7 @@ class Interpreter {
 	 *   // or just: new Enemy() from any other script
 	 */
 	public function loadScript(path:String):Value {
+		#if sys 
 		var source = sys.io.File.getContent(path);
 		run(source, path);
 		// Return a VDict of all non-native globals defined by this script
@@ -934,6 +935,9 @@ class Interpreter {
 			}
 		}
 		return VDict(exports);
+		#else 
+		return VNull;
+		#end
 	}
 
 	/**
@@ -949,6 +953,7 @@ class Interpreter {
 	 * @param recursive  If true, walks subdirectories too (default false)
 	 */
 	public function loadScripts(dir:String, recursive:Bool = false):Void {
+		#if sys
 		var files = sys.FileSystem.readDirectory(dir);
 		for (file in files) {
 			var fullPath = (dir.endsWith("/") ? dir : dir + "/") + file;
@@ -962,6 +967,9 @@ class Interpreter {
 				}
 			}
 		}
+		#else
+			trace('[NXScript] loadScripts: we cant use Sys!');
+		#end
 	}
 
 	/**

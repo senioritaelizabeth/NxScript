@@ -14,7 +14,7 @@ import nx.script.Bytecode;
  * Throws on format mismatch — don't load .json files with this.
  */
 class BytecodeSerializer {
-	// Magic number para verificar formato de archivo (NX + version)
+	/** Magic number prefix for serialized bytecode files. Format: `"NX"` bytes + version byte. */
 	static inline var MAGIC_V1 = 0x4E580001; // "NX" + version 1
 	static inline var MAGIC_V2 = 0x4E580002; // "NX" + version 2 (globalNames)
 	static inline var MAGIC_V3 = 0x4E580003; // "NX" + version 3 (global const mask + upvalue names)

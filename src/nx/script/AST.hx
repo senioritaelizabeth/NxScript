@@ -2,11 +2,30 @@ package nx.script;
 
 import nx.script.Token;
 
-/**
- * Abstract Syntax Tree node types.
- * The compiler walks these. The parser produces them.
- * You stare at them when something doesn't compile right.
- */
+// AST.hx — Abstract Syntax Tree node types for NxScript
+//
+// Produced by `Parser`, consumed by `Compiler`.
+//
+// ## Structure
+//
+//   `Expr`        — expressions that produce a value
+//   `Stmt`        — statements that produce side-effects
+//   `TypeHint`    — optional type annotations (parsed but not enforced at runtime)
+//   `StmtWithPos` — a `Stmt` tagged with its source (line, col)
+//   `Param`       — a named function parameter with an optional type hint
+//   `ClassMethod` — a method declaration inside a `class` body
+//   `ClassField`  — a field declaration inside a `class` body
+//   `MatchCase`   — one arm of a `match` expression
+//   `MatchPattern`— the pattern part of a match arm
+//   `EnumVariant` — one variant in an `enum` declaration
+//   `Either<L,R>` — generic sum type used for lambda bodies
+//
+// ## Notes on TypeHint
+//
+//   Type hints are parsed and stored in the AST for future use, but the
+//   `Compiler` currently ignores them — NxScript is fully dynamically typed
+//   at runtime.  `TDict` and `TFunc` in particular have no runtime effect yet.
+
 enum Expr {
 	// Literals
 	ENumber(value:Float);
@@ -14,14 +33,14 @@ enum Expr {
 	EBool(value:Bool);
 	ENull;
 
-	// Variables
+	// Variables and references
 	EIdentifier(name:String);
-	EThis; // this reference
+	EThis; // `this` — current instance
 
 	// Binary operations
 	EBinary(op:Operator, left:Expr, right:Expr);
 	ENullCoal(left:Expr, right:Expr);
-	ETernary(cond:Expr, then:Expr, els:Expr); // cond ? then : els  // left ?? right
+	ETernary(cond:Expr, then:Expr, els:Expr); // cond ? then : els
 	EOptChain(object:Expr, field:String); // obj?.field
 
 	// Unary operations
@@ -84,7 +103,7 @@ enum Stmt {
 	SThrow(expr:Expr);
 
 	// Destructuring declarations
-	// var [a, b, c] = expr   — array destructure
+	// var [a, b, _] = expr   — array destructure; null names skip that position
 	SDestructureArray(names:Array<Null<String>>, init:Expr);
 	// var {x, y} = expr      — dict/object destructure
 	SDestructureDict(names:Array<String>, init:Expr);
@@ -104,7 +123,8 @@ enum Stmt {
 	SUsing(className:String);
 	/** static var x = val  — module-level or class-level static field */
 	SStaticVar(name:String, init:Null<Expr>);
-	/** static func f(...) {...} — module-level or class-level static method */
+	/** static func f(...) {...} — module-level or class-level static method.
+	    Note: returnType is stored as a raw String here (unlike ClassMethod which uses TypeHint). */
 	SStaticFunc(name:String, params:Array<Param>, returnType:Null<String>, body:Array<Stmt>);
 
 	// Enum declaration

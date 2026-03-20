@@ -15,7 +15,7 @@ import nx.script.Token;
  * Try to use module-level `var` inside a function and you'll get a STORE_VAR. Intentional.
  */
 class Compiler {
-	// The instruction stream we're building. One Chunk per compilation.
+	/** The instruction stream we're building. One Chunk per compilation. */
 	var chunk:Chunk;
 	var constants:Array<Value>;
 	var functions:Array<FunctionChunk>;
@@ -24,18 +24,22 @@ class Compiler {
 	var currentLine:Int = 0;
 	var currentCol:Int = 0;
 
-	// Jump target stacks for break/continue. Push on loop enter, pop on loop exit.
-	// If this is empty inside a break statement, the parser already messed up.
+	/**
+	 * Jump target stacks for break/continue. Push on loop enter, pop on loop exit.
+	 * If this is empty inside a break statement, the parser already messed up.
+	 */
 	var loopStack:Array<LoopContext> = [];
 
-	// How deep we are in try blocks. Used to emit the right number of POP_TRY on return.
+	/** How deep we are in try blocks. Used to emit the right number of POP_TRY on return. */
 	var tryDepth:Int = 0;
 
-	// Counter for synthetic variable names
+	/** Counter for synthetic variable names */
 	var syntheticCounter:Int = 0;
 
-	// Slot allocator for function-local variables. null means we're at module level.
-	// Slots are integer indices into stack[stackBase..stackBase+localCount-1].
+	/**
+	 * Slot allocator for function-local variables. null means we're at module level.
+	 * Slots are integer indices into stack[stackBase..stackBase+localCount-1].
+	 */
 	var localSlots:Map<String, Int> = null;
 	var nextLocalSlot:Int = 0;
 	var globalSlots:Map<String, Int>;
@@ -48,8 +52,10 @@ class Compiler {
 	var enclosingLocalSlots:Map<String, Int> = null;
 	var enclosingUpvalueSlots:Map<String, Int> = null;
 
-	// When compiling a class method body, this holds all method names so
-	// bare calls like foo() can resolve to this.foo() if no local shadows it.
+	/**
+	 * When compiling a class method body, this holds all method names so
+	 * bare calls like foo() can resolve to this.foo() if no local shadows it.
+	 */
 	var currentClassMethodNames:Map<String, Bool> = null;
 
 	// Get or create a slot for a local variable. Slots are never reused (simple but fine for scripts).

@@ -4,26 +4,78 @@ import nx.script.Token;
 
 using StringTools;
 
+// Tokenizer.hx — Source text → flat token list
+//
+// Converts raw NxScript source into an `Array<TokenPos>` ready for the Parser.
+//
+// ## Character handling
+//   - Line endings are normalized to `\n` in the constructor (Windows-safe).
+//   - Whitespace (spaces, tabs) is skipped between tokens; newlines are kept
+//     as `TNewLine` tokens because the parser uses them as implicit semicolons.
+//   - `#` and `//` start line comments; `/* */` are block comments.
+//     Comments are discarded — no `TComment` token is emitted.
+//
+// ## String interpolation
+//   Regular strings (`"` / `'`) and template strings (backtick) both support
+//   `$ident` and `${expr}` interpolation. Interpolated strings are expanded
+//   inline into a sequence of `TString + TOperator(OAdd) + …` tokens so the
+//   parser sees plain concatenation — no special AST node required.
+//
+// ## Pending-token queue
+//   String interpolation can produce multiple tokens per `nextToken()` call.
+//   They are buffered in `pendingTokens` and drained before the next real
+//   character is consumed.
+//
+// ## Number literals
+//   Decimal, hex (`0x`), binary (`0b`), octal (`0o`), and scientific notation
+//   are all supported. Underscores are allowed as digit separators (`1_000`).
+//
+// ## Keyword resolution
+//   After reading an identifier, the tokenizer checks the `keywords` map.
+//   `SyntaxRules.keywordAliases` can remap identifiers before the lookup
+//   (e.g. `"elif"` → `"elseif"`).
+//   `SyntaxRules.operatorAliases` can turn identifiers into operators
+//   (e.g. `"not"` → `!`).
+
 /**
- * Turns a string of source code into a flat list of tokens.
- * Handles `#` line comments, string literals (with escape sequences),
- * numbers (int and float), operators, and keywords.
+ * Converts raw NxScript source text into a flat `Array<TokenPos>` for the `Parser`.
  *
- * Normalizes all line endings to `\n` up front because Windows exists
- * and `\r\n` in error messages is deeply unpleasant.
+ * ### Character handling
+ * Line endings are normalized to `
+` in the constructor. Whitespace is skipped;
+ * newlines are kept as `TNewLine` because the parser uses them as implicit semicolons.
+ * Comments (`#`, `//`) are discarded — no token is emitted.
+ *
+ * ### String interpolation
+ * Both regular strings (`"` / `'`) and template strings (`` ` ``) support
+ * `$ident` and `${expr}` interpolation. Interpolated strings expand inline into
+ * `TString + TOperator(OAdd) + …` sequences — no special AST node required.
+ *
+ * ### Pending-token queue
+ * String interpolation can produce multiple tokens per `nextToken()` call.
+ * They buffer in `pendingTokens` and drain before the next source character is read.
+ *
+ * ### Number literals
+ * Decimal, hex (`0x`), binary (`0b`), octal (`0o`), and scientific notation.
+ * Underscores are allowed as digit separators: `1_000_000`.
+ *
+ * ### Keyword and operator aliases
+ * After reading an identifier, `SyntaxRules.keywordAliases` can remap it before
+ * the keyword table lookup. `SyntaxRules.operatorAliases` can turn identifiers
+ * into operator tokens (e.g. `"not"` → `TOperator(ONot)`).
  */
 class Tokenizer {
 	var input:String;
 	var pos:Int = 0;
 	var line:Int = 1;
 	var col:Int = 1;
-	// Queue for multi-token emissions (template string interpolation)
+	/** Tokens queued by string/template interpolation — drained before the next source char. */
 	var pendingTokens:Array<TokenPos> = [];
 
 	static var keywords = [
 		"let" => KLet,
 		"var" => KVar,
-		"moewvar" => KVar,
+		"meowvar" => KVar,    // secret alias — do not remove
 		"const" => KConst,
 		"func" => KFunc,
 		"fn" => KFn,
@@ -53,7 +105,7 @@ class Tokenizer {
 		"throw" => KThrow,
 		"match" => KMatch,
 		"case" => KCase,
-		"switch" => KSwitch,
+		"switch" => KMatch,   // alias for match
 		"default" => KDefault,
 		"using" => KUsing,
 		"enum" => KEnum,
@@ -64,11 +116,19 @@ class Tokenizer {
 
 	public var rules:SyntaxRules = null;
 
+	/**
+	 * @param input  Raw source text. Line endings are normalised to `\n`.
+	 * @param rules  Optional syntax dialect (keyword/operator aliases). Defaults to no aliases.
+	 */
 	public function new(input:String, ?rules:SyntaxRules) {
 		this.input = input.replace('\r\n', '\n').replace('\r', '\n');
 		this.rules = rules;
 	}
 
+	/**
+	 * Tokenizes the full input and returns the flat token list.
+	 * The last element is always `TEOF`.
+	 */
 	public function tokenize():Array<TokenPos> {
 		var tokens:Array<TokenPos> = [];
 
@@ -231,10 +291,9 @@ class Tokenizer {
 			return TString(value);
 		}
 
-		// Has ${ — hand off to interpolation logic (same as template strings)
-		// We already read `value` as the prefix before the first ${
+		// Interpolation detected — hand off; prefix already accumulated.
 		readStringInterpolation(quote, value);
-		return null; // pendingTokens populated
+		return null; // tokens queued in pendingTokens
 	}
 
 	/**
@@ -374,11 +433,6 @@ class Tokenizer {
 				advance(); // {
 				// Tokenize until matching }
 				var depth = 1;
-				var exprStart = pos;
-				var exprTokens:Array<TokenPos> = [];
-				var innerizer = new Tokenizer(input.substring(exprStart));
-				// We need the raw sub-tokenizer — but since we share pos/line/col
-				// we instead walk manually and collect chars
 				var exprBuf = new StringBuf();
 				while (!isEOF() && depth > 0) {
 					var c = peek();
@@ -702,7 +756,7 @@ class Tokenizer {
 	function skipWhitespaceExceptNewline() {
 		while (!isEOF()) {
 			var c = peek();
-			if (c == ' ' || c == '\t' || c == '\r') {
+			if (c == ' ' || c == '\t') {
 				advance();
 			} else {
 				break;

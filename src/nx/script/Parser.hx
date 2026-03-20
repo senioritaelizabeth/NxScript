@@ -329,8 +329,17 @@ class Parser {
 				TArray(elementType);
 			case TIdentifier(name):
 				advance();
-				// Soporte para clases externas (FlxSound, etc)
-				TCustom(name);
+				// Support generic types: Array<Int>, Map<String, Int>, etc.
+				if (check(TOperator(OLess))) {
+					advance(); // consume '<'
+					var typeParams = [parseTypeHint()];
+					while (match(TComma)) typeParams.push(parseTypeHint());
+					expect(TOperator(OGreater), "Expected '>' after type parameter");
+					TCustom(name + "<" + typeParams.map(t -> typeHintToString(t)).join(", ") + ">");
+				} else {
+					// Soporte para clases externas (FlxSound, etc)
+					TCustom(name);
+				}
 			default:
 				throw 'Expected type hint at line ${token.line}, col ${token.col}';
 		}
@@ -369,8 +378,15 @@ class Parser {
 
 	/** Consume terminator for a single-stmt braceless body — softer than consumeStatementTerminator */
 	function consumeSingleStmtTerminator(stmt:Stmt):Void {
-		if (statementNeedsTerminator(stmt))
-			skipSeparators();
+		if (statementNeedsTerminator(stmt)) {
+			if (strictSemicolons) {
+				if (!check(TRightBrace) && !isEOF())
+					match(TSemicolon); // consume optional ';' so the outer loop doesn't choke
+				skipSeparators();
+			} else {
+				skipSeparators();
+			}
+		}
 	}
 
 	function parseIf():Stmt {
@@ -833,6 +849,19 @@ class Parser {
 				advance();
 				EThis;
 
+			// Anonymous function expression: function(params) { body } or func/fn/fun
+			case TKeyword(KFunc) | TKeyword(KFn) | TKeyword(KFun) | TKeyword(KFunction):
+				advance(); // consume the keyword
+				expect(TLeftParen, "Expected '(' after anonymous function keyword");
+				var params = parseParameters();
+				expect(TRightParen, "Expected ')' after parameters");
+				var returnType = null;
+				if (match(TColon)) returnType = parseTypeHint();
+				expect(TLeftBrace, "Expected '{' for anonymous function body");
+				var body = parseBlockBody();
+				expect(TRightBrace, "Expected '}' after anonymous function body");
+				ELambda(params, Right(body));
+
 			case TKeyword(KNew):
 				advance();
 				var className = expectIdentifier();
@@ -1280,6 +1309,19 @@ class Parser {
 
 	function skipSeparators() {
 		while (match(TNewLine) || match(TSemicolon)) {}
+	}
+
+	function typeHintToString(t:TypeHint):String {
+		return switch (t) {
+			case TNumber: "Number";
+			case TString: "String";
+			case TBool: "Bool";
+			case TAny: "Any";
+			case TArray(inner): "[" + typeHintToString(inner) + "]";
+			case TDict(k, v): "Dict<" + typeHintToString(k) + ", " + typeHintToString(v) + ">";
+			case TFunc(params, ret): "Func<(" + params.map(p -> typeHintToString(p)).join(", ") + ") -> " + typeHintToString(ret) + ">";
+			case TCustom(name): name;
+		};
 	}
 
 	function statementNeedsTerminator(stmt:Stmt):Bool {

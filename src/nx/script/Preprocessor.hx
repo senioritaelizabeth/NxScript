@@ -2,94 +2,42 @@ package nx.script;
 
 using StringTools;
 
-// Preprocessor.hx — Compile-time `#if` / `#elseif` / `#else` / `#end` directives
-//
-// Runs on raw source text **before** tokenization, stripping inactive blocks
-// and replacing them with blank lines so that line numbers in error messages
-// remain accurate.
-//
-// ## Supported syntax
-//
-//   #if debug
-//     trace("debug build")
-//   #end
-//
-//   #if release
-//     trace("release")
-//   #elseif debug
-//     trace("debug")
-//   #else
-//     trace("other")
-//   #end
-//
-// Conditions support `&&`, `||`, `!`, and parentheses:
-//
-//   #if cpp && !windows
-//   #if (debug || trace_enabled) && !release
-//
-// ## Built-in defines  (populated automatically by `Interpreter`)
-//
-//   **Build type:**  `debug`  `release`
-//   **Targets:**     `cpp`  `hl`  `neko`  `js`  `java`  `cs`  `python`
-//                   `lua`  `eval`  `interp`
-//   **Platforms:**   `windows`  `linux`  `mac`  `android`  `ios`
-//
-// Host code can inject custom defines before running a script:
-//
-//   interp.defines.set("myFeature", true);
-//
-// ## Usage
-//
-//   var processed = Preprocessor.run(source, interp.defines);
-
 /**
- * Compile-time `#if` / `#elseif` / `#else` / `#end` directive processor.
+ * NxScript preprocessor — handles #if / #elseif / #else / #end directives.
  *
- * Runs on raw source text **before** tokenization. Inactive blocks are replaced
- * with blank lines so that line numbers in error messages remain accurate.
+ * Runs on raw source text before tokenization.
+ * Inactive blocks are replaced with blank lines (preserving line numbers for error messages).
  *
- * ### Syntax
+ * Usage:
+ *   var defines = ["debug" => true, "cpp" => true, "windows" => false];
+ *   var processed = Preprocessor.run(source, defines);
  *
- *     #if debug
- *       trace("debug build")
- *     #end
+ * Supported syntax:
+ *   #if debug
+ *     trace("debug build")
+ *   #end
  *
- *     #if release
- *       trace("release")
- *     #elseif debug
- *       trace("debug")
- *     #else
- *       trace("other")
- *     #end
+ *   #if release
+ *     trace("release")
+ *   #elseif debug
+ *     trace("debug")
+ *   #else
+ *     trace("other")
+ *   #end
  *
- * Conditions support `&&`, `||`, `!`, and balanced parentheses:
+ * Built-in defines (set automatically by Interpreter based on compile target):
+ *   debug / release
+ *   cpp / hl / neko / js / java / cs / python / lua / eval / interp
+ *   windows / linux / mac / android / ios
  *
- *     #if cpp && !windows
- *     #if (debug || trace_enabled) && !release
- *
- * ### Built-in defines (set automatically by `Interpreter`)
- *
- * Build type: `debug` `release`
- * Targets: `cpp` `hl` `neko` `js` `java` `cs` `python` `lua` `eval` `interp`
- * Platforms: `windows` `linux` `mac` `android` `ios`
- *
- * Custom defines can be injected before running a script:
- *
- *     interp.defines.set("myFeature", true);
+ * The host can add custom defines:
+ *   interp.defines.set("myFeature", true);
  */
 class Preprocessor {
 
 	/**
 	 * Process source, stripping inactive #if blocks.
 	 * Inactive lines are replaced with empty lines to preserve line numbers.
-	 */
-	/**
-	 * Processes `source`, replacing inactive `#if` blocks with blank lines.
-	 * Line numbers are preserved so error messages remain accurate.
-	 *
-	 * @param source   Raw script source text.
-	 * @param defines  Active define flags (see `defaultDefines`).
-	 * @return         Source with inactive blocks blanked out.
 	 */
 	public static function run(source:String, defines:Map<String, Bool>):String {
 		var lines  = source.split("\n");
@@ -126,7 +74,7 @@ class Preprocessor {
 		// Parse condition from the #if line
 		var ifLine   = lines[startLine].trim();
 		var cond     = ifLine.substr(4).trim(); // everything after "#if "
-		var active   = evalCondition(cond, defines);
+		var active   = eval(cond, defines);
 		var emitted  = false; // did we already emit a block?
 
 		// Replace the #if line with blank
@@ -160,7 +108,7 @@ class Preprocessor {
 				// Parse new condition
 				var prefix = trimmed.startsWith("#elseif") ? "#elseif " : "#elif ";
 				var newCond = trimmed.substr(prefix.length).trim();
-				active = !emitted && evalCondition(newCond, defines);
+				active = !emitted && eval(newCond, defines);
 				result.push(""); // replace #elseif line with blank
 				i++;
 			} else if (depth == 1 && trimmed == "#else") {
@@ -213,41 +161,26 @@ class Preprocessor {
 	 * Evaluate a preprocessor condition expression.
 	 * Supports: identifier, !identifier, a && b, a || b, (expr)
 	 */
-	static function evalCondition(expr:String, defines:Map<String, Bool>):Bool {
+	static function eval(expr:String, defines:Map<String, Bool>):Bool {
 		expr = expr.trim();
 
-		// Parentheses — only strip outer parens if they are truly balanced
-		// e.g. "(a || b) && (c || d)" starts with ( but should NOT be stripped
-		if (expr.startsWith("(")) {
-			var depth = 0;
-			var i = 0;
-			while (i < expr.length) {
-				var c = expr.charAt(i);
-				if (c == "(") depth++;
-				else if (c == ")") {
-					depth--;
-					if (depth == 0 && i == expr.length - 1)
-						return evalCondition(expr.substr(1, expr.length - 2), defines);
-					else if (depth == 0)
-						break; // outer ( closes before end — don't strip
-				}
-				i++;
-			}
-		}
+		// Parentheses
+		if (expr.startsWith("(") && expr.endsWith(")"))
+			return eval(expr.substr(1, expr.length - 2), defines);
 
 		// OR  (lowest precedence)
 		var orIdx = findOuterOp(expr, "||");
 		if (orIdx >= 0)
-			return evalCondition(expr.substr(0, orIdx), defines) || evalCondition(expr.substr(orIdx + 2), defines);
+			return eval(expr.substr(0, orIdx), defines) || eval(expr.substr(orIdx + 2), defines);
 
 		// AND
 		var andIdx = findOuterOp(expr, "&&");
 		if (andIdx >= 0)
-			return evalCondition(expr.substr(0, andIdx), defines) && evalCondition(expr.substr(andIdx + 2), defines);
+			return eval(expr.substr(0, andIdx), defines) && eval(expr.substr(andIdx + 2), defines);
 
 		// NOT
 		if (expr.startsWith("!"))
-			return !evalCondition(expr.substr(1), defines);
+			return !eval(expr.substr(1), defines);
 
 		// Simple identifier
 		var name = expr.trim();
@@ -272,13 +205,6 @@ class Preprocessor {
 	/**
 	 * Build the default defines map for the current compile target.
 	 * Called by Interpreter constructor.
-	 */
-	/**
-	 * Builds the default defines map for the current Haxe compile target.
-	 * Called once by `Interpreter` on construction.
-	 * The host can add custom defines before running a script:
-	 *
-	 *     interp.defines.set("myFeature", true);
 	 */
 	public static function defaultDefines():Map<String, Bool> {
 		var d:Map<String, Bool> = new Map();

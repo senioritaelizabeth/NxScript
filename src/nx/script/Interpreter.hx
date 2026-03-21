@@ -1,6 +1,7 @@
 package nx.script;
 import nx.script.Preprocessor;
 import nx.script.SyntaxRules;
+
 import nx.script.Bytecode;
 import nx.script.NativeProxy;
 import nx.script.BytecodeSerializer;
@@ -11,92 +12,19 @@ import nx.script.Tokenizer;
 import nx.script.VM;
 import haxe.io.Path;
 using StringTools;
-
-// Interpreter.hx — High-level front-end for NxScript
-//
-// The main entry point for embedding NxScript into a Haxe application.
-// Orchestrates the full pipeline: source → tokens → AST → bytecode → execution.
-//
-// ## Typical usage
-//
-//   var interp = new Interpreter();
-//   interp.set("player", playerObject);      // expose a Haxe value to scripts
-//   interp.register("shake", 1, (args) -> {  // expose a native function
-//       camera.shake(interp.vm.valueToHaxe(args[0]));
-//       return VNull;
-//   });
-//   interp.run(source);
-//
-// ## Pipeline
-//
-//   1. `preprocessImports`  — resolves `import` statements and `#if` directives
-//   2. `Tokenizer`           — source text → `Array<TokenPos>`
-//   3. `Parser`              — tokens → AST (`Array<StmtWithPos>`)
-//   4. `Compiler`            — AST → `Chunk` (bytecode)
-//   5. `VM.execute`          — runs the bytecode
-//
-// ## Key APIs
-//
-//   `run(source)`          — compile and execute a script string
-//   `runFile(path)`        — load and run a `.nx` file
-//   `set(name, value)`     — expose a Haxe value to scripts (auto-converted)
-//   `get(name)`            — read a script global as a `Value`
-//   `register(name, n, fn)`— expose a native Haxe function
-//   `call(name, args)`     — call a script function from Haxe
-//   `createInstance(name)` — instantiate a script class, returns a Dynamic proxy
-//   `reset_context()`      — clear script state while preserving statics/classes
-//
-// ## Deprecated aliases
-//
-//   `variables` → `globals`  |  `methods` → `natives`
-//   `setVar`    → `set`      |  `getVar`  → `get`
-//   `hasVar`    → `has`      |  `registerFunction` → `register`
-//   `callFunction` → `call`  |  `serializeChunk` → `serialize`
-//
-// ## Performance helpers
-//
-//   `resolveCallable(name)` — cache a script function for repeated calls
-//   `nativeForEach(items, fn)` — loop in Haxe, call script fn per item
-//   `wrapNative(obj, fields)` — shadow-map proxy for hot native objects
-
 /**
- * High-level front-end for NxScript — the main entry point for embedding scripts.
+ * The front door. Tokenizes, parses, compiles, and runs your script in one call.
  *
- * Orchestrates the full pipeline: source → tokens → AST → bytecode → execution.
+ * For most use cases you just need:
+ *   var interp = new Interpreter();
+ *   interp.globals.set("someValue", VNumber(42));
+ *   interp.run(sourceCode);
  *
- * ### Typical usage
+ * If you need class instances from script code, use NxProxy — don't access
+ * VInstance fields manually unless you enjoy pain.
  *
- *     var interp = new Interpreter();
- *     interp.set("player", playerObject);
- *     interp.register("shake", 1, (args) -> { camera.shake(...); return VNull; });
- *     interp.run(source);
- *
- * ### Pipeline
- *
- * 1. `preprocessImports` — resolves `import` statements and `#if` directives
- * 2. `Tokenizer`          — source text → `Array<TokenPos>`
- * 3. `Parser`             — tokens → AST (`Array<StmtWithPos>`)
- * 4. `Compiler`           — AST → `Chunk` (bytecode)
- * 5. `VM.execute`         — runs the bytecode
- *
- * ### Key APIs
- *
- * | Method | Description |
- * |--------|-------------|
- * | `run(source)` | Compile and execute a script string |
- * | `runFile(path)` | Load and run a `.nx` file |
- * | `set(name, value)` | Expose a Haxe value to scripts |
- * | `get(name)` | Read a script global as `Value` |
- * | `register(name, n, fn)` | Expose a native Haxe function |
- * | `call(name, args)` | Call a script function from Haxe |
- * | `createInstance(name)` | Instantiate a script class |
- * | `reset_context()` | Clear script state, preserve statics/classes |
- *
- * ### Deprecated aliases
- *
- * `variables`→`globals`, `methods`→`natives`, `setVar`→`set`, `getVar`→`get`,
- * `hasVar`→`has`, `registerFunction`→`register`, `callFunction`→`call`,
- * `serializeChunk`→`serialize`, `deserializeChunk`→`deserialize`.
+ * `variables` and `methods` still work but are deprecated.
+ * Update your code. They're going away eventually.
  */
 class Interpreter {
 	static var EMPTY_ARGS:Array<Value> = [];
@@ -194,7 +122,7 @@ class Interpreter {
 	 *   interp.run('for (spr in sprites) update(spr, dt)');
 	 *   NativeProxy.flushAll(r.proxies);
 	 */
-	public function wrapNativeMany(objects:Array<Dynamic>, ?fields:Array<String>):nx.script.NativeProxy.WrapManyResult
+	public function wrapNativeMany(objects:Array<Dynamic>, ?fields:Array<String>):nx.script.WrapManyResult
 		return NativeProxy.wrapMany(vm, objects, fields);
 
 	/** Kept for API compat. Use -D NXDEBUG compile flag for actual debug output. */
@@ -224,24 +152,48 @@ class Interpreter {
 	private function registerBuiltins():Void {
 		// Console output
 		register("trace", -1, function(args:Array<Value>):Value {
-			var out = [for (a in args) vm.valueToString(a)].join(" ");
-			var lineInfo = vm.currentInstruction != null
-				? '${normalizeScriptPath(vm.scriptName)}:${vm.currentInstruction.line}: '
-				: "";
-			#if sys Sys.println(lineInfo + out); #else trace(lineInfo + out); #end
+			var parts:Array<Dynamic> = [];
+			for (arg in args) {
+				parts.push(vm.valueToHaxe(arg));
+			}
+
+			// Get current instruction line info
+			var lineInfo = "";
+			if (vm.currentInstruction != null) {
+				lineInfo = '${normalizeScriptPath(vm.scriptName)}:${vm.currentInstruction.line}: ';
+			}
+			#if sys
+			Sys.println(lineInfo + parts.join(" "));
+			#else
+			trace(lineInfo + parts.join(" "));
+			#end
+
 			return VNull;
 		});
 
-		// print / println share the same formatting logic as trace, minus the line info
 		register("print", -1, function(args:Array<Value>):Value {
-			var out = [for (a in args) vm.valueToString(a)].join(" ");
-			#if sys Sys.print(out); #else trace(out); #end
+			var parts:Array<Dynamic> = [];
+			for (arg in args) {
+				parts.push(vm.valueToHaxe(arg));
+			}
+			#if sys
+			Sys.print(parts.join(" "));
+			#else
+			trace(parts.join(" "));
+			#end
 			return VNull;
 		});
 
 		register("println", -1, function(args:Array<Value>):Value {
-			var out = [for (a in args) vm.valueToString(a)].join(" ");
-			#if sys Sys.println(out); #else trace(out); #end
+			var parts:Array<Dynamic> = [];
+			for (arg in args) {
+				parts.push(vm.valueToHaxe(arg));
+			}
+			#if sys
+			Sys.println(parts.join(" "));
+			#else
+			trace(parts.join(" "));
+			#end
 			return VNull;
 		});
 
@@ -535,13 +487,7 @@ class Interpreter {
 				default: "";
 			});
 		});
-		register("eval", 1, function(args:Array<Value>):Value {
-			var code = switch (args[0]) {
-				case VString(s): s;
-				default: throw "eval(code) expects a string";
-			}
-			return run(code, "<eval>");
-		});
+
 		register("split", 2, function(args:Array<Value>):Value {
 			var source = switch (args[0]) {
 				case VString(s): s;
@@ -592,7 +538,12 @@ class Interpreter {
 			var prepared = preprocessImports(source, scriptName);
 			// Run #if/#end preprocessor
 			var scriptSource = Preprocessor.run(prepared.source, defines);
-			var strictMode = strictByDefault || isStrictPragma(scriptSource);
+			var trimmed = StringTools.trim(scriptSource);
+			var strictFromPragma = StringTools.startsWith(trimmed, '"use strict";')
+				|| StringTools.startsWith(trimmed, "'use strict';")
+				|| StringTools.startsWith(trimmed, '"use strict"')
+				|| StringTools.startsWith(trimmed, "'use strict'");
+			var strictMode = strictByDefault || strictFromPragma;
 
 			// Set script name in VM
 			vm.scriptName = scriptName;
@@ -662,7 +613,7 @@ class Interpreter {
 			var line = lines[i];
 			var module = parseImportLine(line);
 			if (module != null) {
-				if (module != "") {
+				if (module != null && module != "") {
 					if (isScriptImport(module)) {
 						var importPath = resolveImportPath(scriptName, module);
 						if (!visited.exists(importPath)) {
@@ -823,19 +774,6 @@ class Interpreter {
 		globals.set(shortName, VNativeObject(sym));
 	}
 
-
-	/**
-	 * Returns `true` if the source starts with a `"use strict"` pragma.
-	 * Supports both quote styles, with or without trailing semicolon.
-	 */
-	function isStrictPragma(source:String):Bool {
-		var t = StringTools.trim(source);
-		return StringTools.startsWith(t, '"use strict";')
-			|| StringTools.startsWith(t, "'use strict';")
-			|| StringTools.startsWith(t, '"use strict"')
-			|| StringTools.startsWith(t, "'use strict'");
-	}
-
 	function formatPrettyError(raw:String, source:String, scriptName:String):String {
 		var message = sanitizeHostErrorPrefix(raw);
 		var stackTail = "";
@@ -862,23 +800,17 @@ class Interpreter {
 		var to = targetLine + 1;
 		if (to > lines.length)
 			to = lines.length;
-		// Don't show trailing blank lines (common in REPL single-line input)
-		while (to > targetLine && StringTools.trim(lines[to - 1]) == "")
-			to--;
 
 		var out:Array<String> = [];
 		for (ln in from...to + 1) {
-			var prefix = (ln == targetLine) ? ">" : " ";
-			var lineNum = StringTools.lpad(Std.string(ln), " ", 4);
-			out.push('$prefix $lineNum | ' + lines[ln - 1]);
-			// Place the caret immediately after the error line
-			if (ln == targetLine) {
-				var caretCol = loc.col < 1 ? 1 : loc.col;
-				// Prefix "> NNN | " = marker(1) + space(1) + num(4) + " | "(3) = 9 chars
-				var pointerSpaces = [for (_ in 0...caretCol - 1 + 9) " "].join("");
-				out.push(' ' + pointerSpaces + '^');
-			}
+			out.push('l | ' + lines[ln - 1]);
 		}
+
+		var caretCol = loc.col;
+		if (caretCol < 1)
+			caretCol = 1;
+		var pointerSpaces = [for (_ in 0...caretCol - 1) " "].join("");
+		out.push('> ' + pointerSpaces + '^');
 
 		var red = "\x1b[31m";
 		var reset = "\x1b[0m";
@@ -927,6 +859,13 @@ class Interpreter {
 			throw 'Unable to load script file: ' + normalized;
 		return run(content, normalized);
 	}
+	/**
+	 * Reset the VM context — clears globals, reloads built-ins, etc.
+	 * Useful if you want to run multiple scripts in the same process without
+	 * them interfering with each other via globals.
+	 * Note: doesn't reset registered natives since those are meant to be shared.
+	**/
+
 	/**
 	 * Reset interpreter state while preserving static globals and class registrations.
 	 *
@@ -983,12 +922,9 @@ class Interpreter {
 	 *   // or just: new Enemy() from any other script
 	 */
 	public function loadScript(path:String):Value {
-		#if sys
-		var normalized = normalizeScriptPath(path);
-		var source = tryLoadScriptText(normalized);
-		if (source == null)
-			throw 'Unable to load script: $normalized';
-		run(source, normalized);
+		#if sys 
+		var source = sys.io.File.getContent(path);
+		run(source, path);
 		// Return a VDict of all non-native globals defined by this script
 		var exports = new Map<String, Value>();
 		for (name in vm.globals.keys()) {
@@ -1069,7 +1005,12 @@ class Interpreter {
 	public function compile(source:String, ?scriptName:String = "script"):Chunk {
 		var prepared = preprocessImports(source, scriptName);
 		var scriptSource = prepared.source;
-		var strictMode = strictByDefault || isStrictPragma(scriptSource);
+		var trimmed = StringTools.trim(scriptSource);
+		var strictFromPragma = StringTools.startsWith(trimmed, '"use strict";')
+			|| StringTools.startsWith(trimmed, "'use strict';")
+			|| StringTools.startsWith(trimmed, '"use strict"')
+			|| StringTools.startsWith(trimmed, "'use strict'");
+		var strictMode = strictByDefault || strictFromPragma;
 
 		// Tokenize
 		var tokenizer = new Tokenizer(scriptSource, rules);

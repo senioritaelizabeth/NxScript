@@ -1,42 +1,12 @@
 package nx.script;
 
-// Bytecode.hx — Runtime types: opcodes, instructions, chunks, and values
-//
-// This file defines everything that flows between the Compiler and the VM:
-//
-//   `Op`            — opcode constants (one byte each)
-//   `Instruction`   — a decoded instruction: {op, arg, line, col}
-//   `Chunk`         — a compiled unit: instructions + constants + strings + functions
-//   `FunctionChunk` — a compiled function with its parameter metadata
-//   `ClassData`     — a class definition (methods, fields, constructor, statics)
-//   `Value`         — the runtime value type (everything the VM can hold)
-//
-// ## Instruction encoding
-//
-//   Instructions are stored in a flat `Array<Int>` as consecutive pairs:
-//
-//     [ op₀, arg₀,  op₁, arg₁,  op₂, arg₂, … ]
-//
-//   `IP` (instruction pointer) always points to an `op`. Reading one instruction
-//   consumes two slots.  Ops that take no argument still reserve a slot (arg = 0).
-//
-//   The `instructions:Array<Instruction>` array is a parallel debug view — it
-//   holds the decoded form including source line/col, used by the disassembler
-//   and error formatter. The VM runs from the flat `code` array for speed.
-//
-// ## CALL_MEMBER encoding
-//
-//   The `arg` of `CALL_MEMBER` packs two 16-bit values into one Int:
-//
-//     arg = (fieldIndex << 16) | argc
-//
-//   Where `fieldIndex` indexes into `Chunk.strings` and `argc` is the argument
-//   count. Both halves must fit in 16 bits (max 65535 string pool entries and
-//   max 65535 arguments — both are effectively unlimited in practice).
-
-/** All opcodes. Each is one byte. The VM dispatch loop reads pairs: [op, arg, op, arg …] */
+/**
+ * All the opcodes. Grouped by category because hex ranges make you feel smart.
+ * Each opcode is two bytes in the flat dispatch array: [op, arg, op, arg, ...].
+ * Ops that don't need an argument still take up a slot (arg = 0). Deal with it.
+ */
 class Op {
-	/** Stack operations (0x00 - 0x0F) */
+	// Stack operations (0x00 - 0x0F)
 	public static inline var LOAD_CONST = 0x00; // Load constant onto stack
 	public static inline var LOAD_VAR = 0x01; // Load variable onto stack
 	public static inline var STORE_VAR = 0x02; // Store top of stack to variable
@@ -51,7 +21,7 @@ class Op {
 	public static inline var POP = 0x05; // Pop top of stack
 	public static inline var DUP = 0x06; // Duplicate top of stack
 
-	/** Arithmetic operations (0x10 - 0x1F) */
+	// Arithmetic operations (0x10 - 0x1F)
 	public static inline var ADD = 0x10;
 	public static inline var SUB = 0x11;
 	public static inline var MUL = 0x12;
@@ -59,7 +29,7 @@ class Op {
 	public static inline var MOD = 0x14;
 	public static inline var NEG = 0x15; // Negate
 
-	/** Bitwise operations (0x20 - 0x2F) */
+	// Bitwise operations (0x20 - 0x2F)
 	public static inline var BIT_AND = 0x20;
 	public static inline var BIT_OR = 0x21;
 	public static inline var BIT_XOR = 0x22;
@@ -67,7 +37,7 @@ class Op {
 	public static inline var SHIFT_LEFT = 0x24;
 	public static inline var SHIFT_RIGHT = 0x25;
 
-	/** Comparison operations (0x30 - 0x3F) */
+	// Comparison operations (0x30 - 0x3F)
 	public static inline var EQ = 0x30; // Equal
 	public static inline var NEQ = 0x31; // Not equal
 	public static inline var LT = 0x32; // Less than
@@ -75,26 +45,26 @@ class Op {
 	public static inline var LTE = 0x34; // Less than or equal
 	public static inline var GTE = 0x35; // Greater than or equal
 
-	/** Logical operations (0x40 - 0x4F) */
+	// Logical operations (0x40 - 0x4F)
 	public static inline var AND = 0x40;
 	public static inline var OR = 0x41;
 	public static inline var NOT = 0x42;
 
-	/** Control flow (0x50 - 0x5F) */
+	// Control flow (0x50 - 0x5F)
 	public static inline var JUMP = 0x50; // Unconditional jump
 	public static inline var JUMP_IF_FALSE = 0x51; // Jump if top of stack is false
 	public static inline var JUMP_IF_TRUE = 0x52; // Jump if top of stack is true
 	public static inline var JUMP_IF_NULL = 0x53; // Jump if TOS is VNull (leaves TOS)
 	public static inline var JUMP_IF_NOT_NULL = 0x54; // Jump if TOS is not VNull (leaves TOS)
 
-	/** Functions (0x60 - 0x6F) */
+	// Functions (0x60 - 0x6F)
 	public static inline var CALL = 0x60; // Call function with n arguments
 	public static inline var RETURN = 0x61; // Return from function
 	public static inline var MAKE_FUNC = 0x62; // Create function object
 	public static inline var MAKE_LAMBDA = 0x63; // Create lambda function
 	public static inline var CALL_MEMBER = 0x64; // Call object member with packed field index + arg count
 
-	/** Data structures (0x70 - 0x7F) */
+	// Data structures (0x70 - 0x7F)
 	public static inline var MAKE_ARRAY = 0x70; // Create array from top n stack items
 	public static inline var MAKE_DICT = 0x71; // Create dict from top 2n stack items
 	public static inline var GET_MEMBER = 0x72; // Get object member
@@ -106,7 +76,7 @@ class Op {
 	public static inline var INSTANTIATE = 0x77; // Create class instance
 	public static inline var GET_THIS = 0x78; // Get 'this' reference
 
-	/** Iterations (0x80 - 0x8F) */
+	// Iterations (0x80 - 0x8F)
 	public static inline var GET_ITER = 0x80; // Get iterator from iterable
 	public static inline var FOR_ITER = 0x81; // Iterate or jump if done
 	/**
@@ -122,17 +92,17 @@ class Op {
 	public static inline var FOR_RANGE_SETUP = 0x83; // arg = varSlot | (endSlot << 16)
 	public static inline var FOR_RANGE = 0x82;       // arg = jumpOffset (instructions)
 
-	/** Special (0x90 - 0x9F) */
+	// Special (0x90 - 0x9F)
 	public static inline var LOAD_NULL = 0x90;
 	public static inline var LOAD_TRUE = 0x91;
 	public static inline var LOAD_FALSE = 0x92;
 
-	/** Exception handling (0xB0 - 0xBF) */
+	// Exception handling (0xB0 - 0xBF)
 	public static inline var THROW = 0xB0; // Throw a value as exception
 	public static inline var SETUP_TRY = 0xB1; // Push catch handler (arg = instruction-count offset to catch block)
 	public static inline var POP_TRY = 0xB2; // Pop catch handler (normal try exit)
 
-	/** Postfix/Prefix modifications (0xC0 - 0xCF) */
+	// Postfix/Prefix modifications (0xC0 - 0xCF)
 	public static inline var INC_LOCAL = 0xC0; // local[arg]++ (returns old)
 	public static inline var DEC_LOCAL = 0xC1; // local[arg]-- (returns old)
 	public static inline var INC_GLOBAL = 0xC2; // global[arg]++
@@ -142,12 +112,12 @@ class Op {
 	public static inline var INC_INDEX = 0xC6; // obj[idx]++ (obj, idx on stack)
 	public static inline var DEC_INDEX = 0xC7; // obj[idx]--
 
-	/** Scope management for block-level let declarations */
+	// Scope management for block-level let declarations
 	public static inline var REGISTER_USING = 0xCF; // arg = string index of class name
 	public static inline var ENTER_SCOPE = 0xD0; // push a new scope frame onto scopeStack
 	public static inline var EXIT_SCOPE  = 0xD1; // pop scope frame, removing its let vars
 
-	/** End of file (0xFF) */
+	// End of file (0xFF)
 	public static inline var EOF = 0xFF;
 
 	/**
@@ -293,15 +263,6 @@ typedef ClassData = {
 	staticMethods:Map<String, FunctionChunk> // Static methods — called on VClass, not VInstance
 }
 
-/**
- * Every runtime value the VM can hold.
- *
- * - Numbers are always `Float` internally — no separate Int type at runtime.
- * - Strings, Arrays, and Dicts are reference types (mutations are visible everywhere).
- * - `VNativeObject` wraps any Haxe object for reflection-based field access.
- * - `VIterator` is a lightweight array-iteration cursor; never exposed to scripts directly.
- * - `VEnumValue` holds a tagged enum variant with optional payload values.
- */
 enum Value {
 	VNumber(v:Float);
 	VString(v:String);

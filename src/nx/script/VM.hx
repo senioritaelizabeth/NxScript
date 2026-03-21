@@ -5,61 +5,34 @@ import haxe.ds.ObjectMap;
 import nx.bridge.Reflection;
 using StringTools;
 
-
 /**
- * VM — Register-based bytecode interpreter for NxScript.
+ * The VM. It runs bytecode. That's literally the whole job.
  *
- * Executes `Chunk` objects produced by the `Compiler`.
- * Everything that runs at script runtime lives here.
- *
- * ### Stack
- * Pre-allocated 512-slot `Array<Value>`. `sp` is the logical top.
- * Locals live at `stack[stackBase .. stackBase + localCount - 1]` per call frame.
- * No `Array.push`/`pop` in the hot path — just `stack[sp++]`.
- *
- * ### Call frames
- * `CallFrame` objects stacked in `frames`. Each carries its own `chunk`, `ip`,
- * `stackBase`, `localVars`, and `upvalues`. `RETURN` pops a frame and resumes
- * the outer one in the same `run()` invocation — trampoline-style, never recursive.
- *
- * ### Flat code array
- * Instructions are stored as `[op, arg, op, arg, …]` pairs in `Chunk.code:Array<Int>`.
- * Reading two ints per step is measurably faster than fetching `Instruction` objects
- * in the hot loop. `Chunk.instructions` is the parallel debug/error-formatter view.
- *
- * ### Globals — two tiers
- * - `scopeVars` / `constVars` — named Map for module-level `let` / `const`
- * - `globalSlotValues` — slot-indexed Array for compiled `var` (O(1) access)
- *
- * ### Closures
- * Captured via `Map<String,Value>` snapshot on `MAKE_LAMBDA`.
- * Functions with no captures share `EMPTY_MAP` to avoid per-call allocation.
- *
- * ### Caches
- * - `EMPTY_MAP` — shared sentinel for zero-capture closures (never write to this)
- * - `EMPTY_UPVALUES` — shared sentinel for no-upvalue functions
- * - `funcCache` — per-chunk `VFunction(chunk, EMPTY_MAP)` cache
- * - `arrayMethodCache` — per-array-instance bound-method cache
- * - `instanceMethodCache` — per-instance bound script-method cache
- *
- * ### Built-in type method dispatch
- * All primitive method calls (`arr.push(x)`, `"hi".upper()`, `(3.5).floor()`)
- * resolve through `getArrayMethod`, `getStringMethod`, or `getNumberMethod`.
- * These are the single authoritative implementations — `CALL_MEMBER` delegates
- * to them rather than duplicating logic inline.
+ * Architecture notes for the brave:
+ * - Pre-allocated 512-slot stack. No Array.push(), no realloc, no crying.
+ * - Locals live directly on the stack (stackBase..stackBase+localCount-1).
+ *   Allocating a fresh array per call was cute. We don't do that anymore.
+ * - EMPTY_MAP is a shared sentinel for closures that capture nothing.
+ *   Avoids `new Map()` on every single function call. You're welcome.
+ * - EMPTY_UPVALUES is a shared sentinel for functions with no upvalues.
+ *   Same deal — eliminates [] allocation on every non-closure call.
+ * - RETURN restores `sp = savedBase`, unwinding the callee's locals without touching a GC.
+ * - MAKE_FUNC caches VFunction(chunk, EMPTY_MAP) per function index.
+ *   Because creating the same object 100,000 times per second is a cry for help.
+ * - Trampoline architecture: RETURN with frames.length > 0 restores the outer frame
+ *   and CONTINUES in the same run() invocation. Do not call run() twice. You'll know why.
+ * - callFunction/callResolved bypass save/restore entirely — push frame directly onto the
+ *   idle stack, let RETURN pop it naturally. No 12-field save/restore per host->script call.
  */
 class VM {
-
-	/** One Map to rule them all — shared across every zero-capture function. Never write to this. */
+	// One Map to rule them all — shared across every zero-capture function. Never write to this.
 	static var EMPTY_MAP:Map<String, Value> = new Map<String, Value>();
-	/** One Array to rule them all — shared across every no-upvalue function. Never write to this. */
+	// One Array to rule them all — shared across every no-upvalue function. Never write to this.
 	static var EMPTY_UPVALUES:Array<Value> = [];
 	static inline var NATIVE_SUPER_INSTANCE_FIELD = "__native_super_instance";
 
-	/**
-	 * The stack. 512 slots, pre-allocated, sp is the logical top.
-	 * If you overflow this, you wrote infinite recursion. That's on you.
-	 */
+	// The stack. 512 slots, pre-allocated, sp is the logical top.
+	// If you overflow this, you wrote infinite recursion. That's on you.
 	var stack:Array<Value>;
 	var sp:Int = 0;
 
@@ -68,18 +41,16 @@ class VM {
 	/** Names registered as static — preserved across reset_context(). Populated by Interpreter after compilation. */
 	public var staticNames:Map<String, Bool> = new Map();
 
-	/** Let-scoped variables (block-level) and compile-time constants */
+	// Let-scoped variables (block-level) and compile-time constants
 	var scopeVars:Map<String, Value>;
 	var constVars:Map<String, Value>;
-	/**
-	 * Stack of scope frames for nested block-level `let` vars (module-level only)
-	 * Each entry is a Set (Map<String,Bool>) of keys that existed BEFORE the scope opened.
-	 * On EXIT_SCOPE, any key absent from that set was introduced inside the scope and gets removed.
-	 * Map<String,Bool> gives O(1) lookup vs the old Array<String>.indexOf which was O(n).
-	 */
-	var scopeStack:Array<Map<String,Bool>> = [];
+	// Stack of scope frames for nested block-level `let` vars (module-level only)
+	// Each entry is the list of scopeVar keys that existed BEFORE this scope.
+	// On EXIT_SCOPE, any key not in that list was introduced by the scope and gets removed.
+	// Array<String> instead of Map snapshot — much cheaper alloc.
+	var scopeStack:Array<Array<String>> = [];
 
-	/** The call stack. frames[last] is currentFrame. Don't touch frames directly in hot code. */
+	// The call stack. frames[last] is currentFrame. Don't touch frames directly in hot code.
 	var frames:Array<CallFrame> = [];
 	var currentFrame:CallFrame;
 
@@ -122,6 +93,7 @@ class VM {
 	 * Maps className -> list of static method containers (VClass or VNativeObject).
 	 * When getMember fails to find a method, these are searched with obj as first arg.
 	 */
+// usingExtensions removed (using feature removed with VProxy)
 
 	/** Set of native/global names blocked in sandboxed mode. */
 	public var sandboxBlocklist:Map<String, Bool> = new Map();
@@ -130,18 +102,6 @@ class VM {
 	 * Enable sandbox with sensible defaults in one call.
 	 * Blocks: Sys, sys, File, FileSystem, Http, Socket, Process.
 	 * Sets maxInstructions=500_000, maxCallDepth=256.
-	 */
-
-
-	/**
-	 * Enables sandboxed execution mode.
-	 *
-	 * When active:
-	 * - Any native registered under a name in `sandboxBlocklist` is blocked.
-	 * - `maxInstructions` is capped at 500,000.
-	 * - `maxCallDepth` is capped at 256.
-	 *
-	 * @param extraBlocklist  Additional native names to block (e.g. `["Sys", "sys"]`).
 	 */
 	public function enableSandbox(?extraBlocklist:Array<String>):Void {
 		sandboxed = true;
@@ -183,6 +143,11 @@ class VM {
 	var arrayMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 	var instanceMethodCache:ObjectMap<Dynamic, Map<String, Value>>;
 	var nativeArgBuffers:Map<Int, Array<Value>>;
+	// Caches Type.getClassName per object instance — one pointer lookup instead of reflection per access
+	// _typeNameCache removed
+	// Per-class field descriptor cache: className -> fieldName -> NativeFieldKind
+	// Resolved once on first access, reused for every subsequent get/set on any instance of that class.
+	// NativeFieldCache removed — cache overhead exceeded Reflection cost on CPP
 
 	/** Script name shown in runtime error messages. Set to a file path for useful stack traces. */
 	public var scriptName:String = "script";
@@ -202,23 +167,14 @@ class VM {
 		return v;
 	}
 
-	/**
-	 * Preallocated frame + frames array for host->script calls (callFunction/callResolved).
-	 * Mutated in-place every call — zero heap allocation per frame in the hot path.
-	 */
+	// Preallocated frame + frames array for host->script calls (callFunction/callResolved).
+	// Mutated in-place every call — zero heap allocation per frame in the hot path.
 	var _hostFrame:CallFrame;
 	var _hostFrames:Array<CallFrame>;
 
 	/**
 	 * Creates a VM. Optionally pass debug=true to get a trace per instruction.
 	 * Don't pass debug=true in production unless you enjoy reading walls of text.
-	 */
-
-
-	/**
-	 * Creates a new VM instance.
-	 *
-	 * @param debug  When `true`, emits a trace line per instruction (very slow — dev only).
 	 */
 	public function new(debug:Bool = false) {
 		this._debug = debug;
@@ -238,7 +194,9 @@ class VM {
 		globalSlotConstInit = [];
 		arrayMethodCache = new ObjectMap();
 		instanceMethodCache = new ObjectMap();
+		// _typeNameCache removed
 		nativeArgBuffers = new Map();
+		// _nativeFieldCache removed
 
 // usingExtensions init removed
 		initializeNativeFunctions();
@@ -249,14 +207,6 @@ class VM {
 	 * Runs a compiled Chunk from the top level.
 	 * Resets all execution state — don't call this mid-execution expecting continuity.
 	 * Builds the flat [op, arg, op, arg...] dispatch array on first run (cached forever after).
-	 */
-
-
-	/**
-	 * Runs a top-level compiled `Chunk` and returns the last evaluated value.
-	 *
-	 * Resets the instruction counter and catch-stack, then calls `run()`.
-	 * Throws on runtime errors (uncaught script exceptions, stack overflow, etc.).
 	 */
 	public function execute(chunk:Chunk):Value {
 		sp = 0;
@@ -289,11 +239,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Returns a human-readable call-stack trace for the current execution state.
-	 * Used by the error formatter in `Interpreter`.
-	 */
 	public function formatStackTrace():String {
 		if (frames == null || frames.length == 0)
 			return "";
@@ -315,13 +260,6 @@ class VM {
 	}
 
 	/** Flatten Instruction objects into [op, arg, op, arg...] to eliminate object indirection in hot loop */
-
-
-	/**
-	 * Flattens `chunk.instructions` into the `[op, arg, op, arg, …]` dispatch array.
-	 * Also recurses into nested function chunks so the entire program is flat before
-	 * `run()` starts. Called once per `execute()`.
-	 */
 	function buildFlatCode(chunk:Chunk) {
 		var insts = chunk.instructions;
 		var len = insts.length;
@@ -343,7 +281,6 @@ class VM {
 			if (fc.chunk.code == null)
 				buildFlatCode(fc.chunk);
 	}
-
 
 	function run():Value {
 		// Cache hot fields as locals — eliminates repeated field-chain dereferences in the hot loop
@@ -766,8 +703,95 @@ class VM {
 
 					switch (objectValue) {
 						case VArray(arr):
-							// Delegate to getArrayMethod — single source of truth for all array ops.
-												case VNativeObject(nobj) if (Std.isOfType(nobj, Array)):
+							var argStart = objectIndex + 1;
+							switch (memberField) {
+								case "push":
+									if (memberArgc != 1)
+										throw 'Native function push expects 1 arguments, got $memberArgc';
+									arr.push(stack[argStart]);
+									sp = objectIndex;
+									stack[sp++] = VNull;
+									continue;
+								case "pop":
+									if (memberArgc != 0)
+										throw 'Native function pop expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length == 0 ? VNull : arr.pop();
+									continue;
+								case "shift":
+									if (memberArgc != 0)
+										throw 'Native function shift expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length == 0 ? VNull : arr.shift();
+									continue;
+								case "unshift":
+									if (memberArgc != 1)
+										throw 'Native function unshift expects 1 arguments, got $memberArgc';
+									arr.unshift(stack[argStart]);
+									sp = objectIndex;
+									stack[sp++] = VNull;
+									continue;
+								case "first":
+									if (memberArgc != 0)
+										throw 'Native function first expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length > 0 ? arr[0] : VNull;
+									continue;
+								case "last":
+									if (memberArgc != 0)
+										throw 'Native function last expects 0 arguments, got $memberArgc';
+									sp = objectIndex;
+									stack[sp++] = arr.length > 0 ? arr[arr.length - 1] : VNull;
+									continue;
+								case "contains":
+									if (memberArgc != 1)
+										throw 'Native function contains expects 1 arguments, got $memberArgc';
+									var searchValue = stack[argStart];
+									var found = false;
+									for (item in arr) {
+										if (valuesEqual(item, searchValue)) {
+											found = true;
+											break;
+										}
+									}
+									sp = objectIndex;
+									stack[sp++] = VBool(found);
+									continue;
+								case "indexOf":
+									if (memberArgc != 1)
+										throw 'Native function indexOf expects 1 arguments, got $memberArgc';
+									var idxValue = stack[argStart];
+									var idx = -1;
+									for (i in 0...arr.length) {
+										if (valuesEqual(arr[i], idxValue)) {
+											idx = i;
+											break;
+										}
+									}
+									sp = objectIndex;
+									stack[sp++] = VNumber(idx);
+									continue;
+								case "reverse":
+									if (memberArgc != 0)
+										throw 'Native function reverse expects 0 arguments, got $memberArgc';
+									arr.reverse();
+									sp = objectIndex;
+									stack[sp++] = VArray(arr);
+									continue;
+								case "join":
+									if (memberArgc != 1)
+										throw 'Native function join expects 1 arguments, got $memberArgc';
+									var delim = switch (stack[argStart]) {
+										case VString(s): s;
+										default: ",";
+									}
+									var parts = [for (v in arr) valueToString(v)];
+									sp = objectIndex;
+									stack[sp++] = VString(parts.join(delim));
+									continue;
+								default:
+							}
+						case VNativeObject(nobj) if (Std.isOfType(nobj, Array)):
 							var narr:Array<Dynamic> = cast nobj;
 							var argStart = objectIndex + 1;
 							switch (memberField) {
@@ -1051,17 +1075,15 @@ class VM {
 						usingClasses.push(className);
 
 				case Op.ENTER_SCOPE:
-					// Snapshot existing keys as a lookup set — O(1) removal on EXIT_SCOPE.
-					var snap = new Map<String,Bool>();
-					for (k in scopeVars.keys()) snap.set(k, true);
-					scopeStack.push(snap);
+					// Snapshot just the key names (no Map alloc, no value copies).
+					scopeStack.push([ for (k in scopeVars.keys()) k ]);
 
 				case Op.EXIT_SCOPE:
-					// Remove any key not present in the snapshot (introduced inside this scope).
+					// Remove keys introduced inside this scope frame.
 					if (scopeStack.length > 0) {
 						var keysBefore = scopeStack.pop();
 						for (k in scopeVars.keys())
-							if (!keysBefore.exists(k))
+							if (keysBefore.indexOf(k) < 0)
 								scopeVars.remove(k);
 					}
 
@@ -1164,14 +1186,6 @@ class VM {
 		return VNull;
 	}
 
-
-
-	/**
-	 * Handles the `MAKE_CLASS` opcode — pops method/field descriptors from the stack
-	 * and builds a `ClassData` registered in `vm.classes` and `vm.globals`.
-	 *
-	 * @param counts  Packed Int: high 16 bits = method count, low 16 bits = field count.
-	 */
 	function handleMakeClass(counts:Int) {
 		// Decode counts: methods = high 16 bits, fields = low 16 bits
 		var methodCount = counts >> 16;
@@ -1247,11 +1261,6 @@ class VM {
 		push(VClass(classData));
 	}
 
-
-	/**
-	 * Handles `MAKE_CLASS_STATICS` — pops static method/field pairs and installs them
-	 * into the class that was just registered by `MAKE_CLASS`.
-	 */
 	function handleMakeClassStatics(counts:Int) {
 		var staticMethodCount = counts >> 16;
 		var staticFieldCount  = counts & 0xFFFF;
@@ -1282,13 +1291,6 @@ class VM {
 		}
 	}
 
-
-
-	/**
-	 * Unwinds the call stack until a matching `SETUP_TRY` handler is found,
-	 * then jumps to the catch block with `val` bound to the catch variable.
-	 * If no handler exists, rethrows as a Haxe exception.
-	 */
 	function handleThrownValue(val:Value, sp:Int) {
 		if (catchStack.length > 0) {
 			var handler = catchStack.pop();
@@ -1306,11 +1308,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Handles the `INSTANTIATE` opcode — pops the class value and `argCount` arguments,
-	 * calls the constructor, and pushes the new instance onto the stack.
-	 */
 	function handleInstantiate(argCount:Int) {
 		var args:Array<Value> = [];
 		var ai = argCount;
@@ -1336,13 +1333,6 @@ class VM {
 		push(instance);
 	}
 
-
-	/**
-	 * Creates a new script class instance from a `ClassData` descriptor.
-	 * Allocates the fields map, runs the constructor (if any), and returns `VInstance`.
-	 *
-	 * Handles native superclass instantiation via `nativeSuper` if present.
-	 */
 	function instantiateFromClassData(classData:ClassData, args:Array<Value>):Value {
 		// Create instance with fields from the entire inheritance chain
 		var instanceFields = new Map<String, Value>();
@@ -1435,18 +1425,12 @@ class VM {
 
 	// Internal helper — direct dispatch, no indirection.
 	// Only used by callInstanceMethod. Hot host paths use callResolved directly.
-
 	inline function call(callee:Value, args:Array<Value>):Value {
 		return callResolved(callee, args);
 	}
 
 	// Returns EMPTY_UPVALUES sentinel for functions with no upvalue names — zero allocation
 	// on the vast majority of calls which have no upvalues.
-
-	/**
-	 * Builds the upvalue array for a function call from the captured closure map.
-	 * Returns `EMPTY_UPVALUES` when the function captures nothing.
-	 */
 	function buildUpvalueArray(funcChunk:FunctionChunk, closure:Map<String, Value>):Array<Value> {
 		var names = funcChunk.upvalueNames;
 		if (names == null || names.length == 0)
@@ -1464,11 +1448,6 @@ class VM {
 		return values;
 	}
 
-
-	/**
-	 * Slices `argc` arguments off the stack starting at `start`.
-	 * Allocates a fresh Array — only called for native functions, not script functions.
-	 */
 	inline function getNativeArgs(argc:Int, start:Int, stack:Array<Value>):Array<Value> {
 		var args = nativeArgBuffers.get(argc);
 		if (args == null) {
@@ -1480,13 +1459,6 @@ class VM {
 		return args;
 	}
 
-
-
-	/**
-	 * Resolves a variable name through the full scope chain:
-	 * local frame vars → upvalues → scope vars → const vars → globals → natives.
-	 * Returns `null` (not `VNull`) if not found.
-	 */
 	function getVariable(name:String):Value {
 		if (currentFrame.localVars != EMPTY_MAP && currentFrame.localVars.exists(name))
 			return currentFrame.localVars.get(name);
@@ -1503,12 +1475,6 @@ class VM {
 		return null;
 	}
 
-
-	/**
-	 * Assigns a value to a named variable, respecting const protection.
-	 * Writes to the first matching tier: scope vars → globals.
-	 * Creates a new global if the name is not found anywhere.
-	 */
 	function setVariable(name:String, value:Value, isConst:Bool) {
 		if (constVars.exists(name))
 			throw 'Cannot reassign constant: $name';
@@ -1529,7 +1495,6 @@ class VM {
 			globals.set(name, value);
 	}
 
-
 	inline function push(value:Value)
 		stack[sp++] = value;
 
@@ -1543,14 +1508,6 @@ class VM {
 
 	// Conversion between Haxe and Script values
 
-
-
-	/**
-	 * Converts a Haxe `Dynamic` value to the script's `Value` type.
-	 *
-	 * Handles: `null`, `Bool`, `Int`, `Float`, `String`, `Array<Dynamic>`,
-	 * `Map<String,Dynamic>`, and any other object as `VNativeObject`.
-	 */
 	public function haxeToValue(value:Dynamic):Value {
 		// hxcpp guard.. dynamic can be of type bool as null !?tM
 		if(value == true)
@@ -1584,14 +1541,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Converts a script `Value` back to a Haxe `Dynamic`.
-	 *
-	 * `VNull` → `null`, `VBool` → `Bool`, `VNumber` → `Float`,
-	 * `VString` → `String`, `VArray` → `Array<Dynamic>`,
-	 * `VDict` → `Map<String,Dynamic>`, everything else → `Dynamic`.
-	 */
 	public function valueToHaxe(value:Value):Dynamic {
 		return switch (value) {
 			case VNumber(n): n;
@@ -1622,20 +1571,6 @@ class VM {
 	 * save/restore approach.
 	 *
 	 * Precondition: no script is currently executing (frames must be empty).
-	 */
-
-
-	/**
-	 * Calls a script function from Haxe host code.
-	 *
-	 * Pushes a pre-built `CallFrame` directly onto the idle stack and lets `RETURN`
-	 * pop it naturally — no save/restore overhead. Safe to call from inside a
-	 * native callback registered via `Interpreter.register()`.
-	 *
-	 * @param func     The compiled function chunk to invoke.
-	 * @param closure  Captured variables (use `EMPTY_MAP` for non-closures).
-	 * @param args     Arguments to pass (converted to local slots 0…n-1).
-	 * @return         The value returned by the script function.
 	 */
 	public function callFunction(func:FunctionChunk, closure:Map<String, Value>, args:Array<Value>):Value {
 		if (func.chunk.code == null)
@@ -1704,13 +1639,6 @@ class VM {
 	 * VFunction: routes through the zero-save/restore callFunction path.
 	 * VNativeFunction: direct dispatch, no frame overhead at all.
 	 */
-
-	/**
-	 * Calls any callable `Value` from Haxe host code.
-	 *
-	 * Routes `VFunction` through `callFunction` and `VNativeFunction` directly.
-	 * Throws if `callee` is not callable.
-	 */
 	public function callResolved(callee:Value, args:Array<Value>):Value {
 		return switch (callee) {
 			case VFunction(funcChunk, closure):
@@ -1725,7 +1653,6 @@ class VM {
 	}
 
 	// Arithmetic operations
-
 
 	function binaryOp(op:(Value, Value) -> Value) {
 		var b = pop();
@@ -1816,11 +1743,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Truthiness rule: `null` and `false` are falsy; `0` and `""` are truthy.
-	 * (NxScript uses JavaScript-style truthiness for null/bool only, not for 0/"").
-	 */
 	inline function isTruthy(value:Value):Bool {
 		return switch (value) {
 			case VNull:       false;
@@ -1834,12 +1756,6 @@ class VM {
 	}
 
 	// Member access
-
-
-	/**
-	 * Searches extension method registries (`using ClassName`) for a matching method.
-	 * Returns the bound `VNativeFunction` if found, or `null` if not.
-	 */
 	function tryUsingMethod(object:Value, field:String):Value {
 		for (className in usingClasses) {
 			var cd = classes.get(className);
@@ -1854,20 +1770,6 @@ class VM {
 		return null;
 	}
 
-
-	/**
-	 * Reads a field or method from a script value.
-	 *
-	 * Dispatch order:
-	 * - `VNumber`  → `getNumberMethod`
-	 * - `VString`  → `getStringMethod`
-	 * - `VArray`   → `getArrayMethod`
-	 * - `VDict`    → built-in dict methods (`keys`, `values`, `has`, `remove`, `set`, `size`, `clear`) or map lookup
-	 * - `VInstance` → instance fields → class method chain → native super fallback
-	 * - `VClass`   → static methods → static fields → constructor
-	 * - `VEnumValue` → `variant`, `name`, `enum`, `values`, `valueN`
-	 * - `VNativeObject` → native Array fast-path → `Reflection.getField`
-	 */
 	public function getMember(object:Value, field:String):Value {
 		return switch (object) {
 			case VNumber(n):
@@ -2010,11 +1912,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Writes a value to a field on a script object.
-	 * Supports `VDict`, `VInstance`, `VClass` (static fields), and `VNativeObject`.
-	 */
 	public function setMember(object:Value, field:String, value:Value) {
 		switch (object) {
 			case VDict(map):
@@ -2046,13 +1943,6 @@ class VM {
 
 	// nativeClassName removed with NativeFieldCache
 
-
-
-	/**
-	 * Handles the `GET_INDEX` opcode — `obj[index]`.
-	 * Supports `VArray` (integer index), `VDict` (string key), `VString` (char at),
-	 * and `VNativeObject` (reflection or Array index).
-	 */
 	function getIndex(object:Value, index:Value):Value {
 		return switch [object, index] {
 			case [VArray(arr), VNumber(i)]:
@@ -2107,11 +1997,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Handles the `SET_INDEX` opcode — `obj[index] = value`.
-	 * Supports `VArray` (integer index), `VDict` (string key), and `VNativeObject`.
-	 */
 	function setIndex(object:Value, index:Value, value:Value) {
 		switch [object, index] {
 			case [VArray(arr), VNumber(i)]:
@@ -2133,13 +2018,6 @@ class VM {
 	}
 
 	// Iterator support
-
-
-	/**
-	 * Wraps an iterable value in a `VIterator` for use by `FOR_ITER`.
-	 * Supports `VArray`, `VDict` (iterates keys), `VString` (iterates chars),
-	 * and `VNativeObject` that is an `Array<Dynamic>`.
-	 */
 	function getIterator(iterable:Value):Value {
 		return switch (iterable) {
 			case VArray(arr):
@@ -2160,11 +2038,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Advances a `VIterator` and returns the next value, or `null` when exhausted.
-	 * `null` (not `VNull`) signals the `FOR_ITER` opcode to exit the loop.
-	 */
 	function iteratorNext(iterator:Value):Value {
 		return switch (iterator) {
 			case VDict(map):
@@ -2191,15 +2064,6 @@ class VM {
 	}
 
 	// Native method helpers
-
-
-	/**
-	 * Returns a bound method `VNativeFunction` for a numeric value.
-	 *
-	 * Supported: `floor`, `ceil`, `round`, `abs`, `sqrt`, `sin`, `cos`, `tan`,
-	 * `toInt`, `toFloat`, `toString`, `clamp`, `lerp`, `min`, `max`, `pow`,
-	 * `isNaN`, `isFinite`, `sign`, `log`, `log2`, `log10`, `exp`.
-	 */
 	function getNumberMethod(n:Float, method:String):Value {
 		return switch (method) {
 			// Rounding
@@ -2268,14 +2132,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Returns a bound method `VNativeFunction` for a string value.
-	 *
-	 * Supported: `length`, `upper`, `lower`, `trim`, `int`, `float`, `bool`,
-	 * `contains`, `indexOf`, `charAt`, `substr`, `split`, `startsWith`, `endsWith`,
-	 * `replace`, `repeat`, `padStart`, `padEnd`.
-	 */
 	function getStringMethod(s:String, method:String):Value {
 		return switch (method) {
 			// Properties
@@ -2289,7 +2145,7 @@ class VM {
 			case "trim": VNativeFunction("trim", 0, (_) -> VString(StringTools.trim(s)));
 
 			// Type conversion
-			case "int": VNativeFunction("int", 0, (_) -> { var n = Std.parseInt(s); VNumber(n != null ? n : 0); });
+			case "int": VNativeFunction("int", 0, (_) -> VNumber(Std.parseInt(s) != null ? Std.parseInt(s) : 0));
 			case "float": VNativeFunction("float", 0, (_) -> VNumber(Std.parseFloat(s)));
 			case "bool": VNativeFunction("bool", 0, (_) -> VBool(s.length > 0));
 
@@ -2375,16 +2231,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Returns a bound method `VNativeFunction` for an array value.
-	 * Results are cached per array instance in `arrayMethodCache`.
-	 *
-	 * Supported: `length`, `push`, `pop`, `shift`, `unshift`, `first`, `last`,
-	 * `contains`/`includes`, `indexOf`, `reverse`, `join`, `map`, `filter`,
-	 * `reduce`, `forEach`, `find`, `findIndex`, `every`, `some`,
-	 * `slice`, `concat`, `flat`, `copy`, `sort`, `sortBy`.
-	 */
 	function getArrayMethod(arr:Array<Value>, method:String):Value {
 		if (method == "length")
 			return VNumber(arr.length);
@@ -2438,6 +2284,17 @@ class VM {
 			case "reverse": VNativeFunction("reverse", 0, (_) -> {
 					arr.reverse();
 					VArray(arr);
+				});
+			case "includes": VNativeFunction("includes", 1, (args) -> {
+					var searchValue = args[0];
+					var found = false;
+					for (item in arr) {
+						if (valuesEqual(item, searchValue)) {
+							found = true;
+							break;
+						}
+					}
+					VBool(found);
 				});
 			case "join": VNativeFunction("join", 1, (args) -> {
 					var delim = switch (args[0]) {
@@ -2558,13 +2415,6 @@ class VM {
 	}
 
 	// Helper to compare two Values for equality
-
-
-	/**
-	 * Structural equality for script values.
-	 * Numbers, strings, and booleans compare by value; everything else is `false`
-	 * (no deep equality for arrays/dicts — use explicit loops for that).
-	 */
 	function valuesEqual(a:Value, b:Value):Bool {
 		return switch [a, b] {
 			case [VNumber(x), VNumber(y)]: x == y;
@@ -2584,12 +2434,6 @@ class VM {
 	}
 
 	// Public API
-
-
-	/**
-	 * Instantiates a script class by name. Throws if the name is not a registered class.
-	 * Prefer `callResolved` with a `VClass` value when the class is already resolved.
-	 */
 	public function instantiateClassByName(name:String, args:Array<Value>):Value {
 		var classValue = getVariable(name);
 		return switch (classValue) {
@@ -2598,11 +2442,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Resolves and calls a method on a script instance.
-	 * Equivalent to `callResolved(getMember(instance, methodName), args)`.
-	 */
 	public function callInstanceMethod(instance:Value, methodName:String, args:Array<Value>):Value {
 		return callResolved(getMember(instance, methodName), args);
 	}
@@ -2618,10 +2457,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Calls a named global function. Throws `"Undefined function: name"` if not found.
-	 */
 	public function callMethod(name:String, args:Array<Value>):Value {
 		var func = getVariable(name);
 		if (func == null)
@@ -2636,12 +2471,6 @@ class VM {
 	 *
 	 *   var result = vm.safeCall("onUpdate", [VNumber(dt)]);
 	 *   if (result == null) { /* script had an error or function not found  }
-	 */
-
-	/**
-	 * Calls a script function by name, returning `null` on any error instead of
-	 * throwing. Useful for optional script hooks in game objects where a missing or
-	 * broken function should degrade gracefully.
 	 */
 	public function safeCall(name:String, ?args:Array<Value>):Null<Value> {
 		try {
@@ -2659,11 +2488,6 @@ class VM {
 	/**
 	 * Safe wrapper around callResolved — catches script errors and returns null.
 	 * Use when you already have a resolved Value (from resolveCallable).
-	 */
-
-	/**
-	 * Like `safeCall` but takes a pre-resolved `Value` instead of a name string.
-	 * Cache the callable with `resolveCallable()` to avoid repeated name lookups.
 	 */
 	public function safeCallResolved(fn:Value, ?args:Array<Value>):Null<Value> {
 		try {
@@ -2684,12 +2508,6 @@ class VM {
 	}
 
 	/** Resolve a callable by name once, then reuse it with callResolved in host hot loops. */
-
-	/**
-	 * Resolves a script function by name for repeated host calls.
-	 * Cache the returned `Value` and pass it to `callResolved` or `safeCallResolved`
-	 * to avoid hash lookup overhead on every frame.
-	 */
 	public function resolveCallable(name:String):Value {
 		syncGlobalSlotsFromMap();
 		var func = getVariable(name);
@@ -2714,13 +2532,6 @@ class VM {
 	 *
 	 * Zero script-loop overhead: no LOAD_VAR, no LT, no JUMP, no stack churn
 	 * for the iteration itself. Only the function body runs in the VM.
-	 */
-
-	/**
-	 * Calls a script function once per item in a Haxe array, with Haxe driving the loop.
-	 *
-	 * This eliminates VM loop overhead for large collections. The function receives
-	 * `(item, index, ...extraArgs)`. See `Interpreter.nativeForEach` for usage examples.
 	 */
 	public function nativeForEach(items:Array<Dynamic>, fn:Value, ?extraArgs:Array<Value>):Void {
 		if (extraArgs == null) extraArgs = [];
@@ -2774,11 +2585,6 @@ class VM {
 	 * Manually flushes all internal VM caches, regardless of gc_kind.
 	 * Useful after a large batch of script executions to let the GC reclaim memory.
 	 */
-
-	/**
-	 * Manually flushes all VM internal caches regardless of `gc_kind`.
-	 * Use after loading a large batch of scripts to free method-binding memory.
-	 */
 	public function gc():Void {
 		flushCaches();
 	}
@@ -2787,6 +2593,8 @@ class VM {
 		arrayMethodCache    = new ObjectMap();
 		instanceMethodCache = new ObjectMap();
 		nativeArgBuffers    = new Map();
+		// _typeNameCache removed
+		// _nativeFieldCache removed
 	}
 
 	function bindGlobalSlots(chunk:Chunk):Void {
@@ -2833,12 +2641,6 @@ class VM {
 		}
 	}
 
-
-	/**
-	 * Converts a script `Value` to its string representation (used by `trace`, `join`, etc.).
-	 * `VNull` → `"null"`, `VBool` → `"true"`/`"false"`, `VNumber` → decimal string,
-	 * `VArray` → `"[a, b, c]"`, `VDict` → `"{k: v}"`, instances → `"ClassName {...}"`.
-	 */
 	public function valueToString(value:Value):String {
 		if (value == null) return "null";
 		return switch (value) {

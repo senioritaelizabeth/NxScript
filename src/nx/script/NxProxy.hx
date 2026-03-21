@@ -68,8 +68,15 @@ class NxProxy {
 		// The sync happens in __syncToScript__ which we'll call periodically
 		var value = fieldStorage.get(fieldName);
 
-		// TODO: use platform-specific property descriptors for reactive sync
+		#if (neko || hl || cpp || java || cs)
+		// For these targets, just set the field directly
+		// We'll rely on manual __syncToScript__ calls
 		Reflect.setField(proxy, fieldName, value);
+		#else
+		// For JS and other targets, we could use property descriptors
+		// but for now, keep it simple
+		Reflect.setField(proxy, fieldName, value);
+		#end
 	}
 
 	// Sync Haxe proxy fields → Script instance fields

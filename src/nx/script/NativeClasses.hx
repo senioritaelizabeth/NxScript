@@ -4,64 +4,20 @@ import nx.script.Bytecode.Value;
 import nx.script.Bytecode.ClassData;
 import nx.script.Bytecode.FunctionChunk;
 
-// NativeClasses.hx — Built-in class stubs for the VM class registry
-//
-// Registers the built-in type hierarchy into `VM.classes` and `VM.globals`:
-//
-//   Object → String, Number (→ Int, Float), Bool, Array, Function
-//
-// ## Why these are empty shells
-//
-//   NxScript's primitive method dispatch (`"hi".upper()`, `arr.push(x)`,
-//   `(3.5).floor()`) lives entirely in `VM.getStringMethod`,
-//   `VM.getArrayMethod`, and `VM.getNumberMethod` — not in `ClassData.methods`.
-//
-//   These stubs exist so that:
-//     1. `import String` / `import Array` resolve to something in globals.
-//     2. Script classes can write `class Foo extends Array { … }` and the
-//        inheritance chain finds a ClassData to walk up to.
-//     3. `x is String`, `x is Array` type checks have a registered class to
-//        match against.
-//
-// ## Known limitation
-//
-//   Because `String`, `Array`, etc. have empty `methods` maps, inheriting from
-//   them and calling a primitive method via `super.push(x)` will silently
-//   return `null` instead of dispatching to the VM's built-in implementation.
-//   This is a known gap — a proper fix requires bridging ClassData methods
-//   to the VM's `getArrayMethod` / `getStringMethod` dispatchers.
-
 /**
- * Registers the built-in type hierarchy into `VM.classes` and `VM.globals`.
+ * Registers the built-in class hierarchy (Object, String, Number, Bool, Array, Function)
+ * into the VM's class/globals registry.
  *
- *     Object → String, Number (→ Int, Float), Bool, Array, Function
+ * These aren't full implementations — they're class shells so that method dispatch on
+ * primitive values (`"hi".upper()`, `(3.5).floor()`, etc.) resolves correctly.
+ * The actual method bodies live in VM's GET_MEMBER/CALL dispatch.
  *
- * ### Why these are empty shells
- *
- * NxScript's primitive method dispatch (`"hi".upper()`, `arr.push(x)`,
- * `(3.5).floor()`) lives in `VM.getStringMethod`, `VM.getArrayMethod`, and
- * `VM.getNumberMethod` — not in `ClassData.methods`.
- *
- * These stubs exist so that:
- * - `import String` / `import Array` resolve to something in globals.
- * - Script classes can write `class Foo extends Array { … }` and the
- *   inheritance chain finds a `ClassData` to walk.
- * - `x is String`, `x is Array` type checks have a registered class to match.
- *
- * ### Known limitation
- *
- * Because `String`, `Array`, etc. have empty `methods` maps, calling a primitive
- * method via `super.push(x)` from a subclass will silently return `null`. A proper
- * fix requires bridging `ClassData.methods` to the VM's built-in dispatchers.
+ * Extending these from script code is technically allowed. Results may vary.
  */
 class NativeClasses {
 	/**
 	 * Registers all native classes. Call once per VM. Calling it twice will overwrite the first
 	 * registration and waste a few microseconds. Don't do that.
-	 */
-	/**
-	 * Registers all built-in classes into the VM. Call once per VM instance.
-	 * Calling it twice will overwrite the first registration.
 	 */
 	public static function registerAll(vm:VM):Void {
 		registerObject(vm);
@@ -77,24 +33,6 @@ class NativeClasses {
 		registerSys(vm);
 		#end
 	}
-
-	/**
-	 * Creates a ClassData shell with empty methods/fields — used for primitive
-	 * types whose actual method dispatch happens in VM's getXxxMethod helpers.
-	 */
-	private static function makeShell(name:String, superClass:Null<String>):ClassData {
-		return {
-			name:          name,
-			superClass:    superClass,
-			nativeSuper:   null,
-			methods:       new Map(),
-			fields:        new Map(),
-			constructor:   null,
-			staticFields:  new Map(),
-			staticMethods: new Map()
-		};
-	}
-
 
 	#if sys
 	/**
@@ -119,7 +57,23 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerObject(vm:VM):Void {
-		var classData = makeShell("Object", null);
+		var methods = new Map<String, FunctionChunk>();
+		var fields = new Map<String, Value>();
+
+		// Object will be the base class, no methods for now
+		// Could add: toString, equals, hashCode, etc.
+
+		var classData:ClassData = {
+			name: "Object",
+			superClass: null,
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
 		vm.classes.set("Object", classData);
 		vm.globals.set("Object", VClass(classData));
 	}
@@ -129,7 +83,21 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerString(vm:VM):Void {
-		var classData = makeShell("String", "Object");
+		var methods = new Map<String, FunctionChunk>();
+		var fields = new Map<String, Value>();
+
+		// String extends Object
+		var classData:ClassData = {
+			name: "String",
+			superClass: "Object",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
 		vm.classes.set("String", classData);
 		vm.globals.set("String", VClass(classData));
 	}
@@ -139,7 +107,20 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerNumber(vm:VM):Void {
-		var classData = makeShell("Number", "Object");
+		var methods = new Map<String, FunctionChunk>();
+		var fields = new Map<String, Value>();
+
+		var classData:ClassData = {
+			name: "Number",
+			superClass: "Object",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
 		vm.classes.set("Number", classData);
 		vm.globals.set("Number", VClass(classData));
 	}
@@ -150,7 +131,19 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerInt(vm:VM):Void {
-		var classData = makeShell("Int", "Number");
+		var methods = new Map<String, FunctionChunk>();
+		var fields  = new Map<String, Value>();
+
+		var classData:ClassData = {
+			name: "Int",
+			superClass: "Number",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
 
 		vm.classes.set("Int", classData);
 		vm.globals.set("Int", VClass(classData));
@@ -174,7 +167,19 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerFloat(vm:VM):Void {
-		var classData = makeShell("Float", "Number");
+		var methods = new Map<String, FunctionChunk>();
+		var fields  = new Map<String, Value>();
+
+		var classData:ClassData = {
+			name: "Float",
+			superClass: "Number",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
 
 		vm.classes.set("Float", classData);
 		vm.globals.set("Float", VClass(classData));
@@ -236,7 +241,21 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerBool(vm:VM):Void {
-		var classData = makeShell("Bool", "Object");
+		var methods = new Map<String, FunctionChunk>();
+		var fields = new Map<String, Value>();
+
+		// Bool extends Object
+		var classData:ClassData = {
+			name: "Bool",
+			superClass: "Object",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
 		vm.classes.set("Bool", classData);
 		vm.globals.set("Bool", VClass(classData));
 	}
@@ -246,7 +265,21 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerArray(vm:VM):Void {
-		var classData = makeShell("Array", "Object");
+		var methods = new Map<String, FunctionChunk>();
+		var fields = new Map<String, Value>();
+
+		// Array extends Object
+		var classData:ClassData = {
+			name: "Array",
+			superClass: "Object",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
 		vm.classes.set("Array", classData);
 		vm.globals.set("Array", VClass(classData));
 	}
@@ -256,7 +289,21 @@ class NativeClasses {
 	// ========================================
 
 	private static function registerFunction(vm:VM):Void {
-		var classData = makeShell("Function", "Object");
+		var methods = new Map<String, FunctionChunk>();
+		var fields = new Map<String, Value>();
+
+		// Function extends Object
+		var classData:ClassData = {
+			name: "Function",
+			superClass: "Object",
+			nativeSuper: null,
+			methods: methods,
+			fields: fields,
+			constructor: null,
+			staticFields: new Map(),
+			staticMethods: new Map()
+		};
+
 		vm.classes.set("Function", classData);
 		vm.globals.set("Function", VClass(classData));
 	}

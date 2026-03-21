@@ -4,27 +4,27 @@ import nx.script.Token;
 
 // AST.hx — Abstract Syntax Tree node types for NxScript
 //
-// Produced by `Parser`, consumed by `Compiler`.
+// Produced by 'Parser', consumed by 'Compiler'.
 //
 // ## Structure
 //
-//   `Expr`        — expressions that produce a value
-//   `Stmt`        — statements that produce side-effects
-//   `TypeHint`    — optional type annotations (parsed but not enforced at runtime)
-//   `StmtWithPos` — a `Stmt` tagged with its source (line, col)
-//   `Param`       — a named function parameter with an optional type hint
-//   `ClassMethod` — a method declaration inside a `class` body
-//   `ClassField`  — a field declaration inside a `class` body
-//   `MatchCase`   — one arm of a `match` expression
-//   `MatchPattern`— the pattern part of a match arm
-//   `EnumVariant` — one variant in an `enum` declaration
-//   `Either<L,R>` — generic sum type used for lambda bodies
+//   'Expr'        — expressions that produce a value
+//   'Stmt'        — statements that produce side-effects
+//   'TypeHint'    — optional type annotations (parsed but not enforced at runtime)
+//   'StmtWithPos' — a 'Stmt' tagged with its source (line, col)
+//   'Param'       — a named function parameter with an optional type hint
+//   'ClassMethod' — a method declaration inside a 'class' body
+//   'ClassField'  — a field declaration inside a 'class' body
+//   'MatchCase'   — one arm of a 'match' expression
+//   'MatchPattern'— the pattern part of a match arm
+//   'EnumVariant' — one variant in an 'enum' declaration
+//   'Either<L,R>' — generic sum type used for lambda bodies
 //
 // ## Notes on TypeHint
 //
 //   Type hints are parsed and stored in the AST for future use, but the
-//   `Compiler` currently ignores them — NxScript is fully dynamically typed
-//   at runtime.  `TDict` and `TFunc` in particular have no runtime effect yet.
+//   'Compiler' currently ignores them — NxScript is fully dynamically typed
+//   at runtime.  'TDict' and 'TFunc' in particular have no runtime effect yet.
 
 enum Expr {
 	// Literals
@@ -164,7 +164,9 @@ typedef StmtWithPos = {
 
 typedef Param = {
 	name:String,
-	type:Null<TypeHint>
+	type:Null<TypeHint>,
+	/** Default value expression, evaluated if the caller passes 'null' or omits the argument. */
+	?defaultValue:Null<Expr>
 }
 
 typedef ClassMethod = {

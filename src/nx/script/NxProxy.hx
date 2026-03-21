@@ -5,14 +5,14 @@ import nx.script.Bytecode.ClassData;
 
 /**
  * Creates a Dynamic proxy around a VInstance so you can access fields and call methods
- * without writing `switch (instance) { case VInstance(...) }` everywhere.
+ * without writing 'switch (instance) { case VInstance(...) }' everywhere.
  *
  * Fields are auto-synced from Haxe to script before every method call.
  * If you modify a field and then read it from inside script code without calling a method first,
- * use `__syncToScript__()`. Yes that's what it's for.
+ * use '__syncToScript__()'. Yes that's what it's for.
  *
- * Use `NxProxy.get()` for class instances with no constructor args.
- * Use `NxProxy.instantiate()` to call the constructor.
+ * Use 'NxProxy.get()' for class instances with no constructor args.
+ * Use 'NxProxy.instantiate()' to call the constructor.
  */
 class NxProxy {
 	static inline var NATIVE_SUPER_INSTANCE_FIELD = "__native_super_instance";

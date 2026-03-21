@@ -6,14 +6,14 @@ package nx.script;
  *
  * **How syncing works:**
  * Fields are synced from Haxe → script automatically when you call any method.
- * You almost never need to call `__syncToScript__()` yourself. Almost.
+ * You almost never need to call '__syncToScript__()' yourself. Almost.
  *
  * **Interpreter mode gotcha:**
- * On `--interp`, you MUST use `Dynamic` for the variable that performs operations.
+ * On '--interp', you MUST use 'Dynamic' for the variable that performs operations.
  * Use the typed interface only for temporary autocomplete help.
  *
  * Example (interpreter mode — Neko, neko, neko):
- * ```haxe
+ * '''haxe
  * interface MyCat extends IScriptInstance {
  *     var meow:Bool;
  *     function speak():String;
@@ -25,14 +25,14 @@ package nx.script;
  *
  * var typedCat:MyCat = cat; // only for autocomplete, don't store this long-term on interp
  * trace(typedCat.meow);
- * ```
+ * '''
  *
  * Example (compiled targets — HL, C++, JS, etc.):
- * ```haxe
+ * '''haxe
  * var cat:MyCat = interp.createInstance("MyCat");
  * cat.meow = false;
  * cat.speak(); // just works
- * ```
+ * '''
  */
 interface IScriptInstance {
 	/**

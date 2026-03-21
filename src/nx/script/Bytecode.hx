@@ -4,33 +4,33 @@ package nx.script;
 //
 // This file defines everything that flows between the Compiler and the VM:
 //
-//   `Op`            — opcode constants (one byte each)
-//   `Instruction`   — a decoded instruction: {op, arg, line, col}
-//   `Chunk`         — a compiled unit: instructions + constants + strings + functions
-//   `FunctionChunk` — a compiled function with its parameter metadata
-//   `ClassData`     — a class definition (methods, fields, constructor, statics)
-//   `Value`         — the runtime value type (everything the VM can hold)
+//   'Op'            — opcode constants (one byte each)
+//   'Instruction'   — a decoded instruction: {op, arg, line, col}
+//   'Chunk'         — a compiled unit: instructions + constants + strings + functions
+//   'FunctionChunk' — a compiled function with its parameter metadata
+//   'ClassData'     — a class definition (methods, fields, constructor, statics)
+//   'Value'         — the runtime value type (everything the VM can hold)
 //
 // ## Instruction encoding
 //
-//   Instructions are stored in a flat `Array<Int>` as consecutive pairs:
+//   Instructions are stored in a flat 'Array<Int>' as consecutive pairs:
 //
 //     [ op₀, arg₀,  op₁, arg₁,  op₂, arg₂, … ]
 //
-//   `IP` (instruction pointer) always points to an `op`. Reading one instruction
+//   'IP' (instruction pointer) always points to an 'op'. Reading one instruction
 //   consumes two slots.  Ops that take no argument still reserve a slot (arg = 0).
 //
-//   The `instructions:Array<Instruction>` array is a parallel debug view — it
+//   The 'instructions:Array<Instruction>' array is a parallel debug view — it
 //   holds the decoded form including source line/col, used by the disassembler
-//   and error formatter. The VM runs from the flat `code` array for speed.
+//   and error formatter. The VM runs from the flat 'code' array for speed.
 //
 // ## CALL_MEMBER encoding
 //
-//   The `arg` of `CALL_MEMBER` packs two 16-bit values into one Int:
+//   The 'arg' of 'CALL_MEMBER' packs two 16-bit values into one Int:
 //
 //     arg = (fieldIndex << 16) | argc
 //
-//   Where `fieldIndex` indexes into `Chunk.strings` and `argc` is the argument
+//   Where 'fieldIndex' indexes into 'Chunk.strings' and 'argc' is the argument
 //   count. Both halves must fit in 16 bits (max 65535 string pool entries and
 //   max 65535 arguments — both are effectively unlimited in practice).
 
@@ -272,7 +272,10 @@ class Chunk {
 @:structInit
 class FunctionChunk {
 	public var name:String;
+	/** Total number of parameters (required + optional with defaults). */
 	public var paramCount:Int;
+	/** Number of required parameters (those without default values). */
+	@:optional public var requiredParamCount:Int = 0;
 	public var paramNames:Array<String>;
 	public var chunk:Chunk;
 	public var isLambda:Bool;
@@ -296,11 +299,11 @@ typedef ClassData = {
 /**
  * Every runtime value the VM can hold.
  *
- * - Numbers are always `Float` internally — no separate Int type at runtime.
+ * - Numbers are always 'Float' internally — no separate Int type at runtime.
  * - Strings, Arrays, and Dicts are reference types (mutations are visible everywhere).
- * - `VNativeObject` wraps any Haxe object for reflection-based field access.
- * - `VIterator` is a lightweight array-iteration cursor; never exposed to scripts directly.
- * - `VEnumValue` holds a tagged enum variant with optional payload values.
+ * - 'VNativeObject' wraps any Haxe object for reflection-based field access.
+ * - 'VIterator' is a lightweight array-iteration cursor; never exposed to scripts directly.
+ * - 'VEnumValue' holds a tagged enum variant with optional payload values.
  */
 enum Value {
 	VNumber(v:Float);

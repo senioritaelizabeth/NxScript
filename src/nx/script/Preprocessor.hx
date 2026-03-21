@@ -2,7 +2,7 @@ package nx.script;
 
 using StringTools;
 
-// Preprocessor.hx — Compile-time `#if` / `#elseif` / `#else` / `#end` directives
+// Preprocessor.hx — Compile-time '#if' / '#elseif' / '#else' / '#end' directives
 //
 // Runs on raw source text **before** tokenization, stripping inactive blocks
 // and replacing them with blank lines so that line numbers in error messages
@@ -22,17 +22,17 @@ using StringTools;
 //     trace("other")
 //   #end
 //
-// Conditions support `&&`, `||`, `!`, and parentheses:
+// Conditions support '&&', '||', '!', and parentheses:
 //
 //   #if cpp && !windows
 //   #if (debug || trace_enabled) && !release
 //
-// ## Built-in defines  (populated automatically by `Interpreter`)
+// ## Built-in defines  (populated automatically by 'Interpreter')
 //
-//   **Build type:**  `debug`  `release`
-//   **Targets:**     `cpp`  `hl`  `neko`  `js`  `java`  `cs`  `python`
-//                   `lua`  `eval`  `interp`
-//   **Platforms:**   `windows`  `linux`  `mac`  `android`  `ios`
+//   **Build type:**  'debug'  'release'
+//   **Targets:**     'cpp'  'hl'  'neko'  'js'  'java'  'cs'  'python'
+//                   'lua'  'eval'  'interp'
+//   **Platforms:**   'windows'  'linux'  'mac'  'android'  'ios'
 //
 // Host code can inject custom defines before running a script:
 //
@@ -43,7 +43,7 @@ using StringTools;
 //   var processed = Preprocessor.run(source, interp.defines);
 
 /**
- * Compile-time `#if` / `#elseif` / `#else` / `#end` directive processor.
+ * Compile-time '#if' / '#elseif' / '#else' / '#end' directive processor.
  *
  * Runs on raw source text **before** tokenization. Inactive blocks are replaced
  * with blank lines so that line numbers in error messages remain accurate.
@@ -62,16 +62,16 @@ using StringTools;
  *       trace("other")
  *     #end
  *
- * Conditions support `&&`, `||`, `!`, and balanced parentheses:
+ * Conditions support '&&', '||', '!', and balanced parentheses:
  *
  *     #if cpp && !windows
  *     #if (debug || trace_enabled) && !release
  *
- * ### Built-in defines (set automatically by `Interpreter`)
+ * ### Built-in defines (set automatically by 'Interpreter')
  *
- * Build type: `debug` `release`
- * Targets: `cpp` `hl` `neko` `js` `java` `cs` `python` `lua` `eval` `interp`
- * Platforms: `windows` `linux` `mac` `android` `ios`
+ * Build type: 'debug' 'release'
+ * Targets: 'cpp' 'hl' 'neko' 'js' 'java' 'cs' 'python' 'lua' 'eval' 'interp'
+ * Platforms: 'windows' 'linux' 'mac' 'android' 'ios'
  *
  * Custom defines can be injected before running a script:
  *
@@ -84,11 +84,11 @@ class Preprocessor {
 	 * Inactive lines are replaced with empty lines to preserve line numbers.
 	 */
 	/**
-	 * Processes `source`, replacing inactive `#if` blocks with blank lines.
+	 * Processes 'source', replacing inactive '#if' blocks with blank lines.
 	 * Line numbers are preserved so error messages remain accurate.
 	 *
 	 * @param source   Raw script source text.
-	 * @param defines  Active define flags (see `defaultDefines`).
+	 * @param defines  Active define flags (see 'defaultDefines').
 	 * @return         Source with inactive blocks blanked out.
 	 */
 	public static function run(source:String, defines:Map<String, Bool>):String {
@@ -104,6 +104,8 @@ class Preprocessor {
 				var consumed = processBlock(lines, i, defines, result);
 				i += consumed;
 			} else {
+				// Non-directive lines (including # comment lines) pass through unchanged.
+				// The Tokenizer treats any line starting with # as a line comment and skips it.
 				result.push(lines[i]);
 				i++;
 			}
@@ -113,8 +115,8 @@ class Preprocessor {
 	}
 
 	/**
-	 * Process a #if block starting at `startLine`.
-	 * Appends processed lines to `result`.
+	 * Process a #if block starting at 'startLine'.
+	 * Appends processed lines to 'result'.
 	 * Returns the number of lines consumed (including #end).
 	 */
 	static function processBlock(
@@ -254,7 +256,7 @@ class Preprocessor {
 		return defines.exists(name) && defines.get(name);
 	}
 
-	/** Find the index of `op` at depth 0 in `expr`. Returns -1 if not found. */
+	/** Find the index of 'op' at depth 0 in 'expr'. Returns -1 if not found. */
 	static function findOuterOp(expr:String, op:String):Int {
 		var depth = 0;
 		var i = 0;
@@ -275,7 +277,7 @@ class Preprocessor {
 	 */
 	/**
 	 * Builds the default defines map for the current Haxe compile target.
-	 * Called once by `Interpreter` on construction.
+	 * Called once by 'Interpreter' on construction.
 	 * The host can add custom defines before running a script:
 	 *
 	 *     interp.defines.set("myFeature", true);

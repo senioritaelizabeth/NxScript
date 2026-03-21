@@ -6,7 +6,7 @@ import sys.io.Process;
 import prismcli.CLI;
 using StringTools;
 /**
- * NxScript CLI — entry point for `haxelib run nxscript`
+ * NxScript CLI — entry point for 'haxelib run nxscript'
  *
  * Usage:
  *   haxelib run nxscript run <file.nx>     — execute a script file

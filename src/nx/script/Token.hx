@@ -2,8 +2,8 @@ package nx.script;
 
 // Token.hx — Lexical token definitions for NxScript
 //
-// Produced by `Tokenizer`, consumed by `Parser`.
-// Every token carries its source position (line, col) via `TokenPos`.
+// Produced by 'Tokenizer', consumed by 'Parser'.
+// Every token carries its source position (line, col) via 'TokenPos'.
 //
 // Layout:
 //   Keyword    → reserved words (let, func, if, class, …)
@@ -16,13 +16,13 @@ package nx.script;
 /**
  * Lexical token definitions for NxScript.
  *
- * Produced by `Tokenizer`, consumed by `Parser`.
- * Every token carries its source position via `TokenPos`.
+ * Produced by 'Tokenizer', consumed by 'Parser'.
+ * Every token carries its source position via 'TokenPos'.
  *
- * - `Keyword`  — reserved words (`let`, `func`, `if`, `class`, …)
- * - `Operator` — all operators (arithmetic, logical, bitwise, assignment)
- * - `Token`    — the full token union (literals, keywords, operators, delimiters)
- * - `TokenPos` — a `Token` tagged with `(line, col)` from the source file
+ * - 'Keyword'  — reserved words ('let', 'func', 'if', 'class', …)
+ * - 'Operator' — all operators (arithmetic, logical, bitwise, assignment)
+ * - 'Token'    — the full token union (literals, keywords, operators, delimiters)
+ * - 'TokenPos' — a 'Token' tagged with '(line, col)' from the source file
  */
 enum Keyword {
 	KLet;       // let  — block-scoped variable
@@ -117,11 +117,11 @@ enum Operator {
  * The full set of tokens the tokenizer can produce.
  *
  * Notes:
- *   - `TBool` is emitted directly for `true`/`false` (not as `TKeyword(KTrue)`).
- *   - `TNull` is emitted directly for `null`.
- *   - `TNewLine` is significant: the parser uses it as an implicit statement
+ *   - 'TBool' is emitted directly for 'true'/'false' (not as 'TKeyword(KTrue)').
+ *   - 'TNull' is emitted directly for 'null'.
+ *   - 'TNewLine' is significant: the parser uses it as an implicit statement
  *     terminator in non-strict mode.
- *   - `TEOF` marks the end of the token stream; the parser stops there.
+ *   - 'TEOF' marks the end of the token stream; the parser stops there.
  */
 enum Token {
 	// Literals

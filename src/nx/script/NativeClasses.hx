@@ -6,53 +6,53 @@ import nx.script.Bytecode.FunctionChunk;
 
 // NativeClasses.hx — Built-in class stubs for the VM class registry
 //
-// Registers the built-in type hierarchy into `VM.classes` and `VM.globals`:
+// Registers the built-in type hierarchy into 'VM.classes' and 'VM.globals':
 //
 //   Object → String, Number (→ Int, Float), Bool, Array, Function
 //
 // ## Why these are empty shells
 //
-//   NxScript's primitive method dispatch (`"hi".upper()`, `arr.push(x)`,
-//   `(3.5).floor()`) lives entirely in `VM.getStringMethod`,
-//   `VM.getArrayMethod`, and `VM.getNumberMethod` — not in `ClassData.methods`.
+//   NxScript's primitive method dispatch ('"hi".upper()', 'arr.push(x)',
+//   '(3.5).floor()') lives entirely in 'VM.getStringMethod',
+//   'VM.getArrayMethod', and 'VM.getNumberMethod' — not in 'ClassData.methods'.
 //
 //   These stubs exist so that:
-//     1. `import String` / `import Array` resolve to something in globals.
-//     2. Script classes can write `class Foo extends Array { … }` and the
+//     1. 'import String' / 'import Array' resolve to something in globals.
+//     2. Script classes can write 'class Foo extends Array { … }' and the
 //        inheritance chain finds a ClassData to walk up to.
-//     3. `x is String`, `x is Array` type checks have a registered class to
+//     3. 'x is String', 'x is Array' type checks have a registered class to
 //        match against.
 //
 // ## Known limitation
 //
-//   Because `String`, `Array`, etc. have empty `methods` maps, inheriting from
-//   them and calling a primitive method via `super.push(x)` will silently
-//   return `null` instead of dispatching to the VM's built-in implementation.
+//   Because 'String', 'Array', etc. have empty 'methods' maps, inheriting from
+//   them and calling a primitive method via 'super.push(x)' will silently
+//   return 'null' instead of dispatching to the VM's built-in implementation.
 //   This is a known gap — a proper fix requires bridging ClassData methods
-//   to the VM's `getArrayMethod` / `getStringMethod` dispatchers.
+//   to the VM's 'getArrayMethod' / 'getStringMethod' dispatchers.
 
 /**
- * Registers the built-in type hierarchy into `VM.classes` and `VM.globals`.
+ * Registers the built-in type hierarchy into 'VM.classes' and 'VM.globals'.
  *
  *     Object → String, Number (→ Int, Float), Bool, Array, Function
  *
  * ### Why these are empty shells
  *
- * NxScript's primitive method dispatch (`"hi".upper()`, `arr.push(x)`,
- * `(3.5).floor()`) lives in `VM.getStringMethod`, `VM.getArrayMethod`, and
- * `VM.getNumberMethod` — not in `ClassData.methods`.
+ * NxScript's primitive method dispatch ('"hi".upper()', 'arr.push(x)',
+ * '(3.5).floor()') lives in 'VM.getStringMethod', 'VM.getArrayMethod', and
+ * 'VM.getNumberMethod' — not in 'ClassData.methods'.
  *
  * These stubs exist so that:
- * - `import String` / `import Array` resolve to something in globals.
- * - Script classes can write `class Foo extends Array { … }` and the
- *   inheritance chain finds a `ClassData` to walk.
- * - `x is String`, `x is Array` type checks have a registered class to match.
+ * - 'import String' / 'import Array' resolve to something in globals.
+ * - Script classes can write 'class Foo extends Array { … }' and the
+ *   inheritance chain finds a 'ClassData' to walk.
+ * - 'x is String', 'x is Array' type checks have a registered class to match.
  *
  * ### Known limitation
  *
- * Because `String`, `Array`, etc. have empty `methods` maps, calling a primitive
- * method via `super.push(x)` from a subclass will silently return `null`. A proper
- * fix requires bridging `ClassData.methods` to the VM's built-in dispatchers.
+ * Because 'String', 'Array', etc. have empty 'methods' maps, calling a primitive
+ * method via 'super.push(x)' from a subclass will silently return 'null'. A proper
+ * fix requires bridging 'ClassData.methods' to the VM's built-in dispatchers.
  */
 class NativeClasses {
 	/**

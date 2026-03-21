@@ -2,9 +2,9 @@ package nx.script;
 
 // SyntaxRules.hx — Configurable syntax dialect for NxScript
 //
-// `SyntaxRules` lets you tune which language features are available and how
-// identifiers map to keywords or operators. Pass an instance to `Interpreter`,
-// `Tokenizer`, or `Parser` to override the defaults.
+// 'SyntaxRules' lets you tune which language features are available and how
+// identifiers map to keywords or operators. Pass an instance to 'Interpreter',
+// 'Tokenizer', or 'Parser' to override the defaults.
 //
 // ## Quick start
 //
@@ -24,12 +24,12 @@ package nx.script;
 // The boolean flags below describe the *intended* feature set. Most are
 // enforced at the **tokenizer level** (operatorAliases / keywordAliases),
 // but enforcement in the parser is still a work-in-progress — flags that
-// are not yet checked are marked `// TODO: enforce`.
+// are not yet checked are marked '// TODO: enforce'.
 //
 // ## Keyword aliases
 //
 // Map an alternative spelling to the canonical keyword string used in the
-// `Tokenizer.keywords` table. Applied during identifier resolution.
+// 'Tokenizer.keywords' table. Applied during identifier resolution.
 //
 //   Example:  rules.addKeywordAlias("elif", "elseif")
 //             rules.addKeywordAlias("def",  "func")
@@ -42,12 +42,12 @@ package nx.script;
 //             rules.addOperatorAlias("and", "&&")
 //             rules.addOperatorAlias("or",  "||")
 //
-// Recognized operator strings: `!`  `&&`  `||`  `==`  `!=`  `??`
+// Recognized operator strings: '!'  '&&'  '||'  '=='  '!='  '??'
 
 /**
  * Configures the syntax dialect for a NxScript interpreter instance.
  *
- * Pass to `Interpreter`, `Tokenizer`, or `Parser` to control which language
+ * Pass to 'Interpreter', 'Tokenizer', or 'Parser' to control which language
  * features are active and how identifiers map to keywords or operators.
  *
  * ### Quick start
@@ -67,36 +67,36 @@ package nx.script;
  * ### Keyword aliases
  *
  * Maps an alternative spelling to the canonical keyword string used in
- * `Tokenizer.keywords`. Example: `addKeywordAlias("elif", "elseif")`.
+ * 'Tokenizer.keywords'. Example: 'addKeywordAlias("elif", "elseif")'.
  *
  * ### Operator aliases
  *
  * Maps an identifier to an operator string. Supported targets:
- * `"!"` `"&&"` `"||"` `"=="` `"!="` `"??"`
- * Example: `addOperatorAlias("not", "!")`.
+ * '"!"' '"&&"' '"||"' '"=="' '"!="' '"??"'
+ * Example: 'addOperatorAlias("not", "!")'.
  */
 class SyntaxRules {
 
 
-	/** Allow truthy coercion in conditions: `if (x)` instead of `if (x != null)` */
+	/** Allow truthy coercion in conditions: 'if (x)' instead of 'if (x != null)' */
 	public var truthyCoercion:Bool = true;
 
-	/** Allow null coalescing operator: `x ?? y` */
+	/** Allow null coalescing operator: 'x ?? y' */
 	public var nullCoalescing:Bool = true;
 
-	/** Allow optional chaining: `obj?.field` */
+	/** Allow optional chaining: 'obj?.field' */
 	public var optionalChain:Bool = true;
 
-	/** Allow backtick template strings: `` `hello ${name}` `` */
+	/** Allow backtick template strings: `' 'hello ${name}' '` */
 	public var templateStrings:Bool = true;
 
-	/** Allow shorthand arrow lambdas: `x => x * 2`  and  `(a, b) -> a + b` */
+	/** Allow shorthand arrow lambdas: 'x => x * 2'  and  '(a, b) -> a + b' */
 	public var arrowFunctions:Bool = true;
 
 	/** Allow trailing commas in arrays, dicts, and function parameters */
 	public var trailingCommas:Bool = true;
 
-	/** Allow braceless control-flow bodies: `if (x) return 1` */
+	/** Allow braceless control-flow bodies: 'if (x) return 1' */
 	public var bracelessBodies:Bool = true;
 
 	/** Require explicit semicolons to terminate statements */
@@ -106,38 +106,38 @@ class SyntaxRules {
 	/**
 	 * Keyword aliases — maps an alternative spelling to the canonical keyword.
 	 *
-	 * The canonical keyword must be a key in `Tokenizer.keywords`
-	 * (e.g. `"elseif"`, `"func"`, `"match"`).
+	 * The canonical keyword must be a key in 'Tokenizer.keywords'
+	 * (e.g. '"elseif"', '"func"', '"match"').
 	 */
 	public var keywordAliases:Map<String, String> = new Map();
 
 	/**
 	 * Operator aliases — maps an identifier to an operator string.
 	 *
-	 * Supported targets: `"!"` `"&&"` `"||"` `"=="` `"!="` `"??"`
+	 * Supported targets: '"!"' '"&&"' '"||"' '"=="' '"!="' '"??"'
 	 */
 	public var operatorAliases:Map<String, String> = new Map();
 
 
-	/** Creates a new empty `SyntaxRules` instance with all features enabled and no aliases. */
+	/** Creates a new empty 'SyntaxRules' instance with all features enabled and no aliases. */
 	public function new() {}
 
-	/** Fluent alias registration. Returns `this` for chaining. */
+	/** Fluent alias registration. Returns 'this' for chaining. */
 	/**
-	 * Registers a keyword alias. Returns `this` for fluent chaining.
+	 * Registers a keyword alias. Returns 'this' for fluent chaining.
 	 * @param alias      The alternative spelling to recognise in source.
-	 * @param canonical  The canonical keyword string (must exist in `Tokenizer.keywords`).
+	 * @param canonical  The canonical keyword string (must exist in 'Tokenizer.keywords').
 	 */
 	public function addKeywordAlias(alias:String, canonical:String):SyntaxRules {
 		keywordAliases.set(alias, canonical);
 		return this;
 	}
 
-	/** Fluent operator-alias registration. Returns `this` for chaining. */
+	/** Fluent operator-alias registration. Returns 'this' for chaining. */
 	/**
-	 * Registers an operator alias. Returns `this` for fluent chaining.
+	 * Registers an operator alias. Returns 'this' for fluent chaining.
 	 * @param alias  Identifier to treat as an operator.
-	 * @param op     Target operator string: `"!"`, `"&&"`, `"||"`, `"=="`, `"!="`, `"??"`.
+	 * @param op     Target operator string: '"!"', '"&&"', '"||"', '"=="', '"!="', '"??"'.
 	 */
 	public function addOperatorAlias(alias:String, op:String):SyntaxRules {
 		operatorAliases.set(alias, op);
@@ -148,10 +148,10 @@ class SyntaxRules {
 	/**
 	 * **NxScript** — the default dialect.
 	 *
-	 * All features enabled. Accepts both `func` and `function`, plus the
-	 * common `elif`/`elsif` spellings for `elseif`.
+	 * All features enabled. Accepts both 'func' and 'function', plus the
+	 * common 'elif'/'elsif' spellings for 'elseif'.
 	 */
-	/** Default NxScript dialect — all features on. Accepts `func`/`function`, `elif`/`elsif`/`elseif`, and `switch` as an alias for `match`. */
+	/** Default NxScript dialect — all features on. Accepts 'func'/'function', 'elif'/'elsif'/'elseif', and 'switch' as an alias for 'match'. */
 	public static function nxScript():SyntaxRules {
 		var r = new SyntaxRules();
 		r.addKeywordAlias("function", "func");
@@ -164,9 +164,9 @@ class SyntaxRules {
 	/**
 	 * **Haxe-style** — leans toward Haxe conventions.
 	 *
-	 * Uses `function` as the primary keyword; `func` is still accepted.
+	 * Uses 'function' as the primary keyword; 'func' is still accepted.
 	 */
-	/** Haxe-style dialect. Uses `function` as the primary keyword; `func` is still accepted. */
+	/** Haxe-style dialect. Uses 'function' as the primary keyword; 'func' is still accepted. */
 	public static function haxeStyle():SyntaxRules {
 		var r = new SyntaxRules();
 		r.addKeywordAlias("func", "function");
@@ -202,14 +202,14 @@ class SyntaxRules {
 	/**
 	 * **Python-ish** — keyword operators and Python-flavoured spellings.
 	 *
-	 * - `not` → `!`  |  `and` → `&&`  |  `or` → `||`
-	 * - `def` → `func`  |  `elif` → `elseif`
-	 * - `None`, `True`, `False` map to `null`, `true`, `false`
-	 * - `pass` is accepted as a no-op (maps to `null`)
+	 * - 'not' → '!'  |  'and' → '&&'  |  'or' → '||'
+	 * - 'def' → 'func'  |  'elif' → 'elseif'
+	 * - 'None', 'True', 'False' map to 'null', 'true', 'false'
+	 * - 'pass' is accepted as a no-op (maps to 'null')
 	 */
 	/**
 	 * Python-flavoured dialect.
-	 * `not`/`and`/`or` as operators; `def`/`elif`/`None`/`True`/`False`/`pass` as keywords.
+	 * 'not'/'and'/'or' as operators; 'def'/'elif'/'None'/'True'/'False'/'pass' as keywords.
 	 */
 	public static function pythonish():SyntaxRules {
 		var r = new SyntaxRules();

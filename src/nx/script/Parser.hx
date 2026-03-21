@@ -302,12 +302,17 @@ class Parser {
 				break;
 			var name = expectIdentifier();
 			var type = null;
+			var defaultValue = null;
 
 			if (match(TColon)) {
 				type = parseTypeHint();
 			}
+			// Default parameter value:  func foo(x = 10)
+			if (match(TOperator(OAssign))) {
+				defaultValue = parseExpression();
+			}
 
-			params.push({name: name, type: type});
+			params.push({name: name, type: type, defaultValue: defaultValue});
 			skipNewlines();
 		} while (match(TComma));
 
@@ -508,7 +513,7 @@ class Parser {
 	// Expression parsing with operator precedence
 	function parseExpression():Expr {
 		var expr = parseAssignment();
-		// `is` type check: expr is TypeName
+		// 'is' type check: expr is TypeName
 		if (check(TKeyword(KIs))) {
 			advance();
 			var typeName = expectIdentifier();
@@ -595,11 +600,11 @@ class Parser {
 	}
 
 	function parseLogicalAnd():Expr {
-		var left = parseBitwiseOr();
+		var left = parseEquality();
 
 		while (match(TOperator(OAnd))) {
 			var op = OAnd;
-			var right = parseBitwiseOr();
+			var right = parseEquality();
 			left = EBinary(op, left, right);
 		}
 
@@ -631,11 +636,11 @@ class Parser {
 	}
 
 	function parseBitwiseAnd():Expr {
-		var left = parseEquality();
+		var left = parseShift();
 
 		while (match(TOperator(OBitAnd))) {
 			var op = OBitAnd;
-			var right = parseEquality();
+			var right = parseShift();
 			left = EBinary(op, left, right);
 		}
 
@@ -661,7 +666,7 @@ class Parser {
 	}
 
 	function parseComparison():Expr {
-		var left = parseShift();
+		var left = parseBitwiseOr();
 
 		while (true) {
 			var token = peek().token;
@@ -673,7 +678,7 @@ class Parser {
 				default: break;
 			}
 
-			var right = parseShift();
+			var right = parseBitwiseOr();
 			left = EBinary(op, left, right);
 		}
 
@@ -872,9 +877,9 @@ class Parser {
 
 			case TIdentifier(name):
 				advance();
-				// Shorthand lambda: x => expr  or  x => { stmts }
-				if (check(TFatArrow)) {
-					advance(); // consume =>
+				// Shorthand lambda: x => expr  |  x => { }  |  x -> expr  |  x -> { }
+				if (check(TFatArrow) || check(TArrow)) {
+					advance(); // consume => or ->
 					if (check(TLeftBrace)) {
 						advance();
 						var body = parseBlockBody();
@@ -1003,8 +1008,9 @@ class Parser {
 	}
 
 	function parseMatch():Stmt {
-		advance(); // consume 'match'
+		advance(); // consume 'match' or 'switch'
 		var subject = parseExpression();
+		skipSeparators(); // allow newline between expression and opening brace
 		expect(TLeftBrace, "Expected '{' after match expression");
 		skipSeparators();
 
@@ -1268,7 +1274,7 @@ class Parser {
 
 	/**
 	 * Like expectIdentifier but also accepts keywords as field names.
-	 * Needed for member access like `d.enum`, `obj.new`, `x.type`, etc.
+	 * Needed for member access like 'd.enum', 'obj.new', 'x.type', etc.
 	 * In JavaScript/Haxe, any word can be a field name even if it's reserved.
 	 */
 	function expectMemberName():String {

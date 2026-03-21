@@ -29,35 +29,35 @@ using StringTools;
 //
 // ## Pipeline
 //
-//   1. `preprocessImports`  — resolves `import` statements and `#if` directives
-//   2. `Tokenizer`           — source text → `Array<TokenPos>`
-//   3. `Parser`              — tokens → AST (`Array<StmtWithPos>`)
-//   4. `Compiler`            — AST → `Chunk` (bytecode)
-//   5. `VM.execute`          — runs the bytecode
+//   1. 'preprocessImports'  — resolves 'import' statements and '#if' directives
+//   2. 'Tokenizer'           — source text → 'Array<TokenPos>'
+//   3. 'Parser'              — tokens → AST ('Array<StmtWithPos>')
+//   4. 'Compiler'            — AST → 'Chunk' (bytecode)
+//   5. 'VM.execute'          — runs the bytecode
 //
 // ## Key APIs
 //
-//   `run(source)`          — compile and execute a script string
-//   `runFile(path)`        — load and run a `.nx` file
-//   `set(name, value)`     — expose a Haxe value to scripts (auto-converted)
-//   `get(name)`            — read a script global as a `Value`
-//   `register(name, n, fn)`— expose a native Haxe function
-//   `call(name, args)`     — call a script function from Haxe
-//   `createInstance(name)` — instantiate a script class, returns a Dynamic proxy
-//   `reset_context()`      — clear script state while preserving statics/classes
+//   'run(source)'          — compile and execute a script string
+//   'runFile(path)'        — load and run a '.nx' file
+//   'set(name, value)'     — expose a Haxe value to scripts (auto-converted)
+//   'get(name)'            — read a script global as a 'Value'
+//   'register(name, n, fn)'— expose a native Haxe function
+//   'call(name, args)'     — call a script function from Haxe
+//   'createInstance(name)' — instantiate a script class, returns a Dynamic proxy
+//   'reset_context()'      — clear script state while preserving statics/classes
 //
 // ## Deprecated aliases
 //
-//   `variables` → `globals`  |  `methods` → `natives`
-//   `setVar`    → `set`      |  `getVar`  → `get`
-//   `hasVar`    → `has`      |  `registerFunction` → `register`
-//   `callFunction` → `call`  |  `serializeChunk` → `serialize`
+//   'variables' → 'globals'  |  'methods' → 'natives'
+//   'setVar'    → 'set'      |  'getVar'  → 'get'
+//   'hasVar'    → 'has'      |  'registerFunction' → 'register'
+//   'callFunction' → 'call'  |  'serializeChunk' → 'serialize'
 //
 // ## Performance helpers
 //
-//   `resolveCallable(name)` — cache a script function for repeated calls
-//   `nativeForEach(items, fn)` — loop in Haxe, call script fn per item
-//   `wrapNative(obj, fields)` — shadow-map proxy for hot native objects
+//   'resolveCallable(name)' — cache a script function for repeated calls
+//   'nativeForEach(items, fn)' — loop in Haxe, call script fn per item
+//   'wrapNative(obj, fields)' — shadow-map proxy for hot native objects
 
 /**
  * High-level front-end for NxScript — the main entry point for embedding scripts.
@@ -73,30 +73,30 @@ using StringTools;
  *
  * ### Pipeline
  *
- * 1. `preprocessImports` — resolves `import` statements and `#if` directives
- * 2. `Tokenizer`          — source text → `Array<TokenPos>`
- * 3. `Parser`             — tokens → AST (`Array<StmtWithPos>`)
- * 4. `Compiler`           — AST → `Chunk` (bytecode)
- * 5. `VM.execute`         — runs the bytecode
+ * 1. 'preprocessImports' — resolves 'import' statements and '#if' directives
+ * 2. 'Tokenizer'          — source text → 'Array<TokenPos>'
+ * 3. 'Parser'             — tokens → AST ('Array<StmtWithPos>')
+ * 4. 'Compiler'           — AST → 'Chunk' (bytecode)
+ * 5. 'VM.execute'         — runs the bytecode
  *
  * ### Key APIs
  *
  * | Method | Description |
  * |--------|-------------|
- * | `run(source)` | Compile and execute a script string |
- * | `runFile(path)` | Load and run a `.nx` file |
- * | `set(name, value)` | Expose a Haxe value to scripts |
- * | `get(name)` | Read a script global as `Value` |
- * | `register(name, n, fn)` | Expose a native Haxe function |
- * | `call(name, args)` | Call a script function from Haxe |
- * | `createInstance(name)` | Instantiate a script class |
- * | `reset_context()` | Clear script state, preserve statics/classes |
+ * | 'run(source)' | Compile and execute a script string |
+ * | 'runFile(path)' | Load and run a '.nx' file |
+ * | 'set(name, value)' | Expose a Haxe value to scripts |
+ * | 'get(name)' | Read a script global as 'Value' |
+ * | 'register(name, n, fn)' | Expose a native Haxe function |
+ * | 'call(name, args)' | Call a script function from Haxe |
+ * | 'createInstance(name)' | Instantiate a script class |
+ * | 'reset_context()' | Clear script state, preserve statics/classes |
  *
  * ### Deprecated aliases
  *
- * `variables`→`globals`, `methods`→`natives`, `setVar`→`set`, `getVar`→`get`,
- * `hasVar`→`has`, `registerFunction`→`register`, `callFunction`→`call`,
- * `serializeChunk`→`serialize`, `deserializeChunk`→`deserialize`.
+ * 'variables'→'globals', 'methods'→'natives', 'setVar'→'set', 'getVar'→'get',
+ * 'hasVar'→'has', 'registerFunction'→'register', 'callFunction'→'call',
+ * 'serializeChunk'→'serialize', 'deserializeChunk'→'deserialize'.
  */
 class Interpreter {
 	static var EMPTY_ARGS:Array<Value> = [];
@@ -825,7 +825,7 @@ class Interpreter {
 
 
 	/**
-	 * Returns `true` if the source starts with a `"use strict"` pragma.
+	 * Returns 'true' if the source starts with a '"use strict"' pragma.
 	 * Supports both quote styles, with or without trailing semicolon.
 	 */
 	function isStrictPragma(source:String):Bool {
@@ -932,7 +932,7 @@ class Interpreter {
 	 *
 	 * After reset:
 	 *  - All regular (non-static) globals are cleared
-	 *  - Static globals (declared with `static var`) are preserved with their current values
+	 *  - Static globals (declared with 'static var') are preserved with their current values
 	 *  - All class definitions are preserved (re-injected into new VM globals)
 	 *  - Static fields on classes are preserved (they live in ClassData, not globals)
 	 *  - Natives registered via interp.register() are re-registered
@@ -1038,7 +1038,7 @@ class Interpreter {
 
 	/**
 	 * Run source code and return result as Haxe Dynamic (auto-converted)
-	 * Makes testing easier: `runDynamic("1 + 2") == 3`
+	 * Makes testing easier: 'runDynamic("1 + 2") == 3'
 	 */
 	public function runDynamic(source:String, ?scriptName:String = "script"):Dynamic {
 
@@ -1196,7 +1196,7 @@ class Interpreter {
 	 * Create a type-safe instance of a script class
 	 * 
 	 * Usage with Interface for IDE Support:
-	 * ```haxe
+	 * '''haxe
 	 * interface MyCat {
 	 *     var meow:Bool;
 	 *     var name:String;
@@ -1217,7 +1217,7 @@ class Interpreter {
 	 * cat.meow = false;
 	 * cat.name = "Fluffy";
 	 * cat.__syncToScript__();  // Sync changes back to script
-	 * ```
+	 * '''
 	 * 
 	 * Note: In Haxe interpreter mode (--interp), use Dynamic for method calls
 	 * to avoid runtime type verification issues. For field access, you can use
@@ -1246,10 +1246,10 @@ class Interpreter {
 	 * Create a strongly-typed instance using an interface (better IDE support)
 	 * 
 	 * Usage:
-	 * ```haxe
+	 * '''haxe
 	 * var cat = interp.typed(MyCat, "MyCat");
 	 * // Now 'cat' has full autocomplete and type safety!
-	 * ```
+	 * '''
 	 * 
 	 * Note: This is a compile-time only helper. At runtime it's the same as createInstance.
 	 */

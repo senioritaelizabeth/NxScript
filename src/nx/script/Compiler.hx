@@ -12,7 +12,7 @@ import nx.script.Token;
  * with extra overhead. Yes, there is a difference. The benchmarks said so.
  *
  * Module-level code (outside any func) has no slot system — globals only.
- * Try to use module-level `var` inside a function and you'll get a STORE_VAR. Intentional.
+ * Try to use module-level 'var' inside a function and you'll get a STORE_VAR. Intentional.
  */
 class Compiler {
 	/** The instruction stream we're building. One Chunk per compilation. */
@@ -837,7 +837,7 @@ class Compiler {
 						emit(Op.SET_INDEX);
 
 					default:
-						throw "Invalid assignment target";
+						throw 'Invalid assignment target at line $currentLine, col $currentCol';
 				}
 		}
 	}
@@ -1296,6 +1296,22 @@ class Compiler {
 			globalConstMask: globalConstMask
 		};
 
+		// Emit default-value guards for parameters that have defaults.
+		// Pattern per param:  if (LOAD_LOCAL slot == null) { STORE_LOCAL slot = defaultExpr }
+		for (p in params) {
+			if (p.defaultValue != null) {
+				var slot = localSlots.get(p.name);
+				// if (param == null) param = defaultExpr
+				emitWithArg(Op.LOAD_LOCAL, slot);
+				var jumpSkip = emitJump(Op.JUMP_IF_NOT_NULL); // skip if already provided
+				emit(Op.POP);
+				compileExpression(p.defaultValue);
+				emitWithArg(Op.STORE_LOCAL, slot);
+				emit(Op.POP);
+				patchJump(jumpSkip);
+			}
+		}
+
 		for (stmt in body) {
 			compileStatement(stmt);
 		}
@@ -1309,9 +1325,15 @@ class Compiler {
 		for (varName in localSlots.keys())
 			localNames[localSlots.get(varName)] = varName;
 
+		// paramCount = number of *required* arguments (those without defaults).
+		// The VM allows callers to pass fewer args up to paramCount; extras default to VNull.
+		var requiredCount = 0;
+		for (p in params) if (p.defaultValue == null) requiredCount++;
+
 		var funcChunk:FunctionChunk = {
 			name: name,
-			paramCount: params.length,
+			paramCount: params.length,     // total slots (required + optional)
+			requiredParamCount: requiredCount,
 			paramNames: [for (p in params) p.name],
 			chunk: chunk,
 			isLambda: isLambda,

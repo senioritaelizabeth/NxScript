@@ -1,5 +1,5 @@
 -cp src
--main nx.script.Main
 -lib nxscript
 -lib prismcli
---interp
+# --run nx.script.Main
+-D NXDEBUG

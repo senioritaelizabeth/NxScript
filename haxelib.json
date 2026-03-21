@@ -1,16 +1,17 @@
 {
   "name": "nxscript",
-  "url": "https://github.com/Kitsumizy/NxScript",
+  "url": "https://github.com/senioritaelizabeth/Nz-Dialogue",
   "license": "MIT",
   "tags": [
     "scripting",
     "bytecode",
+    "dialogue",
     "vm",
     "compiler",
     "interpreter"
   ],
   "description": "NxScript - A comprehensive suite of scripting languages for Haxe: Nx-Script (bytecode VM), Nz-Dialogue (interactive conversations), and Nz-Cinematic (cutscenes)",
-  "version": "0.5.9",
+  "version": "0.5.8",
   "classPath": "src/",
   "releasenote": "Complete rewrite: Added Nz-Script bytecode language with hex opcodes, stack-based VM, functions, lambdas, arrays, dictionaries, and full debugging support",
   "contributors": [

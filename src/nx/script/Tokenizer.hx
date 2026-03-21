@@ -6,63 +6,63 @@ using StringTools;
 
 // Tokenizer.hx — Source text → flat token list
 //
-// Converts raw NxScript source into an `Array<TokenPos>` ready for the Parser.
+// Converts raw NxScript source into an 'Array<TokenPos>' ready for the Parser.
 //
 // ## Character handling
-//   - Line endings are normalized to `\n` in the constructor (Windows-safe).
+//   - Line endings are normalized to '\\n' in the constructor (Windows-safe).
 //   - Whitespace (spaces, tabs) is skipped between tokens; newlines are kept
-//     as `TNewLine` tokens because the parser uses them as implicit semicolons.
-//   - `#` and `//` start line comments; `/* */` are block comments.
-//     Comments are discarded — no `TComment` token is emitted.
+//     as 'TNewLine' tokens because the parser uses them as implicit semicolons.
+//   - '#' and '//' start line comments; '/* */' are block comments.
+//     Comments are discarded — no 'TComment' token is emitted.
 //
 // ## String interpolation
-//   Regular strings (`"` / `'`) and template strings (backtick) both support
-//   `$ident` and `${expr}` interpolation. Interpolated strings are expanded
-//   inline into a sequence of `TString + TOperator(OAdd) + …` tokens so the
+//   Regular strings ('"' / ''') and template strings (backtick) both support
+//   '$ident' and '${expr}' interpolation. Interpolated strings are expanded
+//   inline into a sequence of 'TString + TOperator(OAdd) + …' tokens so the
 //   parser sees plain concatenation — no special AST node required.
 //
 // ## Pending-token queue
-//   String interpolation can produce multiple tokens per `nextToken()` call.
-//   They are buffered in `pendingTokens` and drained before the next real
+//   String interpolation can produce multiple tokens per 'nextToken()' call.
+//   They are buffered in 'pendingTokens' and drained before the next real
 //   character is consumed.
 //
 // ## Number literals
-//   Decimal, hex (`0x`), binary (`0b`), octal (`0o`), and scientific notation
-//   are all supported. Underscores are allowed as digit separators (`1_000`).
+//   Decimal, hex ('0x'), binary ('0b'), octal ('0o'), and scientific notation
+//   are all supported. Underscores are allowed as digit separators ('1_000').
 //
 // ## Keyword resolution
-//   After reading an identifier, the tokenizer checks the `keywords` map.
-//   `SyntaxRules.keywordAliases` can remap identifiers before the lookup
-//   (e.g. `"elif"` → `"elseif"`).
-//   `SyntaxRules.operatorAliases` can turn identifiers into operators
-//   (e.g. `"not"` → `!`).
+//   After reading an identifier, the tokenizer checks the 'keywords' map.
+//   'SyntaxRules.keywordAliases' can remap identifiers before the lookup
+//   (e.g. '"elif"' → '"elseif"').
+//   'SyntaxRules.operatorAliases' can turn identifiers into operators
+//   (e.g. '"not"' → '!').
 
 /**
- * Converts raw NxScript source text into a flat `Array<TokenPos>` for the `Parser`.
+ * Converts raw NxScript source text into a flat 'Array<TokenPos>' for the 'Parser'.
  *
  * ### Character handling
- * Line endings are normalized to `
-` in the constructor. Whitespace is skipped;
- * newlines are kept as `TNewLine` because the parser uses them as implicit semicolons.
- * Comments (`#`, `//`) are discarded — no token is emitted.
+ * Line endings are normalized to '
+' in the constructor. Whitespace is skipped;
+ * newlines are kept as 'TNewLine' because the parser uses them as implicit semicolons.
+ * Comments ('#', '//') are discarded — no token is emitted.
  *
  * ### String interpolation
- * Both regular strings (`"` / `'`) and template strings (`` ` ``) support
- * `$ident` and `${expr}` interpolation. Interpolated strings expand inline into
- * `TString + TOperator(OAdd) + …` sequences — no special AST node required.
+ * Both regular strings ('"' / "'") and template strings (backtick) support
+ * '$ident' and '${expr}' interpolation. Interpolated strings expand inline into
+ * 'TString + TOperator(OAdd) + ...' sequences — no special AST node required.
  *
  * ### Pending-token queue
- * String interpolation can produce multiple tokens per `nextToken()` call.
- * They buffer in `pendingTokens` and drain before the next source character is read.
+ * String interpolation can produce multiple tokens per 'nextToken()' call.
+ * They buffer in 'pendingTokens' and drain before the next source character is read.
  *
  * ### Number literals
- * Decimal, hex (`0x`), binary (`0b`), octal (`0o`), and scientific notation.
- * Underscores are allowed as digit separators: `1_000_000`.
+ * Decimal, hex ('0x'), binary ('0b'), octal ('0o'), and scientific notation.
+ * Underscores are allowed as digit separators: '1_000_000'.
  *
  * ### Keyword and operator aliases
- * After reading an identifier, `SyntaxRules.keywordAliases` can remap it before
- * the keyword table lookup. `SyntaxRules.operatorAliases` can turn identifiers
- * into operator tokens (e.g. `"not"` → `TOperator(ONot)`).
+ * After reading an identifier, 'SyntaxRules.keywordAliases' can remap it before
+ * the keyword table lookup. 'SyntaxRules.operatorAliases' can turn identifiers
+ * into operator tokens (e.g. 'not' -> 'TOperator(ONot)').
  */
 class Tokenizer {
 	var input:String;
@@ -75,7 +75,7 @@ class Tokenizer {
 	static var keywords = [
 		"let" => KLet,
 		"var" => KVar,
-		"meowvar" => KVar,    // secret alias — do not remove
+		"meowvar" => KVar,    // 🐱 secret alias — do not remove
 		"const" => KConst,
 		"func" => KFunc,
 		"fn" => KFn,
@@ -117,7 +117,7 @@ class Tokenizer {
 	public var rules:SyntaxRules = null;
 
 	/**
-	 * @param input  Raw source text. Line endings are normalised to `\n`.
+	 * @param input  Raw source text. Line endings are normalised to '\\n'.
 	 * @param rules  Optional syntax dialect (keyword/operator aliases). Defaults to no aliases.
 	 */
 	public function new(input:String, ?rules:SyntaxRules) {
@@ -127,7 +127,7 @@ class Tokenizer {
 
 	/**
 	 * Tokenizes the full input and returns the flat token list.
-	 * The last element is always `TEOF`.
+	 * The last element is always 'TEOF'.
 	 */
 	public function tokenize():Array<TokenPos> {
 		var tokens:Array<TokenPos> = [];
@@ -389,7 +389,7 @@ class Tokenizer {
 	}
 
 	/**
-	 * Template strings: `Hello ${name}, you are ${age} years old!`
+	 * Template strings: 'Hello ${name}, you are ${age} years old!'
 	 * Expands into a sequence of tokens representing string concatenation.
 	 * e.g.:  TString("Hello ") TOperator(OAdd) TIdentifier("name") TOperator(OAdd) TString(", you are ") ...
 	 */
